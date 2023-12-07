@@ -1,4 +1,3 @@
-"""
 README: Biologically Plausible Neural Network Package
 
 This package is a biologically plausible neural network implementation that extends PyTorch. It provides several biologically plausible neurons and layers for building neural networks with a focus on biological realism.
@@ -28,7 +27,3 @@ model.add_layer(bioplnn.AdaptiveExponentialLayer())
 For more details and examples, please refer to the documentation and examples provided with the package.
 
 Note: This package is intended for research and educational purposes and may not be optimized for production use.
-
-"""
-
-# Your code here...
