@@ -1,0 +1,1958 @@
+[I 2023-12-07 15:42:09.688 ServerApp] Package jupyterlab took 0.0000s to import
+[I 2023-12-07 15:42:09.821 ServerApp] Package jupyter_lsp took 0.1319s to import
+[W 2023-12-07 15:42:09.821 ServerApp] A `_jupyter_server_extension_points` function was not found in jupyter_lsp. Instead, a `_jupyter_server_extension_paths` function was found and will be used for now. This function name will be deprecated in future releases of Jupyter Server.
+[I 2023-12-07 15:42:09.871 ServerApp] Package jupyter_server_terminals took 0.0502s to import
+[I 2023-12-07 15:42:09.872 ServerApp] Package notebook took 0.0000s to import
+[I 2023-12-07 15:42:09.876 ServerApp] Package notebook_shim took 0.0000s to import
+[W 2023-12-07 15:42:09.876 ServerApp] A `_jupyter_server_extension_points` function was not found in notebook_shim. Instead, a `_jupyter_server_extension_paths` function was found and will be used for now. This function name will be deprecated in future releases of Jupyter Server.
+[I 2023-12-07 15:42:09.878 ServerApp] jupyter_lsp | extension was successfully linked.
+[I 2023-12-07 15:42:09.883 ServerApp] jupyter_server_terminals | extension was successfully linked.
+[W 2023-12-07 15:42:09.886 LabApp] 'allow_origin' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[W 2023-12-07 15:42:09.887 LabApp] 'port_retries' has moved from NotebookApp to ServerApp. This config will be passed to ServerApp. Be sure to update your config before our next release.
+[I 2023-12-07 15:42:09.889 ServerApp] jupyterlab | extension was successfully linked.
+[I 2023-12-07 15:42:09.895 ServerApp] notebook | extension was successfully linked.
+[I 2023-12-07 15:42:11.227 ServerApp] notebook_shim | extension was successfully linked.
+[I 2023-12-07 15:42:11.404 ServerApp] notebook_shim | extension was successfully loaded.
+[I 2023-12-07 15:42:11.406 ServerApp] jupyter_lsp | extension was successfully loaded.
+[I 2023-12-07 15:42:11.408 ServerApp] jupyter_server_terminals | extension was successfully loaded.
+[I 2023-12-07 15:42:11.472 LabApp] JupyterLab extension loaded from /om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyterlab
+[I 2023-12-07 15:42:11.472 LabApp] JupyterLab application directory is /rdma/vast-rdma/user/valmiki/miniconda/envs/pytorch-3.10/share/jupyter/lab
+[I 2023-12-07 15:42:11.474 LabApp] Extension Manager is 'pypi'.
+[I 2023-12-07 15:42:11.476 ServerApp] jupyterlab | extension was successfully loaded.
+[I 2023-12-07 15:42:11.485 ServerApp] notebook | extension was successfully loaded.
+[I 2023-12-07 15:42:11.485 ServerApp] Serving notebooks from local directory: /net/vast-storage.ib.cluster/scratch/user/valmiki/bioplnn
+[I 2023-12-07 15:42:11.485 ServerApp] Jupyter Server 2.10.1 is running at:
+[I 2023-12-07 15:42:11.485 ServerApp] http://node106:2141/lab?token=d544005264a9e76e8a159614323c99f8c4a0fda47f2b5037
+[I 2023-12-07 15:42:11.485 ServerApp]     http://127.0.0.1:2141/lab?token=d544005264a9e76e8a159614323c99f8c4a0fda47f2b5037
+[I 2023-12-07 15:42:11.485 ServerApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 2023-12-07 15:42:11.506 ServerApp] 
+    
+    To access the server, open this file in a browser:
+        file:///rdma/vast-rdma/vast-home/valmiki/.local/share/jupyter/runtime/jpserver-492848-open.html
+    Or copy and paste one of these URLs:
+        http://node106:2141/lab?token=d544005264a9e76e8a159614323c99f8c4a0fda47f2b5037
+        http://127.0.0.1:2141/lab?token=d544005264a9e76e8a159614323c99f8c4a0fda47f2b5037
+[I 2023-12-07 15:42:11.649 ServerApp] Skipped non-installed server(s): bash-language-server, dockerfile-language-server-nodejs, javascript-typescript-langserver, jedi-language-server, julia-language-server, pyright, python-language-server, python-lsp-server, r-languageserver, sql-language-server, texlab, typescript-language-server, unified-language-server, vscode-css-languageserver-bin, vscode-html-languageserver-bin, vscode-json-languageserver-bin, yaml-language-server
+[W 2023-12-07 15:57:12.796 ServerApp] 404 GET /hub/api (@172.16.20.254) 37.40ms referer=None
+[I 2023-12-07 15:57:12.822 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.37ms
+[W 2023-12-07 15:57:13.831 ServerApp] 404 GET /hub/api (@172.16.20.254) 0.86ms referer=None
+[I 2023-12-07 15:57:13.852 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.28ms
+[I 2023-12-07 15:57:32.423 ServerApp] Kernel started: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 15:57:33.764 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[W 2023-12-07 15:57:34.023 ServerApp] 404 GET /hub/api (@172.16.20.254) 3.45ms referer=None
+[W 2023-12-07 15:57:34.024 ServerApp] 404 GET /hub/api (@172.16.20.254) 3.92ms referer=None
+[W 2023-12-07 15:57:34.024 ServerApp] 404 GET /hub/api (@172.16.20.254) 4.38ms referer=None
+[W 2023-12-07 15:57:34.025 ServerApp] 404 GET /hub/api (@172.16.20.254) 4.82ms referer=None
+[W 2023-12-07 15:57:34.026 ServerApp] 404 GET /hub/api (@172.16.20.254) 5.27ms referer=None
+[W 2023-12-07 15:57:34.026 ServerApp] 404 GET /hub/api (@172.16.20.254) 5.72ms referer=None
+[W 2023-12-07 15:57:34.027 ServerApp] 404 GET /hub/api (@172.16.20.254) 6.15ms referer=None
+[W 2023-12-07 15:57:34.028 ServerApp] 404 GET /hub/api (@172.16.20.254) 6.60ms referer=None
+[W 2023-12-07 15:57:34.028 ServerApp] 404 GET /hub/api (@172.16.20.254) 7.02ms referer=None
+[W 2023-12-07 15:57:34.029 ServerApp] 404 GET /hub/api (@172.16.20.254) 7.45ms referer=None
+[I 2023-12-07 15:57:34.041 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.47ms
+[I 2023-12-07 15:57:34.042 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.49ms
+[I 2023-12-07 15:57:34.044 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.37ms
+[I 2023-12-07 15:57:34.044 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.50ms
+[I 2023-12-07 15:57:34.044 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.57ms
+[I 2023-12-07 15:57:34.045 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.64ms
+[I 2023-12-07 15:57:34.045 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.37ms
+[I 2023-12-07 15:57:34.046 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.44ms
+[I 2023-12-07 15:57:34.049 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.26ms
+[I 2023-12-07 15:57:34.050 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.55ms
+[W 2023-12-07 15:57:34.061 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.072 ServerApp] 403 GET /api/kernelspecs?1701982654044 (@172.16.20.254) 11.46ms referer=None
+[W 2023-12-07 15:57:34.072 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.073 ServerApp] 403 GET /api/kernels?1701982654044 (@172.16.20.254) 12.00ms referer=None
+[W 2023-12-07 15:57:34.073 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.073 ServerApp] 403 GET /api/kernels?1701982654045 (@172.16.20.254) 12.51ms referer=None
+[W 2023-12-07 15:57:34.073 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.074 ServerApp] 403 GET /api/sessions?1701982654045 (@172.16.20.254) 12.90ms referer=None
+[W 2023-12-07 15:57:34.083 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.083 ServerApp] 403 GET /api/kernelspecs?1701982654054 (@172.16.20.254) 6.93ms referer=None
+[W 2023-12-07 15:57:34.083 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.084 ServerApp] 403 GET /api/kernels?1701982654054 (@172.16.20.254) 7.21ms referer=None
+[W 2023-12-07 15:57:34.084 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.084 ServerApp] 403 GET /api/kernelspecs?1701982654055 (@172.16.20.254) 7.43ms referer=None
+[W 2023-12-07 15:57:34.084 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.084 ServerApp] 403 GET /api/kernels?1701982654056 (@172.16.20.254) 7.64ms referer=None
+[W 2023-12-07 15:57:34.085 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.085 ServerApp] 403 GET /api/kernelspecs?1701982654056 (@172.16.20.254) 7.83ms referer=None
+[W 2023-12-07 15:57:34.085 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.085 ServerApp] 403 GET /api/kernels?1701982654056 (@172.16.20.254) 7.99ms referer=None
+[W 2023-12-07 15:57:34.085 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.086 ServerApp] 403 GET /api/kernelspecs?1701982654057 (@172.16.20.254) 8.10ms referer=None
+[W 2023-12-07 15:57:34.086 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.086 ServerApp] 403 GET /api/kernels?1701982654057 (@172.16.20.254) 8.31ms referer=None
+[W 2023-12-07 15:57:34.086 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.087 ServerApp] 403 GET /api/kernels?1701982654058 (@172.16.20.254) 8.45ms referer=None
+[W 2023-12-07 15:57:34.087 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.087 ServerApp] 403 GET /api/sessions?1701982654059 (@172.16.20.254) 8.58ms referer=None
+[W 2023-12-07 15:57:34.087 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.087 ServerApp] 403 GET /api/kernels?1701982654059 (@172.16.20.254) 8.68ms referer=None
+[W 2023-12-07 15:57:34.088 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.088 ServerApp] 403 GET /api/sessions?1701982654060 (@172.16.20.254) 8.78ms referer=None
+[W 2023-12-07 15:57:34.088 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.088 ServerApp] 403 GET /api/kernels?1701982654060 (@172.16.20.254) 8.89ms referer=None
+[W 2023-12-07 15:57:34.088 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.089 ServerApp] 403 GET /api/sessions?1701982654060 (@172.16.20.254) 8.99ms referer=None
+[W 2023-12-07 15:57:34.089 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.089 ServerApp] 403 GET /api/kernels?1701982654061 (@172.16.20.254) 9.17ms referer=None
+[W 2023-12-07 15:57:34.089 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.090 ServerApp] 403 GET /api/sessions?1701982654061 (@172.16.20.254) 9.25ms referer=None
+[W 2023-12-07 15:57:34.090 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.090 ServerApp] 403 GET /api/kernels?1701982654062 (@172.16.20.254) 9.37ms referer=None
+[W 2023-12-07 15:57:34.090 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.090 ServerApp] 403 GET /api/sessions?1701982654062 (@172.16.20.254) 9.47ms referer=None
+[W 2023-12-07 15:57:34.090 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.091 ServerApp] 403 GET /api/kernelspecs?1701982654062 (@172.16.20.254) 9.47ms referer=None
+[W 2023-12-07 15:57:34.091 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.091 ServerApp] 403 GET /api/kernels?1701982654063 (@172.16.20.254) 9.58ms referer=None
+[W 2023-12-07 15:57:34.091 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.092 ServerApp] 403 GET /api/kernels?1701982654065 (@172.16.20.254) 9.85ms referer=None
+[W 2023-12-07 15:57:34.092 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.092 ServerApp] 403 GET /api/sessions?1701982654066 (@172.16.20.254) 9.97ms referer=None
+[W 2023-12-07 15:57:34.096 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.096 ServerApp] 403 GET /api/kernelspecs?1701982654046 (@172.16.20.254) 3.74ms referer=None
+[W 2023-12-07 15:57:34.096 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.096 ServerApp] 403 GET /api/kernels?1701982654046 (@172.16.20.254) 4.02ms referer=None
+[W 2023-12-07 15:57:34.097 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.097 ServerApp] 403 GET /api/kernels?1701982654047 (@172.16.20.254) 4.29ms referer=None
+[W 2023-12-07 15:57:34.097 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.097 ServerApp] 403 GET /api/sessions?1701982654047 (@172.16.20.254) 4.49ms referer=None
+[W 2023-12-07 15:57:34.097 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.098 ServerApp] 403 GET /api/kernelspecs?1701982654048 (@172.16.20.254) 4.73ms referer=None
+[W 2023-12-07 15:57:34.098 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.098 ServerApp] 403 GET /api/kernels?1701982654048 (@172.16.20.254) 4.94ms referer=None
+[W 2023-12-07 15:57:34.098 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.099 ServerApp] 403 GET /api/kernelspecs?1701982654049 (@172.16.20.254) 5.21ms referer=None
+[W 2023-12-07 15:57:34.099 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.099 ServerApp] 403 GET /api/kernels?1701982654049 (@172.16.20.254) 5.42ms referer=None
+[W 2023-12-07 15:57:34.099 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.099 ServerApp] 403 GET /api/kernels?1701982654050 (@172.16.20.254) 5.66ms referer=None
+[W 2023-12-07 15:57:34.100 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.100 ServerApp] 403 GET /api/sessions?1701982654051 (@172.16.20.254) 5.84ms referer=None
+[W 2023-12-07 15:57:34.100 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.100 ServerApp] 403 GET /api/kernels?1701982654051 (@172.16.20.254) 6.06ms referer=None
+[W 2023-12-07 15:57:34.100 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.101 ServerApp] 403 GET /api/sessions?1701982654051 (@172.16.20.254) 6.27ms referer=None
+[W 2023-12-07 15:57:34.101 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.101 ServerApp] 403 GET /api/kernelspecs?1701982654052 (@172.16.20.254) 6.49ms referer=None
+[W 2023-12-07 15:57:34.101 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.101 ServerApp] 403 GET /api/kernels?1701982654053 (@172.16.20.254) 6.71ms referer=None
+[W 2023-12-07 15:57:34.104 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.104 ServerApp] 403 GET /api/kernelspecs?1701982654073 (@172.16.20.254) 2.26ms referer=None
+[W 2023-12-07 15:57:34.104 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.104 ServerApp] 403 GET /api/kernelspecs?1701982654083 (@172.16.20.254) 2.43ms referer=None
+[W 2023-12-07 15:57:34.105 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.105 ServerApp] 403 GET /api/kernelspecs?1701982654085 (@172.16.20.254) 2.62ms referer=None
+[W 2023-12-07 15:57:34.105 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.105 ServerApp] 403 GET /api/kernelspecs?1701982654086 (@172.16.20.254) 2.83ms referer=None
+[W 2023-12-07 15:57:34.105 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.106 ServerApp] 403 GET /api/kernelspecs?1701982654087 (@172.16.20.254) 3.02ms referer=None
+[W 2023-12-07 15:57:34.106 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.106 ServerApp] 403 GET /api/kernelspecs?1701982654088 (@172.16.20.254) 3.21ms referer=None
+[W 2023-12-07 15:57:34.106 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.106 ServerApp] 403 GET /api/sessions?1701982654088 (@172.16.20.254) 3.46ms referer=None
+[W 2023-12-07 15:57:34.108 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.108 ServerApp] 403 GET /api/kernelspecs?1701982654093 (@172.16.20.254) 0.81ms referer=None
+[W 2023-12-07 15:57:34.110 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.111 ServerApp] 403 GET /api/kernelspecs?1701982654096 (@172.16.20.254) 0.50ms referer=None
+[W 2023-12-07 15:57:34.113 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.113 ServerApp] 403 GET /api/kernelspecs?1701982654099 (@172.16.20.254) 0.48ms referer=None
+[W 2023-12-07 15:57:34.114 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 15:57:34.114 ServerApp] 403 GET /api/kernelspecs?1701982654102 (@172.16.20.254) 0.46ms referer=None
+[I 2023-12-07 15:58:35.277 ServerApp] Kernel interrupted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 15:58:46.677 ServerApp] Kernel restarted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 15:58:46.694 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:642f6095-389b-48fe-b13a-86130d5b3b6b
+[I 2023-12-07 15:58:46.711 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[I 2023-12-07 15:58:46.711 ServerApp] Restoring connection for 9d58bb91-8a67-40ed-b128-700897a1bbb6:642f6095-389b-48fe-b13a-86130d5b3b6b
+[I 2023-12-07 16:00:00.361 ServerApp] Kernel restarted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 16:00:00.374 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:642f6095-389b-48fe-b13a-86130d5b3b6b
+[I 2023-12-07 16:00:00.388 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[I 2023-12-07 16:00:00.388 ServerApp] Restoring connection for 9d58bb91-8a67-40ed-b128-700897a1bbb6:642f6095-389b-48fe-b13a-86130d5b3b6b
+[W 2023-12-07 16:12:00.388 ServerApp] WebSocket ping timeout after 119961 ms.
+[I 2023-12-07 16:12:05.393 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:642f6095-389b-48fe-b13a-86130d5b3b6b
+[I 2023-12-07 16:37:57.306 ServerApp] Kernel interrupted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 16:38:05.642 ServerApp] Kernel interrupted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 16:38:14.388 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[W 2023-12-07 16:38:14.509 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.513 ServerApp] 403 GET /api/kernelspecs?1701985094469 (@172.16.20.254) 6.59ms referer=None
+[W 2023-12-07 16:38:14.514 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.514 ServerApp] 403 GET /api/kernels?1701985094469 (@172.16.20.254) 7.15ms referer=None
+[W 2023-12-07 16:38:14.514 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.514 ServerApp] 403 GET /api/kernelspecs?1701985094471 (@172.16.20.254) 7.44ms referer=None
+[W 2023-12-07 16:38:14.517 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.517 ServerApp] 403 GET /api/sessions?1701985094486 (@172.16.20.254) 2.51ms referer=None
+[W 2023-12-07 16:38:14.517 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.518 ServerApp] 403 GET /api/kernels?1701985094486 (@172.16.20.254) 2.69ms referer=None
+[W 2023-12-07 16:38:14.518 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.518 ServerApp] 403 GET /api/sessions?1701985094487 (@172.16.20.254) 2.88ms referer=None
+[W 2023-12-07 16:38:14.518 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.518 ServerApp] 403 GET /api/kernels?1701985094487 (@172.16.20.254) 3.08ms referer=None
+[W 2023-12-07 16:38:14.519 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.519 ServerApp] 403 GET /api/sessions?1701985094488 (@172.16.20.254) 3.27ms referer=None
+[W 2023-12-07 16:38:14.519 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.519 ServerApp] 403 GET /api/kernels?1701985094488 (@172.16.20.254) 3.46ms referer=None
+[W 2023-12-07 16:38:14.519 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.520 ServerApp] 403 GET /api/sessions?1701985094488 (@172.16.20.254) 3.65ms referer=None
+[W 2023-12-07 16:38:14.520 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.520 ServerApp] 403 GET /api/kernels?1701985094489 (@172.16.20.254) 3.82ms referer=None
+[W 2023-12-07 16:38:14.520 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.520 ServerApp] 403 GET /api/sessions?1701985094490 (@172.16.20.254) 4.01ms referer=None
+[W 2023-12-07 16:38:14.520 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.521 ServerApp] 403 GET /api/kernels?1701985094490 (@172.16.20.254) 4.19ms referer=None
+[W 2023-12-07 16:38:14.524 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.524 ServerApp] 403 GET /api/kernels?1701985094471 (@172.16.20.254) 2.71ms referer=None
+[W 2023-12-07 16:38:14.524 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.525 ServerApp] 403 GET /api/kernelspecs?1701985094471 (@172.16.20.254) 2.99ms referer=None
+[W 2023-12-07 16:38:14.525 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.525 ServerApp] 403 GET /api/kernels?1701985094472 (@172.16.20.254) 3.25ms referer=None
+[W 2023-12-07 16:38:14.525 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.525 ServerApp] 403 GET /api/kernelspecs?1701985094473 (@172.16.20.254) 3.54ms referer=None
+[W 2023-12-07 16:38:14.525 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.526 ServerApp] 403 GET /api/kernels?1701985094473 (@172.16.20.254) 3.80ms referer=None
+[W 2023-12-07 16:38:14.526 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.526 ServerApp] 403 GET /api/kernelspecs?1701985094474 (@172.16.20.254) 4.07ms referer=None
+[W 2023-12-07 16:38:14.526 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.527 ServerApp] 403 GET /api/kernels?1701985094474 (@172.16.20.254) 4.32ms referer=None
+[W 2023-12-07 16:38:14.527 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.527 ServerApp] 403 GET /api/sessions?1701985094490 (@172.16.20.254) 4.52ms referer=None
+[W 2023-12-07 16:38:14.532 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.532 ServerApp] 403 GET /api/kernelspecs?1701985094475 (@172.16.20.254) 4.25ms referer=None
+[W 2023-12-07 16:38:14.533 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.533 ServerApp] 403 GET /api/kernels?1701985094475 (@172.16.20.254) 4.58ms referer=None
+[W 2023-12-07 16:38:14.533 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.534 ServerApp] 403 GET /api/kernelspecs?1701985094475 (@172.16.20.254) 4.95ms referer=None
+[W 2023-12-07 16:38:14.534 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.534 ServerApp] 403 GET /api/kernels?1701985094476 (@172.16.20.254) 5.29ms referer=None
+[W 2023-12-07 16:38:14.534 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.535 ServerApp] 403 GET /api/kernelspecs?1701985094476 (@172.16.20.254) 5.67ms referer=None
+[W 2023-12-07 16:38:14.535 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.535 ServerApp] 403 GET /api/kernels?1701985094477 (@172.16.20.254) 6.04ms referer=None
+[W 2023-12-07 16:38:14.535 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.536 ServerApp] 403 GET /api/kernelspecs?1701985094477 (@172.16.20.254) 6.35ms referer=None
+[W 2023-12-07 16:38:14.536 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.536 ServerApp] 403 GET /api/kernels?1701985094477 (@172.16.20.254) 6.64ms referer=None
+[W 2023-12-07 16:38:14.539 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.540 ServerApp] 403 GET /api/kernels?1701985094482 (@172.16.20.254) 9.48ms referer=None
+[W 2023-12-07 16:38:14.540 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.540 ServerApp] 403 GET /api/sessions?1701985094483 (@172.16.20.254) 9.79ms referer=None
+[W 2023-12-07 16:38:14.540 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.541 ServerApp] 403 GET /api/kernels?1701985094483 (@172.16.20.254) 10.05ms referer=None
+[W 2023-12-07 16:38:14.541 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.541 ServerApp] 403 GET /api/sessions?1701985094483 (@172.16.20.254) 10.33ms referer=None
+[W 2023-12-07 16:38:14.541 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.542 ServerApp] 403 GET /api/kernels?1701985094484 (@172.16.20.254) 10.62ms referer=None
+[W 2023-12-07 16:38:14.542 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.542 ServerApp] 403 GET /api/sessions?1701985094485 (@172.16.20.254) 10.95ms referer=None
+[W 2023-12-07 16:38:14.542 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.542 ServerApp] 403 GET /api/kernels?1701985094486 (@172.16.20.254) 11.27ms referer=None
+[W 2023-12-07 16:38:14.545 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.545 ServerApp] 403 GET /api/kernelspecs?1701985094503 (@172.16.20.254) 2.72ms referer=None
+[W 2023-12-07 16:38:14.547 ServerApp] 404 GET /hub/api (@172.16.20.254) 3.96ms referer=None
+[W 2023-12-07 16:38:14.547 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.547 ServerApp] 403 GET /api/kernelspecs?1701985094505 (@172.16.20.254) 4.20ms referer=None
+[W 2023-12-07 16:38:14.548 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.548 ServerApp] 403 GET /api/kernelspecs?1701985094508 (@172.16.20.254) 4.44ms referer=None
+[W 2023-12-07 16:38:14.548 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.548 ServerApp] 403 GET /api/kernelspecs?1701985094509 (@172.16.20.254) 4.67ms referer=None
+[W 2023-12-07 16:38:14.549 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.549 ServerApp] 403 GET /api/kernelspecs?1701985094509 (@172.16.20.254) 4.89ms referer=None
+[W 2023-12-07 16:38:14.549 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.549 ServerApp] 403 GET /api/kernelspecs?1701985094510 (@172.16.20.254) 5.09ms referer=None
+[W 2023-12-07 16:38:14.550 ServerApp] 404 GET /hub/api (@172.16.20.254) 5.48ms referer=None
+[W 2023-12-07 16:38:14.556 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.556 ServerApp] 403 GET /api/kernelspecs?1701985094514 (@172.16.20.254) 4.35ms referer=None
+[W 2023-12-07 16:38:14.557 ServerApp] 404 GET /hub/api (@172.16.20.254) 4.71ms referer=None
+[W 2023-12-07 16:38:14.557 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.558 ServerApp] 403 GET /api/kernelspecs?1701985094515 (@172.16.20.254) 5.03ms referer=None
+[W 2023-12-07 16:38:14.558 ServerApp] 404 GET /hub/api (@172.16.20.254) 5.45ms referer=None
+[W 2023-12-07 16:38:14.559 ServerApp] 404 GET /hub/api (@172.16.20.254) 5.80ms referer=None
+[W 2023-12-07 16:38:14.559 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.559 ServerApp] 403 GET /api/kernelspecs?1701985094519 (@172.16.20.254) 6.05ms referer=None
+[W 2023-12-07 16:38:14.566 ServerApp] 404 GET /hub/api (@172.16.20.254) 11.75ms referer=None
+[W 2023-12-07 16:38:14.567 ServerApp] 404 GET /hub/api (@172.16.20.254) 12.22ms referer=None
+[W 2023-12-07 16:38:14.567 ServerApp] 404 GET /hub/api (@172.16.20.254) 12.65ms referer=None
+[W 2023-12-07 16:38:14.568 ServerApp] 404 GET /hub/api (@172.16.20.254) 13.13ms referer=None
+[I 2023-12-07 16:38:14.569 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.54ms
+[I 2023-12-07 16:38:14.573 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.38ms
+[I 2023-12-07 16:38:14.574 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.30ms
+[I 2023-12-07 16:38:14.585 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.45ms
+[I 2023-12-07 16:38:14.586 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.51ms
+[I 2023-12-07 16:38:14.587 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.37ms
+[I 2023-12-07 16:38:14.587 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.44ms
+[I 2023-12-07 16:38:14.592 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.37ms
+[I 2023-12-07 16:38:14.592 JupyterNotebookApp] 302 GET /tree? (@172.16.20.254) 0.48ms
+[W 2023-12-07 16:38:14.593 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.593 ServerApp] 403 GET /api/kernelspecs?1701985094566 (@172.16.20.254) 0.72ms referer=None
+[W 2023-12-07 16:38:14.593 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.594 ServerApp] 403 GET /api/kernels?1701985094567 (@172.16.20.254) 1.05ms referer=None
+[W 2023-12-07 16:38:14.595 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.595 ServerApp] 403 GET /api/kernelspecs?1701985094567 (@172.16.20.254) 0.77ms referer=None
+[W 2023-12-07 16:38:14.595 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.596 ServerApp] 403 GET /api/kernels?1701985094569 (@172.16.20.254) 1.10ms referer=None
+[W 2023-12-07 16:38:14.600 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.601 ServerApp] 403 GET /api/sessions?1701985094573 (@172.16.20.254) 1.40ms referer=None
+[W 2023-12-07 16:38:14.601 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.601 ServerApp] 403 GET /api/kernelspecs?1701985094571 (@172.16.20.254) 1.64ms referer=None
+[W 2023-12-07 16:38:14.601 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.602 ServerApp] 403 GET /api/kernels?1701985094573 (@172.16.20.254) 1.95ms referer=None
+[W 2023-12-07 16:38:14.602 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.602 ServerApp] 403 GET /api/kernels?1701985094571 (@172.16.20.254) 2.22ms referer=None
+[W 2023-12-07 16:38:14.603 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.604 ServerApp] 403 GET /api/kernels?1701985094571 (@172.16.20.254) 1.27ms referer=None
+[W 2023-12-07 16:38:14.604 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.604 ServerApp] 403 GET /api/sessions?1701985094572 (@172.16.20.254) 1.56ms referer=None
+[W 2023-12-07 16:38:14.604 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.605 ServerApp] 403 GET /api/kernels?1701985094572 (@172.16.20.254) 1.95ms referer=None
+[W 2023-12-07 16:38:14.606 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.606 ServerApp] 403 GET /api/sessions?1701985094573 (@172.16.20.254) 1.12ms referer=None
+[W 2023-12-07 16:38:14.607 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.607 ServerApp] 403 GET /api/kernelspecs?1701985094574 (@172.16.20.254) 1.17ms referer=None
+[W 2023-12-07 16:38:14.609 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.609 ServerApp] 403 GET /api/kernels?1701985094575 (@172.16.20.254) 1.86ms referer=None
+[W 2023-12-07 16:38:14.610 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.610 ServerApp] 403 GET /api/kernelspecs?1701985094575 (@172.16.20.254) 2.10ms referer=None
+[W 2023-12-07 16:38:14.610 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.610 ServerApp] 403 GET /api/kernels?1701985094576 (@172.16.20.254) 2.38ms referer=None
+[W 2023-12-07 16:38:14.610 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.611 ServerApp] 403 GET /api/kernels?1701985094577 (@172.16.20.254) 2.72ms referer=None
+[W 2023-12-07 16:38:14.611 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.611 ServerApp] 403 GET /api/sessions?1701985094577 (@172.16.20.254) 2.99ms referer=None
+[W 2023-12-07 16:38:14.611 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.612 ServerApp] 403 GET /api/kernels?1701985094577 (@172.16.20.254) 3.28ms referer=None
+[W 2023-12-07 16:38:14.612 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.612 ServerApp] 403 GET /api/sessions?1701985094577 (@172.16.20.254) 3.71ms referer=None
+[W 2023-12-07 16:38:14.615 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.615 ServerApp] 403 GET /api/kernelspecs?1701985094581 (@172.16.20.254) 2.16ms referer=None
+[W 2023-12-07 16:38:14.615 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.616 ServerApp] 403 GET /api/kernelspecs?1701985094578 (@172.16.20.254) 2.52ms referer=None
+[W 2023-12-07 16:38:14.616 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.616 ServerApp] 403 GET /api/kernels?1701985094578 (@172.16.20.254) 2.86ms referer=None
+[W 2023-12-07 16:38:14.616 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.617 ServerApp] 403 GET /api/kernelspecs?1701985094579 (@172.16.20.254) 3.30ms referer=None
+[W 2023-12-07 16:38:14.617 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.617 ServerApp] 403 GET /api/kernels?1701985094579 (@172.16.20.254) 3.71ms referer=None
+[W 2023-12-07 16:38:14.617 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.618 ServerApp] 403 GET /api/kernels?1701985094579 (@172.16.20.254) 4.14ms referer=None
+[W 2023-12-07 16:38:14.618 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.618 ServerApp] 403 GET /api/sessions?1701985094580 (@172.16.20.254) 4.45ms referer=None
+[W 2023-12-07 16:38:14.618 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.619 ServerApp] 403 GET /api/kernels?1701985094580 (@172.16.20.254) 4.78ms referer=None
+[W 2023-12-07 16:38:14.619 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.619 ServerApp] 403 GET /api/sessions?1701985094580 (@172.16.20.254) 5.10ms referer=None
+[W 2023-12-07 16:38:14.619 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.620 ServerApp] 403 GET /api/kernels?1701985094582 (@172.16.20.254) 5.38ms referer=None
+[W 2023-12-07 16:38:14.621 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.621 ServerApp] 403 GET /api/kernelspecs?1701985094582 (@172.16.20.254) 1.41ms referer=None
+[W 2023-12-07 16:38:14.621 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.622 ServerApp] 403 GET /api/kernels?1701985094582 (@172.16.20.254) 1.68ms referer=None
+[W 2023-12-07 16:38:14.622 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.622 ServerApp] 403 GET /api/sessions?1701985094583 (@172.16.20.254) 1.95ms referer=None
+[W 2023-12-07 16:38:14.622 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.623 ServerApp] 403 GET /api/kernels?1701985094583 (@172.16.20.254) 2.27ms referer=None
+[W 2023-12-07 16:38:14.623 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.623 ServerApp] 403 GET /api/kernels?1701985094583 (@172.16.20.254) 2.58ms referer=None
+[W 2023-12-07 16:38:14.624 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.625 ServerApp] 403 GET /api/kernelspecs?1701985094592 (@172.16.20.254) 1.47ms referer=None
+[W 2023-12-07 16:38:14.625 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.625 ServerApp] 403 GET /api/kernelspecs?1701985094586 (@172.16.20.254) 1.69ms referer=None
+[W 2023-12-07 16:38:14.626 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.626 ServerApp] 403 GET /api/sessions?1701985094584 (@172.16.20.254) 2.02ms referer=None
+[W 2023-12-07 16:38:14.626 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.627 ServerApp] 403 GET /api/kernelspecs?1701985094584 (@172.16.20.254) 2.38ms referer=None
+[W 2023-12-07 16:38:14.627 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.628 ServerApp] 403 GET /api/kernelspecs?1701985094599 (@172.16.20.254) 0.65ms referer=None
+[W 2023-12-07 16:38:14.629 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.629 ServerApp] 403 GET /api/kernelspecs?1701985094602 (@172.16.20.254) 0.62ms referer=None
+[W 2023-12-07 16:38:14.631 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.631 ServerApp] 403 GET /api/kernelspecs?1701985094604 (@172.16.20.254) 0.57ms referer=None
+[W 2023-12-07 16:38:14.635 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.635 ServerApp] 403 GET /api/kernelspecs?1701985094607 (@172.16.20.254) 0.65ms referer=None
+[W 2023-12-07 16:38:14.641 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.641 ServerApp] 403 GET /api/kernelspecs?1701985094612 (@172.16.20.254) 0.58ms referer=None
+[W 2023-12-07 16:38:14.821 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.822 ServerApp] 403 GET /api/kernelspecs?1701985094778 (@172.16.20.254) 2.32ms referer=None
+[W 2023-12-07 16:38:14.825 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.825 ServerApp] 403 GET /api/kernels?1701985094779 (@172.16.20.254) 2.89ms referer=None
+[W 2023-12-07 16:38:14.826 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.826 ServerApp] 403 GET /api/kernelspecs?1701985094779 (@172.16.20.254) 3.24ms referer=None
+[W 2023-12-07 16:38:14.826 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.827 ServerApp] 403 GET /api/kernels?1701985094780 (@172.16.20.254) 3.66ms referer=None
+[W 2023-12-07 16:38:14.827 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.827 ServerApp] 403 GET /api/kernelspecs?1701985094780 (@172.16.20.254) 4.10ms referer=None
+[W 2023-12-07 16:38:14.828 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.828 ServerApp] 403 GET /api/kernels?1701985094780 (@172.16.20.254) 4.55ms referer=None
+[W 2023-12-07 16:38:14.834 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.834 ServerApp] 403 GET /api/kernelspecs?1701985094781 (@172.16.20.254) 5.65ms referer=None
+[W 2023-12-07 16:38:14.834 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.834 ServerApp] 403 GET /api/kernels?1701985094781 (@172.16.20.254) 5.93ms referer=None
+[W 2023-12-07 16:38:14.835 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.835 ServerApp] 403 GET /api/kernelspecs?1701985094782 (@172.16.20.254) 6.20ms referer=None
+[W 2023-12-07 16:38:14.835 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.835 ServerApp] 403 GET /api/kernels?1701985094782 (@172.16.20.254) 6.52ms referer=None
+[W 2023-12-07 16:38:14.835 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.836 ServerApp] 403 GET /api/kernelspecs?1701985094782 (@172.16.20.254) 6.75ms referer=None
+[W 2023-12-07 16:38:14.836 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.836 ServerApp] 403 GET /api/kernels?1701985094783 (@172.16.20.254) 7.06ms referer=None
+[W 2023-12-07 16:38:14.837 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.837 ServerApp] 403 GET /api/kernelspecs?1701985094784 (@172.16.20.254) 7.38ms referer=None
+[W 2023-12-07 16:38:14.837 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.837 ServerApp] 403 GET /api/kernels?1701985094785 (@172.16.20.254) 7.70ms referer=None
+[W 2023-12-07 16:38:14.838 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.838 ServerApp] 403 GET /api/kernelspecs?1701985094785 (@172.16.20.254) 8.09ms referer=None
+[W 2023-12-07 16:38:14.839 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.839 ServerApp] 403 GET /api/kernels?1701985094801 (@172.16.20.254) 9.22ms referer=None
+[W 2023-12-07 16:38:14.840 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.840 ServerApp] 403 GET /api/sessions?1701985094802 (@172.16.20.254) 9.42ms referer=None
+[W 2023-12-07 16:38:14.840 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.840 ServerApp] 403 GET /api/kernels?1701985094802 (@172.16.20.254) 9.62ms referer=None
+[W 2023-12-07 16:38:14.841 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.841 ServerApp] 403 GET /api/sessions?1701985094802 (@172.16.20.254) 9.91ms referer=None
+[W 2023-12-07 16:38:14.841 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.841 ServerApp] 403 GET /api/kernels?1701985094803 (@172.16.20.254) 10.22ms referer=None
+[W 2023-12-07 16:38:14.842 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.842 ServerApp] 403 GET /api/sessions?1701985094803 (@172.16.20.254) 10.47ms referer=None
+[W 2023-12-07 16:38:14.842 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.842 ServerApp] 403 GET /api/kernels?1701985094803 (@172.16.20.254) 10.76ms referer=None
+[W 2023-12-07 16:38:14.843 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.843 ServerApp] 403 GET /api/kernels?1701985094804 (@172.16.20.254) 11.01ms referer=None
+[W 2023-12-07 16:38:14.843 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.844 ServerApp] 403 GET /api/sessions?1701985094804 (@172.16.20.254) 11.35ms referer=None
+[W 2023-12-07 16:38:14.844 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.844 ServerApp] 403 GET /api/sessions?1701985094804 (@172.16.20.254) 11.52ms referer=None
+[W 2023-12-07 16:38:14.844 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.844 ServerApp] 403 GET /api/kernels?1701985094805 (@172.16.20.254) 11.78ms referer=None
+[W 2023-12-07 16:38:14.845 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.845 ServerApp] 403 GET /api/sessions?1701985094805 (@172.16.20.254) 11.98ms referer=None
+[W 2023-12-07 16:38:14.845 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.845 ServerApp] 403 GET /api/kernels?1701985094805 (@172.16.20.254) 12.28ms referer=None
+[W 2023-12-07 16:38:14.846 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.847 ServerApp] 403 GET /api/kernels?1701985094786 (@172.16.20.254) 8.71ms referer=None
+[W 2023-12-07 16:38:14.847 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.847 ServerApp] 403 GET /api/kernelspecs?1701985094786 (@172.16.20.254) 9.12ms referer=None
+[W 2023-12-07 16:38:14.848 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.848 ServerApp] 403 GET /api/kernels?1701985094786 (@172.16.20.254) 9.52ms referer=None
+[W 2023-12-07 16:38:14.857 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.857 ServerApp] 403 GET /api/sessions?1701985094806 (@172.16.20.254) 5.13ms referer=None
+[W 2023-12-07 16:38:14.857 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.858 ServerApp] 403 GET /api/kernels?1701985094806 (@172.16.20.254) 5.18ms referer=None
+[W 2023-12-07 16:38:14.858 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.858 ServerApp] 403 GET /api/sessions?1701985094806 (@172.16.20.254) 5.37ms referer=None
+[W 2023-12-07 16:38:14.858 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.859 ServerApp] 403 GET /api/kernels?1701985094806 (@172.16.20.254) 5.56ms referer=None
+[W 2023-12-07 16:38:14.859 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.859 ServerApp] 403 GET /api/sessions?1701985094807 (@172.16.20.254) 5.72ms referer=None
+[W 2023-12-07 16:38:14.861 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.861 ServerApp] 403 GET /api/kernelspecs?1701985094811 (@172.16.20.254) 6.84ms referer=None
+[W 2023-12-07 16:38:14.862 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.862 ServerApp] 403 GET /api/kernelspecs?1701985094815 (@172.16.20.254) 7.06ms referer=None
+[W 2023-12-07 16:38:14.862 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.862 ServerApp] 403 GET /api/kernelspecs?1701985094816 (@172.16.20.254) 6.98ms referer=None
+[W 2023-12-07 16:38:14.863 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.863 ServerApp] 403 GET /api/kernelspecs?1701985094822 (@172.16.20.254) 7.13ms referer=None
+[W 2023-12-07 16:38:14.863 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.864 ServerApp] 403 GET /api/kernelspecs?1701985094823 (@172.16.20.254) 7.44ms referer=None
+[W 2023-12-07 16:38:14.866 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.867 ServerApp] 403 GET /api/kernelspecs?1701985094828 (@172.16.20.254) 2.13ms referer=None
+[W 2023-12-07 16:38:14.867 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.867 ServerApp] 403 GET /api/kernelspecs?1701985094829 (@172.16.20.254) 2.29ms referer=None
+[W 2023-12-07 16:38:14.867 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.868 ServerApp] 403 GET /api/kernelspecs?1701985094829 (@172.16.20.254) 2.48ms referer=None
+[W 2023-12-07 16:38:14.868 ServerApp] wrote error: 'Forbidden'
+    Traceback (most recent call last):
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 1784, in _execute
+        result = method(*self.path_args, **self.path_kwargs)
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/tornado/web.py", line 3278, in wrapper
+        url = self.get_login_url()
+      File "/om2/user/valmiki/miniconda/envs/pytorch-3.10/lib/python3.10/site-packages/jupyter_server/base/handlers.py", line 761, in get_login_url
+        raise web.HTTPError(403)
+    tornado.web.HTTPError: HTTP 403: Forbidden
+[W 2023-12-07 16:38:14.868 ServerApp] 403 GET /api/kernelspecs?1701985094836 (@172.16.20.254) 2.65ms referer=None
+[I 2023-12-07 16:38:20.952 ServerApp] Kernel restarted: 9d58bb91-8a67-40ed-b128-700897a1bbb6
+[I 2023-12-07 16:38:20.961 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[I 2023-12-07 16:38:20.972 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[I 2023-12-07 16:38:20.972 ServerApp] Restoring connection for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[W 2023-12-07 17:16:50.973 ServerApp] WebSocket ping timeout after 119993 ms.
+[I 2023-12-07 17:16:55.976 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[I 2023-12-07 17:30:54.176 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[I 2023-12-07 17:30:54.177 ServerApp] Restoring connection for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[W 2023-12-07 17:32:24.177 ServerApp] WebSocket ping timeout after 90001 ms.
+[I 2023-12-07 17:32:29.181 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[I 2023-12-07 17:41:38.650 ServerApp] Connecting to kernel 9d58bb91-8a67-40ed-b128-700897a1bbb6.
+[I 2023-12-07 17:41:38.650 ServerApp] Restoring connection for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+[W 2023-12-07 17:43:08.653 ServerApp] WebSocket ping timeout after 90003 ms.
+[I 2023-12-07 17:43:13.656 ServerApp] Starting buffering for 9d58bb91-8a67-40ed-b128-700897a1bbb6:de835d4f-69f8-4c2e-8b22-7b040c6f02ac
+slurmstepd: error: *** JOB 33955866 ON node106 CANCELLED AT 2023-12-07T23:42:09 DUE TO TIME LIMIT ***
