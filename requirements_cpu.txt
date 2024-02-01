@@ -14,6 +14,7 @@ matplotlib
 mne
 wandb
 accelerate
+lightning
 torch-scatter 
 torch-sparse 
 -f https://data.pyg.org/whl/torch-2.0.0+cpu.html

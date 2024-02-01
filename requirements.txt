@@ -14,5 +14,6 @@ mne
 wandb
 accelerate
 torch-scatter 
-torch-sparse 
+torch-sparse
+torchsparsegradutils
 -f https://data.pyg.org/whl/torch-2.0.0+cu117.html
