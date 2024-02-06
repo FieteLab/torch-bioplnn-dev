@@ -17,6 +17,24 @@ class TopographicalCorticalSheet(nn.Module):
         batch_first=False,
         **kwargs,
     ):
+        """
+        Initialize the TopographicalCorticalSheet object.
+
+        Args:
+            sheet_size (tuple): The size of the sheet (number of rows, number of columns).
+            connectivity_std (float): The standard deviation of the connectivity weights.
+            synapses_per_neuron (int): The number of synapses per neuron.
+            bias (bool, optional): Whether to include bias or not. Defaults to True.
+            mm_function (str, optional): The sparse matrix multiplication function to use.
+                Possible values are "native", "torch_sparse", and "tsgu". Defaults to "native".
+            sparse_format (str, optional): The sparse format to use.
+                Possible values are "coo", "csr", and "torch_sparse". Defaults to "coo".
+            batch_first (bool, optional): Whether the batch dimension is the first dimension. Defaults to False.
+            **kwargs: Additional keyword arguments.
+
+        Raises:
+            ValueError: If an invalid mm_function or sparse_format is provided.
+        """
         super().__init__()
         # Save the sparse matrix multiplication function
         self.sheet_size = sheet_size
@@ -94,15 +112,45 @@ class TopographicalCorticalSheet(nn.Module):
         )
 
     def coalesce(self):
+        """
+        Coalesce the weight matrix.
+        """
         self.weight.data = self.weight.data.coalesce()
 
     def idx_1D_to_2D(self, x):
+        """
+        Convert a 1D index to a 2D index.
+
+        Args:
+            x (torch.Tensor): 1D index.
+
+        Returns:
+            torch.Tensor: 2D index.
+        """
         return torch.stack((x // self.sheet_size[1], x % self.sheet_size[1]))
 
     def idx_2D_to_1D(self, x):
+        """
+        Convert a 2D index to a 1D index.
+
+        Args:
+            x (torch.Tensor): 2D index.
+
+        Returns:
+            torch.Tensor: 1D index.
+        """
         return x[0] * self.sheet_size[1] + x[1]
 
     def forward(self, x):
+        """
+        Forward pass of the TopographicalCorticalSheet.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         # x: Dense (strided) tensor of shape (batch_size, num_neurons) if
         # batch_first, otherwise (num_neurons, batch_size)
         # assert self.weight.is_coalesced()
@@ -116,7 +164,7 @@ class TopographicalCorticalSheet(nn.Module):
             x = self.mm_function(
                 self.indices,
                 self.weight,
-                self.num_neurons,
+                self.num_neurons,  # type: ignore
                 self.num_neurons,
                 x,
             )
@@ -149,6 +197,24 @@ class TopographicalCorticalRNN(nn.Module):
         sheet_batch_first=False,
         **kwargs,
     ):
+        """
+        Initialize the TopographicalCorticalRNN object.
+
+        Args:
+            sheet_size (tuple): The size of the cortical sheet (number of rows, number of columns).
+            connectivity_std (float): The standard deviation of the connectivity weights.
+            synapses_per_neuron (int): The number of synapses per neuron.
+            num_timesteps (int): The number of timesteps for the recurrent processing.
+            pool_stride (int): The stride for the max pooling operation.
+            activation (torch.nn.Module, optional): The activation function to use. Defaults to nn.GELU.
+            sheet_bias (bool, optional): Whether to include bias in the cortical sheet. Defaults to True.
+            sheet_mm_function (str, optional): The sparse matrix multiplication function to use in the cortical sheet.
+                Possible values are "native", "torch_sparse", and "tsgu". Defaults to "native".
+            sheet_sparse_format (str, optional): The sparse format to use in the cortical sheet.
+                Possible values are "coo", "csr", and "torch_sparse". Defaults to "coo".
+            sheet_batch_first (bool, optional): Whether the batch dimension is the first dimension in the cortical sheet. Defaults to False.
+            **kwargs: Additional keyword arguments.
+        """
         super().__init__()
         self.num_neurons = sheet_size[0] * sheet_size[1]
         self.sheet_size = sheet_size
@@ -177,6 +243,15 @@ class TopographicalCorticalRNN(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Forward pass of the TopographicalCorticalRNN.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         # x: Dense (strided) tensor of shape (batch_size, 1, 32, 32)
         batch_size = x.shape[0]
 
