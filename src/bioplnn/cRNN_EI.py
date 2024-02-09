@@ -1,92 +1,185 @@
+from typing import Union
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
 
+class LinearExc(nn.Linear):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def positive_rectifier(self, weight):
+        """
+        Applies the positive rectifier activation function to the convolutional layer weights.
+
+        Args:
+            conv (torch.nn.Conv2d): The convolutional layer.
+        Returns:
+            torch.Tensor: The rectified weights.
+        """
+        return torch.relu(weight)
+
+    def forward(self, x):
+        self.weight.data = self.positive_rectifier(self.weight.data)
+        return super().forward(x)
+
+
+class LinearInh(nn.Linear):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def non_positive_rectifier(self, weight):
+        """
+        Applies the positive rectifier activation function to the convolutional layer weights in-place.
+
+        Args:
+            conv (torch.nn.Conv2d): The convolutional layer.
+        Returns:
+            torch.Tensor: The rectified weights.
+        """
+        return -torch.relu(-weight)
+
+    def forward(self, x):
+        self.weight.data = self.non_positive_rectifier(self.weight.data)
+        return super().forward(x)
+
+
+class Conv2dExc(nn.Conv2d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def positive_rectifier(self, weight):
+        """
+        Applies the positive rectifier activation function to the convolutional layer weights in-place.
+
+        Args:
+            conv (torch.nn.Conv2d): The convolutional layer.
+        Returns:
+            torch.Tensor: The rectified weights.
+        """
+        return torch.relu(weight)
+
+    def forward(self, x):
+        self.weight.data = self.positive_rectifier(self.weight.data)
+        return super().forward(x)
+
+
+class Conv2dInh(nn.Conv2d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def non_positive_rectifier(self, weight):
+        """
+        Applies the positive rectifier activation function to the convolutional layer weights in-place.
+
+        Args:
+            conv (torch.nn.Conv2d): The convolutional layer.
+        Returns:
+            torch.Tensor: The rectified weights.
+        """
+        return -torch.relu(-weight)
+
+    def forward(self, x):
+        self.weight.data = self.non_positive_rectifier(self.weight.data)
+        return super().forward(x)
+
+
 class ConvRNNEICell(nn.Module):
     def __init__(
         self,
-        input_size,
-        input_dim,
-        exc_column_dim,
-        inh_class_dim,
-        kernel_size,
-        inhib_conv_kernel_sizes,
-        bias,
-        dtype,
-        euler=False,
-        dt=1,
+        input_size: tuple[int, int],
+        input_dim: int,
+        exc_dim: int,
+        inh_dim: int,
+        kernel_size: tuple[int, int],
+        inhib_conv_kernel_sizes: Union[list[int], tuple[int]],
+        bias: bool = True,
+        euler: bool = False,
+        dt: int = 1,
+        activation: str = "tanh",
     ):
         """
         Initialize the ConvGRU cell
-        :param input_size: (int, int)
-            Height and width of input tensor as (height, width).
-        :param input_dim: int
-            Number of channels of input tensor.
-        :param hidden_dim: int
-            Number of channels of hidden state.
-        :param kernel_size: (int, int)
-            Size of the convolutional kernel.
-        :param bias: bool
-            Whether or not to add the bias.
-        :param dtype: torch.cuda.FloatTensor or torch.FloatTensor
-            Whether or not to use cuda.
+
+        Args:
+            input_size (tuple[int, int]): Height and width of input tensor as (height, width).
+            input_dim (int): Number of channels of input tensor.
+            exc_dim (int): Number of channels of excitatory column tensor.
+            inh_dim (int): Number of channels of inhibitory class tensor.
+            kernel_size (tuple[int, int]): Size of the convolutional kernel.
+            inhib_conv_kernel_sizes (Union[list[int], tuple[int]]): Sizes of the convolutional kernels for inhibitory convolutions.
+            bias (bool): Whether or not to add the bias.
+            euler (bool, optional): Whether to use Euler updates for the cell state. Default is False.
+            dt (int, optional): Time step for Euler updates. Default is 1.
         """
         super(ConvRNNEICell, self).__init__()
         self.height, self.width = input_size
         self.padding = kernel_size[0] // 2, kernel_size[1] // 2
-        self.exc_column_dim = exc_column_dim
-        self.inh_class_dim = inh_class_dim
+        self.exc_dim = exc_dim
+        self.inh_dim = inh_dim
         self.bias = bias
-        self.dtype = dtype
         self.euler = euler
         self.dt = dt
-
-        # Learnable membrane time constants for excitatory and inhibitory cell populations
-        # self.tau_exc = nn.Parameter(torch.randn((self.exc_column_dim, self.height, self.width), requires_grad=True)).type(self.dtype).unsqueeze(0)
-        # self.tau_inh = nn.Parameter(torch.randn((self.inh_class_dim, self.height, self.width), requires_grad=True) + 0.5).type(self.dtype).unsqueeze(0)
-        self.tau_exc = (
-            nn.Parameter(torch.randn(self.exc_column_dim, requires_grad=True))
-            .type(self.dtype)
-            .unsqueeze(0)  # type: ignore
-        )
-        self.tau_inh = (
-            nn.Parameter(
-                torch.randn(self.inh_class_dim, requires_grad=True) + 0.5
+        if activation == "tanh":
+            self.activation = nn.Tanh()
+        elif activation == "relu":
+            self.activation = nn.ReLU()
+        else:
+            raise NotImplementedError(
+                "Only 'tanh' and 'relu' activations are supported."
             )
-            .type(self.dtype)
-            .unsqueeze(0)  # type: ignore
-        )
+        # Learnable membrane time constants for excitatory and inhibitory cell populations
+        self.tau_exc = nn.Parameter(
+            torch.randn(
+                (self.exc_dim, self.height, self.width), requires_grad=True
+            )
+        ).unsqueeze(0)
+        self.tau_inh = nn.Parameter(
+            torch.randn(
+                (self.inh_dim, self.height, self.width), requires_grad=True
+            )
+            + 0.5
+        ).unsqueeze(0)
+        # self.tau_exc = nn.Parameter(
+        #     torch.randn(self.exc_dim, requires_grad=True)
+        # ).unsqueeze(0)
+        # self.tau_inh = nn.Parameter(
+        #     torch.randn(self.inh_dim, requires_grad=True) + 0.5
+        # ).unsqueeze(0)
 
-        self.conv_cnm_exc = nn.Conv2d(
-            in_channels=input_dim + self.exc_column_dim,
-            out_channels=self.exc_column_dim,
+        self.conv_exc = Conv2dExc(
+            in_channels=input_dim + self.exc_dim,
+            out_channels=self.exc_dim,
             kernel_size=kernel_size,
             padding=self.padding,
             bias=self.bias,
         )
 
-        self.conv_cnm_inh = nn.Conv2d(
-            in_channels=input_dim + self.exc_column_dim + self.inh_class_dim,
-            out_channels=self.inh_class_dim,
+        self.conv_inh = Conv2dInh(
+            in_channels=input_dim + self.exc_dim + self.inh_dim,
+            out_channels=self.inh_dim,
             kernel_size=kernel_size,
             padding=self.padding,
             bias=self.bias,
         )
 
-        # inhibitory convs
-        assert isinstance(inhib_conv_kernel_sizes, list) or isinstance(
-            inhib_conv_kernel_sizes, tuple
-        )
+        # Inhibitory convs
+        if not (
+            isinstance(inhib_conv_kernel_sizes, list)
+            or isinstance(inhib_conv_kernel_sizes, tuple)
+        ):
+            raise ValueError(
+                "inhib_conv_kernel_sizes must be a list or tuple of integers."
+            )
 
         self.inhib_conv_kernel_sizes = inhib_conv_kernel_sizes
         self.inhib_convs = nn.ModuleList()
 
         for kernel_size in self.inhib_conv_kernel_sizes:
             self.inhib_convs.append(
-                nn.Conv2d(
-                    in_channels=self.inh_class_dim,
-                    out_channels=self.exc_column_dim,
+                Conv2dInh(
+                    in_channels=self.inh_dim,
+                    out_channels=self.exc_dim,
                     kernel_size=kernel_size,
                     stride=1,
                     padding=(kernel_size[0] // 2, kernel_size[1] // 2),
@@ -97,51 +190,61 @@ class ConvRNNEICell(nn.Module):
         self.out_pool = nn.AvgPool2d((5, 5), stride=(2, 2), padding=(2, 2))
 
     def init_hidden(self, batch_size):
+        """
+        Initializes the hidden state tensor for the cRNN_EI model.
+
+        Args:
+            batch_size (int): The size of the input batch.
+
+        Returns:
+            torch.Tensor: The initialized hidden state tensor.
+        """
         return Variable(
             torch.zeros(
                 batch_size,
-                (self.exc_column_dim + self.inh_class_dim),
+                (self.exc_dim + self.inh_dim),
                 self.height,
                 self.width,
             )
-        ).type(self.dtype)
+        )
 
-    def non_positive_rectifier(self, conv):
-        # same as min(0, conv.weight.data)
-        conv.weight.data = -torch.relu(-conv.weight.data)
-
-    def forward(self, input_tensor, h_cur):
+    def forward(self, input_tensor: torch.Tensor, h_cur: torch.Tensor):
         """
-        :param self:
-        :param input_tensor: (b, c, h, w)
-            input is actually the target_model
-        :param h_cur: (b, c_hidden, h, w)
-            current hidden and cell states respectively
-        :return: h_next,
-            next hidden state
+        Performs forward pass of the cRNN_EI model.
+
+        Args:
+            input_tensor (torch.Tensor): Input tensor of shape (b, c, h, w).
+                The input is actually the target_model.
+            h_cur (torch.Tensor): Current hidden and cell states respectively
+                of shape (b, c_hidden, h, w).
+
+        Returns:
+            torch.Tensor: Next hidden state of shape (b, c_hidden*2, h, w).
+            torch.Tensor: Output tensor after pooling of shape (b, c_hidden*2, h', w').
         """
 
-        exc_cells, inh_cells = torch.split(h_cur, self.exc_column_dim, dim=1)
+        exc_cells, inh_cells = torch.split(
+            h_cur, [self.exc_dim, self.inh_dim], dim=1
+        )
 
         cnm_exc = torch.tanh(
-            self.conv_cnm_exc(torch.cat([input_tensor, exc_cells], dim=1))
+            self.conv_exc(torch.cat([input_tensor, exc_cells], dim=1))
         )
 
         cnm_inh = torch.tanh(
-            self.conv_cnm_inh(
+            self.conv_inh(
                 torch.cat([input_tensor, exc_cells, inh_cells], dim=1)
             )
         )
 
         # candidate neural memories after inhibition of varying distance
-        total_inhs = []
+        total_inhs = torch.zeros_like(cnm_inh)
         for conv in self.inhib_convs:
             # non-positive rectification of each conv weight
-            self.non_positive_rectifier(conv)
+            total_inhs += conv(cnm_inh)
 
-            total_inhs.append(conv(cnm_inh))
         # subtract contribution of inhibitory conv's from the cnm
-        cnm_exc_with_inh = cnm_exc - sum(total_inhs)
+        cnm_exc_with_inh = cnm_exc - total_inhs
 
         if self.euler:
             self.tau_exc = torch.sigmoid(self.tau_exc)
@@ -162,7 +265,7 @@ class ConvRNNEICell(nn.Module):
 
             h_next = torch.cat([h_next_exc, h_next_inh], dim=1)
         else:
-            raise NotImplementedError("please use euler updates for now.")
+            raise NotImplementedError("Please use euler updates for now.")
 
         out = self.out_pool(h_next)
 
