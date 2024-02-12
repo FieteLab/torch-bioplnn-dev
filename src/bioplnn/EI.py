@@ -27,6 +27,8 @@ class Conv2dExc(nn.Conv2d):
 
     def forward(self, x):
         self.weight = torch.relu(self.weight)
+        if self.bias is not None:
+            self.bias = torch.relu(self.bias)
         return super().forward(x)
 
 
@@ -36,6 +38,8 @@ class Conv2dInh(nn.Conv2d):
 
     def forward(self, x):
         self.weight = -torch.relu(-self.weight)
+        if self.bias is not None:
+            self.bias = -torch.relu(-self.bias)
         return super().forward(x)
 
 
@@ -48,8 +52,9 @@ class ConvRNNEICell(nn.Module):
         prev_inh_dim: int,
         cur_exc_dim: int,
         cur_inh_dim: int,
+        feedback_exc_dim: int,
+        feedback_inh_dim: int,
         kernel_size: tuple[int, int],
-        inhib_conv_kernel_sizes: list[int] | tuple[int],
         bias: bool = True,
         euler: bool = False,
         dt: int = 1,
@@ -71,10 +76,14 @@ class ConvRNNEICell(nn.Module):
         """
         super(ConvRNNEICell, self).__init__()
         self.input_size = input_size
+        self.cur_exc_dim = cur_exc_dim
+        self.cur_inh_dim = cur_inh_dim
+        self.prev_exc_dim = prev_exc_dim
+        self.prev_inh_dim = prev_inh_dim
+        self.feedback_exc_dim = feedback_exc_dim
+        self.feedback_inh_dim = feedback_inh_dim
         padding = kernel_size[0] // 2, kernel_size[1] // 2
         self.input_dim = input_dim
-        self.exc_dim = exc_dim
-        self.inh_dim = inh_dim
         self.bias = bias
         self.euler = euler
         self.dt = dt
@@ -88,10 +97,11 @@ class ConvRNNEICell(nn.Module):
             )
         # Learnable membrane time constants for excitatory and inhibitory cell populations
         self.tau_exc = nn.Parameter(
-            torch.randn((1, exc_dim, *input_size), requires_grad=True)
+            torch.randn((1, cur_exc_dim, *input_size), requires_grad=True)
         )
         self.tau_inh = nn.Parameter(
-            torch.randn((1, inh_dim, *input_size), requires_grad=True) + 0.5
+            torch.randn((1, cur_inh_dim, *input_size), requires_grad=True)
+            + 0.5
         )
         # self.tau_exc = nn.Parameter(
         #     torch.randn(self.exc_dim, requires_grad=True)
@@ -101,29 +111,23 @@ class ConvRNNEICell(nn.Module):
         # ).unsqueeze(0)
 
         self.conv_exc = Conv2dExc(
-            in_channels=input_dim + exc_dim,
-            out_channels=exc_dim,
+            in_channels=input_dim
+            + prev_exc_dim
+            + cur_exc_dim
+            + feedback_exc_dim,
+            out_channels=cur_exc_dim + cur_inh_dim,
             kernel_size=kernel_size,
             padding=padding,
             bias=bias,
         )
 
         self.conv_inh = Conv2dInh(
-            in_channels=input_dim + exc_dim + inh_dim,
-            out_channels=inh_dim,
+            in_channels=prev_inh_dim + cur_inh_dim + feedback_inh_dim,
+            out_channels=cur_inh_dim + cur_inh_dim,
             kernel_size=kernel_size,
             padding=padding,
             bias=bias,
         )
-
-        # Inhibitory convs
-        if not (
-            isinstance(inhib_conv_kernel_sizes, list)
-            or isinstance(inhib_conv_kernel_sizes, tuple)
-        ):
-            raise ValueError(
-                "inhib_conv_kernel_sizes must be a list or tuple of integers."
-            )
 
         self.out_pool = nn.AvgPool2d((5, 5), stride=(2, 2), padding=(2, 2))
 
@@ -139,7 +143,7 @@ class ConvRNNEICell(nn.Module):
         """
         return Variable(
             torch.zeros(
-                batch_size, (self.exc_dim + self.inh_dim), *self.input_size
+                batch_size, (self.cur_exc_dim + self.inh_dim), *self.input_size
             )
         )
 
@@ -167,22 +171,26 @@ class ConvRNNEICell(nn.Module):
             torch.Tensor: Output tensor after pooling of shape (b, c_hidden*2, h', w').
         """
 
-        cnm_ei = self.activation(
-            self.conv_exc(torch.cat([input, h_cur_exc, feedback_exc], dim=1))
+        cnm = self.activation(
+            self.conv_exc(
+                torch.cat([input, h_cur_exc, h_prev_exc, feedback_exc], dim=1)
+            )
         )
 
-        cnm_inh = self.activation(
-            self.conv_inh(torch.cat([input, h_cur_exc, h_cur_inh], dim=1))
+        inhibitions = self.activation(
+            self.conv_inh(
+                torch.cat(
+                    [input, h_cur_exc, h_prev_exc, feedback_exc],
+                    dim=1,
+                )
+            )
         )
-
-        # candidate neural memories after inhibition of varying distance
-        total_inhs = torch.zeros_like(cnm_inh)
-        for conv in self.inhib_convs:
-            # non-positive rectification of each conv weight
-            total_inhs += conv(cnm_inh)
 
         # subtract contribution of inhibitory conv's from the cnm
-        cnm_exc_with_inh = cnm_exc - total_inhs
+        cnm_with_inh = cnm + inhibitions
+        cnm_exc_with_inh, cnm_inh_with_inh = torch.split(
+            cnm_with_inh, [self.exc_dim, self.inh_dim], dim=1
+        )
 
         if self.euler:
             self.tau_exc = torch.sigmoid(self.tau_exc)
