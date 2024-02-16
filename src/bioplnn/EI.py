@@ -21,7 +21,7 @@ class LinearInh(nn.Linear):
         return super().forward(x)
 
 
-class Conv2dExc(nn.Conv2d):
+class Conv2dPositive(nn.Conv2d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -29,17 +29,6 @@ class Conv2dExc(nn.Conv2d):
         self.weight = torch.relu(self.weight)
         if self.bias is not None:
             self.bias = torch.relu(self.bias)
-        return super().forward(x)
-
-
-class Conv2dInh(nn.Conv2d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, x):
-        self.weight = -torch.relu(-self.weight)
-        if self.bias is not None:
-            self.bias = -torch.relu(-self.bias)
         return super().forward(x)
 
 
@@ -51,13 +40,15 @@ class Conv2dEIRNNCell(nn.Module):
         cur_exc_dim: int,
         cur_inh_dim: int,
         exc_kernel_size: tuple[int, int],
-        inhib_kernel_sizes: list[tuple[int, int]],
+        inh_kernel_sizes: list[tuple[int, int]],
         use_h_prev: bool = False,
         prev_exc_dim: int = None,
         prev_inh_dim: int = None,
-        use_feedback: bool = False,
-        feedback_exc_dim: int = None,
-        feedback_inh_dim: int = None,
+        use_fb: bool = False,
+        fb_exc_dim: int = None,
+        fb_inh_dim: int = None,
+        fb_exc_kernel_size: tuple[int, int] = (3, 3),
+        fb_inh_kernel_sizes: list[tuple[int, int]] = [(3, 3), (3, 3)],
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
@@ -75,8 +66,8 @@ class Conv2dEIRNNCell(nn.Module):
             prev_inh_dim (int): Number of channels of previous inhibitory tensor.
             cur_exc_dim (int): Number of channels of current excitatory tensor.
             cur_inh_dim (int): Number of channels of current inhibitory tensor.
-            feedback_exc_dim (int): Number of channels of feedback excitatory tensor.
-            feedback_inh_dim (int): Number of channels of feedback inhibitory tensor.
+            fb_exc_dim (int): Number of channels of fb excitatory tensor.
+            fb_inh_dim (int): Number of channels of fb inhibitory tensor.
             exc_kernel_size (tuple[int, int]): Size of the kernel for excitatory convolution.
             inhib_kernel_sizes (list[tuple[int, int]]): Sizes of the kernels for inhibitory convolutions.
             bias (bool, optional): Whether or not to add the bias. Default is True.
@@ -94,62 +85,56 @@ class Conv2dEIRNNCell(nn.Module):
             raise ValueError(
                 "If use_h_prev is True, prev_exc_dim and prev_inh_dim must be provided."
             )
-        if use_feedback and (
-            feedback_exc_dim is None or feedback_inh_dim is None
-        ):
+        if use_fb and (fb_exc_dim is None or fb_inh_dim is None):
             raise ValueError(
-                "If use_feedback is True, feedback_exc_dim and feedback_inh_dim must be provided."
+                "If use_fb is True, fb_exc_dim and fb_inh_dim must be provided."
             )
         self.use_h_prev = use_h_prev
-        self.use_feedback = use_feedback
-        padding = exc_kernel_size[0] // 2, exc_kernel_size[1] // 2
-        self.bias = bias
+        self.use_fb = use_fb
         self.euler = euler
         self.dt = dt
         if activation == "tanh":
             self.activation = nn.Tanh()
         elif activation == "relu":
+            print("Warning: using ReLU activation will have no effect")
             self.activation = nn.ReLU()
         else:
-            raise ValueError(
-                "Only 'tanh' and 'relu' activations are supported."
-            )
+            raise ValueError("Only 'tanh' and 'relu' activations are supported.")
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
         self.tau_exc = nn.Parameter(
             torch.randn((1, cur_exc_dim, *input_size), requires_grad=True)
         )
         self.tau_inh = nn.Parameter(
-            torch.randn((1, cur_inh_dim, *input_size), requires_grad=True)
-            + 0.5
+            torch.randn((1, cur_inh_dim, *input_size), requires_grad=True) + 0.5
         )
 
         # Initialize excitatory convolutional layers
-        exc_in_channels = (
-            input_dim
-            + cur_exc_dim
-            + (prev_exc_dim if use_h_prev else 0)
-            + (feedback_exc_dim if use_feedback else 0)
-        )
-        self.conv_exc = Conv2dExc(
-            in_channels=exc_in_channels,
+        exc_channels = input_dim + cur_exc_dim + (prev_inh_dim if use_h_prev else 0)
+        self.conv_exc = Conv2dPositive(
+            in_channels=exc_channels,
             out_channels=cur_exc_dim + cur_inh_dim,
             kernel_size=exc_kernel_size,
-            padding=padding,
+            padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
             bias=bias,
         )
 
+        if use_fb:
+            self.fb_conv_exc = Conv2dPositive(
+                in_channels=fb_exc_dim,
+                out_channels=cur_exc_dim + cur_inh_dim,
+                kernel_size=exc_kernel_size,
+                padding=(fb_exc_kernel_size[0] // 2, fb_exc_kernel_size[1] // 2),
+                bias=bias,
+            )
+
         # Initialize inhibitory convolutional layers with different kernel sizes
         self.convs_inh = nn.ModuleList()
-        inh_in_channels = (
-            cur_inh_dim
-            + (prev_inh_dim if use_h_prev else 0)
-            + (feedback_inh_dim if use_feedback else 0)
-        )
-        for kernel_size in inhib_kernel_sizes:
+        inh_channels = cur_inh_dim + (prev_inh_dim if use_h_prev else 0)
+        for kernel_size in inh_kernel_sizes:
             self.convs_inh.append(
-                Conv2dInh(
-                    in_channels=inh_in_channels,
+                Conv2dPositive(
+                    in_channels=inh_channels,
                     out_channels=cur_exc_dim + cur_inh_dim,
                     kernel_size=kernel_size,
                     stride=1,
@@ -158,6 +143,19 @@ class Conv2dEIRNNCell(nn.Module):
                 )
             )
 
+        if use_fb:
+            self.fb_convs_inh = nn.ModuleList()
+            for kernel_size in fb_inh_kernel_sizes:
+                self.fb_convs_inh.append(
+                    Conv2dPositive(
+                        in_channels=fb_inh_dim,
+                        out_channels=cur_exc_dim + cur_inh_dim,
+                        kernel_size=kernel_size,
+                        stride=1,
+                        padding=(kernel_size[0] // 2, kernel_size[1] // 2),
+                        bias=False,
+                    )
+                )
         # Initialize output pooling layer
         self.out_pool = nn.AvgPool2d(
             kernel_size=pool_kernel_size,
@@ -177,12 +175,8 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: The initialized inhibitory hidden state tensor.
         """
         return (
-            Variable(
-                torch.zeros(batch_size, (self.cur_exc_dim), *self.input_size)
-            ),
-            Variable(
-                torch.zeros(batch_size, (self.cur_inh_dim), *self.input_size)
-            ),
+            Variable(torch.zeros(batch_size, (self.cur_exc_dim), *self.input_size)),
+            Variable(torch.zeros(batch_size, (self.cur_inh_dim), *self.input_size)),
         )
 
     def forward(
@@ -192,8 +186,8 @@ class Conv2dEIRNNCell(nn.Module):
         h_cur_inh: torch.Tensor,
         h_prev_exc: torch.Tensor | None = None,
         h_prev_inh: torch.Tensor | None = None,
-        feedback_exc: torch.Tensor | None = None,
-        feedback_inh: torch.Tensor | None = None,
+        fb_exc: torch.Tensor | None = None,
+        fb_inh: torch.Tensor | None = None,
     ):
         """
         Performs forward pass of the cRNN_EI model.
@@ -211,59 +205,50 @@ class Conv2dEIRNNCell(nn.Module):
         exc_input = [input, h_cur_exc]
         if self.use_h_prev:
             if h_prev_exc is None:
-                raise ValueError(
-                    "If use_h_prev is True, h_prev_exc must be provided."
-                )
+                raise ValueError("If use_h_prev is True, h_prev_exc must be provided.")
             exc_input.append(h_prev_exc)
-        if self.use_feedback:
-            if feedback_exc is None:
-                raise ValueError(
-                    "If use_feedback is True, feedback_exc must be provided."
-                )
-            exc_input.append(feedback_exc)
-        exc_input = torch.cat([*exc_input], dim=1)
+
+        exc_input = torch.cat(exc_input, dim=1)
         cnm = self.activation(self.conv_exc(exc_input, dim=1))
 
-        inhibitions = []
+        if self.use_fb:
+            if fb_exc is None:
+                raise ValueError("If use_fb is True, fb_exc must be provided.")
+            cnm += self.activation(self.fb_conv_exc(fb_exc, dim=1))
+
         inh_input = []
         if self.use_h_prev:
             if h_prev_inh is None:
-                raise ValueError(
-                    "If use_h_prev is True, h_prev_inh must be provided."
-                )
+                raise ValueError("If use_h_prev is True, h_prev_inh must be provided.")
             inh_input.append(h_prev_inh)
-        if self.use_feedback:
-            if feedback_inh is None:
-                raise ValueError(
-                    "If use_feedback is True, feedback_inh must be provided."
-                )
-            inh_input.append(feedback_inh)
+
         inh_input = torch.cat(inh_input, dim=1)
-        for conv_inh in self.convs_inh:
-            inhibitions.append(self.activation(conv_inh(inh_input, dim=1)))
+        inhibitions = torch.zeros_like(cnm)
+        for conv in self.convs_inh:
+            inhibitions += self.activation(conv(inh_input, dim=1))
+
+        if self.use_fb:
+            if fb_inh is None:
+                raise ValueError("If use_fb is True, fb_inh must be provided.")
+            for conv in self.fb_convs_inh:
+                inhibitions += self.activation(conv(inh_input, dim=1))
 
         # subtract contribution of inhibitory conv's from the cnm
-        cnm_with_inh = cnm + sum(inhibitions)
+        cnm_with_inh = cnm - inhibitions
         cnm_exc_with_inh, cnm_inh_with_inh = torch.split(
             cnm_with_inh, [self.cur_exc_dim, self.cur_inh_dim], dim=1
         )
 
         if self.euler:
             self.tau_exc = torch.sigmoid(self.tau_exc)
-            h_next_exc = (
-                1
-                - self.tau_exc.unsqueeze(1)
-                .unsqueeze(2)
-                .repeat(1, *self.input_size)
-            ) * h_cur_exc + (self.tau_exc) * cnm_exc_with_inh
+            h_next_exc = (1 - self.tau_exc) * h_cur_exc + (
+                self.tau_exc
+            ) * cnm_exc_with_inh
 
             self.tau_inh = torch.sigmoid(self.tau_inh)
-            h_next_inh = (
-                1
-                - self.tau_inh.unsqueeze(1)
-                .unsqueeze(2)
-                .repeat(1, self.height, self.width)
-            ) * h_cur_inh + (self.tau_inh) * cnm_inh_with_inh
+            h_next_inh = (1 - self.tau_inh) * h_cur_inh + (
+                self.tau_inh
+            ) * cnm_inh_with_inh
         else:
             raise NotImplementedError("Please use euler updates for now.")
 
@@ -271,141 +256,181 @@ class Conv2dEIRNNCell(nn.Module):
 
         return h_next_exc, h_next_inh, out
 
-    class Conv2dEIRNN(nn.Module):
-        def __init__(
-            self,
-            input_size: tuple[int, int],
-            input_dim: int,
-            exc_dim: int | list[int],
-            inh_dim: int | list[int],
-            exc_kernel_size: tuple[int, int] | list[tuple[int, int]],
-            inhib_kernel_sizes: (
-                list[tuple[int, int]] | list[list[tuple[int, int]]]
-            ),
-            inhib_sclae_factors: list[int] | list[list[int]],
-            num_layers: int,
-            num_steps: int,
-            num_classes: int,
-            use_h_prev: bool = False,
-            use_feedback: bool = False,
-            feedback_adjacency: torch.Tensor | None = None,
-            pool_kernel_size: tuple[int, int] = (5, 5),
-            pool_stride: tuple[int, int] = (2, 2),
-            bias: bool = True,
-            euler: bool = True,
-            dt: int = 1,
-            activation: str = "tanh",
+
+class Conv2dEIRNN(nn.Module):
+    def __init__(
+        self,
+        input_size: tuple[int, int],
+        input_dim: int,
+        exc_dim: int | list[int],
+        inh_dim: int | list[int],
+        exc_kernel_size: tuple[int, int] | list[tuple[int, int]],
+        inh_kernel_sizes: list[tuple[int, int]] | list[list[tuple[int, int]]],
+        inh_scale_factors: list[int] | list[list[int]],
+        num_layers: int,
+        num_steps: int,
+        num_classes: int,
+        use_h_prev: bool = False,
+        use_fb: bool = False,
+        fb_exc_dim: int | list[int] | None = None,
+        fb_inh_dim: int | list[int] | None = None,
+        fb_exc_kernel_size: tuple[int, int] | list[tuple[int, int]] | None = None,
+        fb_inh_kernel_sizes: (
+            list[tuple[int, int]] | list[list[tuple[int, int]]] | None
+        ) = None,
+        fb_adjacency: torch.Tensor | None = None,
+        pool_kernel_size: tuple[int, int] | list[tuple[int, int]] = (5, 5),
+        pool_stride: tuple[int, int] | list[tuple[int, int]] = (2, 2),
+        bias: bool | list[bool] = True,
+        euler: bool = True,
+        dt: int = 1,
+        activation: str = "tanh",
+    ):
+        """
+        Initialize the Conv2dEIRNN.
+
+        Args:
+            input_size (tuple[int, int]): Height and width of input tensor as (height, width).
+            input_dim (int): Number of channels of input tensor.
+            hidden_dim (int): Number of channels of hidden tensor.
+            num_layers (int): Number of layers in the RNN.
+            num_iterations (int): Number of iterations to perform in each layer.
+            exc_kernel_size (tuple[int, int]): Size of the kernel for excitatory convolution.
+            inhib_kernel_sizes (list[tuple[int, int]]): Sizes of the kernels for inhibitory convolutions.
+            use_h_prev (bool, optional): Whether to use previous hidden states as input. Default is False.
+            use_fb (bool, optional): Whether to use fb from previous layers as input. Default is False.
+            pool_kernel_size (tuple[int, int], optional): Size of the kernel for pooling. Default is (5, 5).
+            pool_stride (tuple[int, int], optional): Stride of the pooling operation. Default is (2, 2).
+            bias (bool, optional): Whether or not to add the bias. Default is True.
+            euler (bool, optional): Whether to use Euler updates for the cell state. Default is True.
+            dt (int, optional): Time step for Euler updates. Default is 1.
+            activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "tanh".
+        """
+        super().__init__()
+        self.input_size = input_size
+        self.input_dims = self._extend_for_multilayer(input_dim, num_layers)
+        self.exc_dims = self._extend_for_multilayer(exc_dim, num_layers)
+        self.inh_dims = self._extend_for_multilayer(inh_dim, num_layers)
+        self.exc_kernel_sizes = self._extend_for_multilayer(exc_kernel_size, num_layers)
+        self.inh_kernel_sizes = self._extend_for_multilayer(
+            inh_kernel_sizes, num_layers, depth=1
+        )
+        self.inh_scale_factors = self._extend_for_multilayer(
+            inh_scale_factors, num_layers, depth=1
+        )
+
+        if use_fb:
+            self.fb_exc_dims = self._extend_for_multilayer(fb_exc_dim, num_layers)
+            self.fb_inh_dims = self._extend_for_multilayer(fb_inh_dim, num_layers)
+            self.fb_exc_kernel_sizes = self._extend_for_multilayer(
+                fb_exc_kernel_size, num_layers
+            )
+            self.fb_inh_kernel_sizes = self._extend_for_multilayer(
+                fb_inh_kernel_sizes, num_layers, depth=1
+            )
+
+        self.pool_kernel_sizes = self._extend_for_multilayer(
+            pool_kernel_size, num_layers
+        )
+        self.pool_strides = self._extend_for_multilayer(pool_stride, num_layers)
+        self.biases = self._extend_for_multilayer(bias, num_layers)
+
+        self.layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.layers.append(
+                Conv2dEIRNNCell(
+                    input_size=input_size,
+                    input_dim=self.input_dims[i],
+                    cur_exc_dim=self.exc_dims[i],
+                    cur_inh_dim=self.inh_dims[i],
+                    exc_kernel_size=self.exc_kernel_sizes[i],
+                    inh_kernel_sizes=self.inh_kernel_sizes[i],
+                    use_h_prev=use_h_prev if i > 0 else False,
+                    prev_exc_dim=self.exc_dims[i - 1] if use_h_prev and i > 0 else None,
+                    prev_inh_dim=self.inh_dims[i - 1] if use_h_prev and i > 0 else None,
+                    use_fb=use_fb,
+                    fb_exc_dim=self.fb_exc_dims[i] if use_fb else None,
+                    fb_inh_dim=self.fb_inh_dims[i] if use_fb else None,
+                    fb_exc_kernel_size=self.fb_exc_kernel_sizes[i] if use_fb else None,
+                    fb_inh_kernel_sizes=self.fb_inh_kernel_sizes[i] if use_fb else None,
+                    pool_kernel_size=self.pool_kernel_sizes[i],
+                    pool_stride=self.pool_strides[i],
+                    bias=self.biases[i],
+                    euler=euler,
+                    dt=dt,
+                    activation=activation,
+                )
+            )
+
+    def _init_hidden(self, batch_size):
+        init_excs = []
+        init_inhs = []
+        for layer in self.layers:
+            init_exc, init_inh = layer.init_hidden(batch_size)
+            init_excs.append(init_exc)
+            init_inhs.append(init_inh)
+        return init_excs, init_inhs
+
+    @staticmethod
+    def _check_kernel_size_consistency(kernel_size):
+        if not (
+            isinstance(kernel_size, tuple)
+            or (
+                isinstance(kernel_size, list)
+                and all([isinstance(elem, tuple) for elem in kernel_size])
+            )
         ):
-            """
-            Initialize the Conv2dEIRNN.
+            raise ValueError("`kernel_size` must be tuple or list of tuples")
 
-            Args:
-                input_size (tuple[int, int]): Height and width of input tensor as (height, width).
-                input_dim (int): Number of channels of input tensor.
-                hidden_dim (int): Number of channels of hidden tensor.
-                num_layers (int): Number of layers in the RNN.
-                num_iterations (int): Number of iterations to perform in each layer.
-                exc_kernel_size (tuple[int, int]): Size of the kernel for excitatory convolution.
-                inhib_kernel_sizes (list[tuple[int, int]]): Sizes of the kernels for inhibitory convolutions.
-                use_h_prev (bool, optional): Whether to use previous hidden states as input. Default is False.
-                use_feedback (bool, optional): Whether to use feedback from previous layers as input. Default is False.
-                pool_kernel_size (tuple[int, int], optional): Size of the kernel for pooling. Default is (5, 5).
-                pool_stride (tuple[int, int], optional): Stride of the pooling operation. Default is (2, 2).
-                bias (bool, optional): Whether or not to add the bias. Default is True.
-                euler (bool, optional): Whether to use Euler updates for the cell state. Default is True.
-                dt (int, optional): Time step for Euler updates. Default is 1.
-                activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "tanh".
-            """
-            super().__init__()
-            self.input_size = input_size
-            self.input_dim = input_dim
-            self.hidden_dim = self._extend_for_multilayer(hidden_dim)
-            self.num_layers = num_layers
-            self.num_steps = num_steps
-            self.use_h_prev = use_h_prev
-            self.use_feedback = use_feedback
-            self.pool_kernel_size = pool_kernel_size
-            self.pool_stride = pool_stride
-            self.bias = bias
-            self.euler = euler
-            self.dt = dt
-            self.activation = activation
+    @staticmethod
+    def _extend_for_multilayer(param, num_layers, depth=0):
+        inner = param
+        for _ in range(depth):
+            if not isinstance(inner, list):
+                raise ValueError("depth exceeds the depth of param.")
+            inner = inner[0]
 
-            self.layers = nn.ModuleList()
-            for _ in range(num_layers):
-                self.layers.append(
-                    Conv2dEIRNNCell(
-                        input_size=input_size,
-                        input_dim=input_dim,
-                        cur_exc_dim=hidden_dim,
-                        cur_inh_dim=hidden_dim,
-                        exc_kernel_size=exc_kernel_size,
-                        inhib_kernel_sizes=inhib_kernel_sizes,
-                        use_h_prev=use_h_prev,
-                        prev_exc_dim=hidden_dim,
-                        prev_inh_dim=hidden_dim,
-                        use_feedback=use_feedback,
-                        feedback_exc_dim=hidden_dim,
-                        feedback_inh_dim=hidden_dim,
-                        pool_kernel_size=pool_kernel_size,
-                        pool_stride=pool_stride,
-                        bias=bias,
-                        euler=euler,
-                        dt=dt,
-                        activation=activation,
-                    )
+        if not isinstance(inner, list):
+            param = [param] * num_layers
+        return param
+
+    def forward(self, input: torch.Tensor):
+        """
+        Performs forward pass of the Conv2dEIRNN.
+
+        Args:
+            input (torch.Tensor): Input tensor of shape (b, c, h, w).
+
+        Returns:
+            torch.Tensor: Output tensor after pooling of shape (b, hidden_dim*2, h', w').
+        """
+        batch_size = input.size(0)
+        h_exc, h_inh = self._init_hidden(batch_size)
+        fb_exc = [
+            torch.zeros(batch_size, d, *self.input_size) for d in self.fb_exc_dims
+        ]
+        fb_inh = [
+            torch.zeros(batch_size, d, *self.input_size) for d in self.fb_inh_dims
+        ]
+
+        for _ in range(self.num_iterations):
+            for i, layer in enumerate(self.layers):
+                h_exc, h_inh = layer(
+                    input,
+                    h_cur_exc=h_exc[i],
+                    h_cur_inh=h_inh,
+                    h_prev_exc=h_exc if self.use_h_prev else None,
+                    h_prev_inh=h_inh if self.use_h_prev else None,
+                    fb_exc=h_exc if self.use_fb else None,
+                    fb_inh=h_inh if self.use_fb else None,
                 )
-
-        @staticmethod
-        def _check_kernel_size_consistency(kernel_size):
-            if not (
-                isinstance(kernel_size, tuple)
-                or (
-                    isinstance(kernel_size, list)
-                    and all([isinstance(elem, tuple) for elem in kernel_size])
-                )
-            ):
-                raise ValueError(
-                    "`kernel_size` must be tuple or list of tuples"
-                )
-
-        @staticmethod
-        def _extend_for_multilayer(param, num_layers):
-            if not isinstance(param, list):
-                param = [param] * num_layers
-            return param
-
-        def forward(self, input: torch.Tensor):
-            """
-            Performs forward pass of the Conv2dEIRNN.
-
-            Args:
-                input (torch.Tensor): Input tensor of shape (b, c, h, w).
-
-            Returns:
-                torch.Tensor: Output tensor after pooling of shape (b, hidden_dim*2, h', w').
-            """
-            batch_size = input.size(0)
-            h_exc, h_inh = self._init_hidden(batch_size)
-            prev_exc = [
-                torch.zeros(batch_size, self.hidden_dim[i], *self.input_size)
-            ] * self.num_layers
-            prev_inh = [0] * self.num_layers
-            feedback_exc = [0] * self.num_layers
-            feedback_inh = [0] * self.num_layers
-
-            for _ in range(self.num_iterations):
-                for layer in self.layers:
-                    h_exc, h_inh = layer(
-                        input,
-                        h_cur_exc=h_exc,
-                        h_cur_inh=h_inh,
-                        h_prev_exc=h_exc if self.use_h_prev else None,
-                        h_prev_inh=h_inh if self.use_h_prev else None,
-                        feedback_exc=h_exc if self.use_feedback else None,
-                        feedback_inh=h_inh if self.use_feedback else None,
-                    )
-            return h_exc
+            fb_exc = [
+                torch.zeros(batch_size, d, *self.input_size) for d in self.fb_exc_dims
+            ]
+            fb_inh = [
+                torch.zeros(batch_size, d, *self.input_size) for d in self.fb_inh_dims
+            ]
+        return h_exc
 
 
 class RecAttnModel(nn.Module):
@@ -470,20 +495,14 @@ class RecAttnModel(nn.Module):
         self.kernel_size = kernel_size
 
         # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
-        self.kernel_size = self._extend_for_multilayer(
-            self.kernel_size, num_layers
-        )
-        self.hidden_dim = self._extend_for_multilayer(
-            self.hidden_dim, num_layers
-        )
+        self.kernel_size = self._extend_for_multilayer(self.kernel_size, num_layers)
+        self.hidden_dim = self._extend_for_multilayer(self.hidden_dim, num_layers)
         if not len(self.kernel_size) == len(self.hidden_dim) == num_layers:
             raise ValueError("Inconsistent list length.")
 
         self.inhib_conv_kernel_sizes = inhib_conv_kernel_sizes
         self.inhib_scale_factors = inhib_scale_factors
-        assert len(self.inhib_scale_factors) == len(
-            self.inhib_conv_kernel_sizes
-        )
+        assert len(self.inhib_scale_factors) == len(self.inhib_conv_kernel_sizes)
 
         self.dtype = dtype
         self.num_layers = num_layers
@@ -497,11 +516,7 @@ class RecAttnModel(nn.Module):
 
         # TODO: readout only from the exc cells, not both exc and inh
         self.fc = nn.Linear(
-            self.hidden_dim[-1]
-            * self.input_size[-1]
-            // 2
-            * self.input_size[-1]
-            // 2,
+            self.hidden_dim[-1] * self.input_size[-1] // 2 * self.input_size[-1] // 2,
             fc_size,
         )
         self.classification = nn.Linear(fc_size, num_classes)
@@ -533,9 +548,7 @@ class RecAttnModel(nn.Module):
                     dt=dt,
                 )
             )
-            attn_blocks.append(
-                SimpleAttentionalGain(xh // 2, self.hidden_dim[i])
-            )
+            attn_blocks.append(SimpleAttentionalGain(xh // 2, self.hidden_dim[i]))
 
         # convert python list to pytorch module
         self.cell_list = nn.ModuleList(cell_list)
@@ -607,9 +620,7 @@ class RecAttnModel(nn.Module):
                 # Attention block #
                 ###################
                 # h = self.attn_blocks[layer_idx](cue_activities[layer_idx], h)
-                out = self.attn_blocks[layer_idx](
-                    cue_activities[layer_idx][0], out
-                )
+                out = self.attn_blocks[layer_idx](cue_activities[layer_idx][0], out)
 
                 output_inner.append(out)
 
@@ -662,10 +673,7 @@ class RecAttnModel(nn.Module):
         for cell in self.cell_list:
             for scale, conv in zip(self.inhib_scale_factors, cell.inhib_convs):
                 inhib_loss += (
-                    scale
-                    * torch.linalg.norm(
-                        conv.weight, dim=(-2, -1), ord=2
-                    ).mean()
+                    scale * torch.linalg.norm(conv.weight, dim=(-2, -1), ord=2).mean()
                 )
 
         # calculate cross entropy loss
