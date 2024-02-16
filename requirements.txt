@@ -15,8 +15,8 @@ mne
 wandb
 accelerate
 lightning
-# -f https://data.pyg.org/whl/torch-2.0.0+cu117.html # uncomment if CUDA 11.7
--f https://data.pyg.org/whl/torch-2.0.0+cpu.html # uncomment if OSX
+-f https://data.pyg.org/whl/torch-2.0.0+cu117.html # uncomment if CUDA 11.7
+# -f https://data.pyg.org/whl/torch-2.0.0+cpu.html # uncomment if OSX
 torch-scatter 
 torch-sparse
 torchsparsegradutils
