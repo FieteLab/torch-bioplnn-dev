@@ -1,21 +1,25 @@
+import math
 import torch
 import torch.nn as nn
 import torch_sparse
 import torchsparsegradutils as tsgu
-import math
+import scipy
+import numpy as np
+from typing import Any, Optional
 
 
-class TopographicalCorticalSheet(nn.Module):
+class TopographicalCorticalCell(nn.Module):
     def __init__(
         self,
-        sheet_size,
-        connectivity_std,
-        synapses_per_neuron,
-        bias=True,
-        mm_function="native",
-        sparse_format="coo",
-        batch_first=False,
-        **kwargs,
+        sheet_size: tuple[int, int] = (100, 100),
+        connectivity_std: float = 10,
+        synapses_per_neuron: int = 32,
+        bias: bool = True,
+        mm_function: str = "torch_sparse",
+        sparse_format: str = "torch_sparse",
+        batch_first: bool = True,
+        adjacency_matrix_path: str = None,
+        **kwargs: Any,
     ):
         """
         Initialize the TopographicalCorticalSheet object.
@@ -30,15 +34,13 @@ class TopographicalCorticalSheet(nn.Module):
             sparse_format (str, optional): The sparse format to use.
                 Possible values are "coo", "csr", and "torch_sparse". Defaults to "coo".
             batch_first (bool, optional): Whether the batch dimension is the first dimension. Defaults to False.
-            **kwargs: Additional keyword arguments.
+            **kwargs: Additional keyword arguments (unused)
 
         Raises:
             ValueError: If an invalid mm_function or sparse_format is provided.
         """
         super().__init__()
         # Save the sparse matrix multiplication function
-        self.sheet_size = sheet_size
-        self.num_neurons = sheet_size[0] * sheet_size[1]
         self.sparse_format = sparse_format
         self.batch_first = batch_first
 
@@ -56,35 +58,45 @@ class TopographicalCorticalSheet(nn.Module):
         else:
             raise ValueError(f"Invalid mm_function: {mm_function}")
 
-        # Create adjacency matrix with normal distribution randomized weights
-        indices = []
-        for i in range(sheet_size[0]):
-            for j in range(sheet_size[1]):
-                synapses = (
-                    torch.randn(2, synapses_per_neuron) * connectivity_std
-                    + torch.tensor((i, j))[:, None]
-                ).long()
-                synapses = torch.cat(
-                    [synapses, torch.tensor((i, j))[:, None]], dim=1
-                )
-                synapses = synapses.clamp(
-                    torch.tensor((0, 0))[:, None],
-                    torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
-                        :, None
-                    ],
-                )
-                synapses = self.idx_2D_to_1D(synapses)
-                synapse_root = torch.full_like(
-                    synapses, self.idx_2D_to_1D(torch.tensor((i, j)))
-                )
-                indices.append(torch.stack((synapses, synapse_root)))
-        indices = torch.cat(indices, dim=1)
-        # Sort indices by synapses
-        # indices = indices[:, torch.argsort(indices[0])]
-        # Xavier initialization of values (synapses_per_neuron is the fan-in/out)
-        values = torch.randn(indices.shape[1]) * math.sqrt(
-            1 / synapses_per_neuron
-        )
+        if adjacency_matrix_path is not None:
+            weight = torch.load(adjacency_matrix_path).coalesce()
+            sheet_size = weight.shape
+            values = weight.values().float()
+            indices = weight.indices().long()
+        else:
+            # Create adjacency matrix with normal distribution randomized weights
+            indices = []
+            for i in range(sheet_size[0]):
+                for j in range(sheet_size[1]):
+                    synapses = (
+                        torch.randn(2, synapses_per_neuron) * connectivity_std
+                        + torch.tensor((i, j))[:, None]
+                    ).long()
+                    synapses = torch.cat(
+                        [synapses, torch.tensor((i, j))[:, None]], dim=1
+                    )
+                    synapses = synapses.clamp(
+                        torch.tensor((0, 0))[:, None],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
+                            :, None
+                        ],
+                    )
+                    synapses = self.idx_2D_to_1D(synapses)
+                    synapse_root = torch.full_like(
+                        synapses, self.idx_2D_to_1D(torch.tensor((i, j)))
+                    )
+                    indices.append(torch.stack((synapses, synapse_root)))
+            indices = torch.cat(indices, dim=1)
+            # Sort indices by synapses
+            # indices = indices[:, torch.argsort(indices[0])]
+            # Xavier initialization of values (synapses_per_neuron is the fan-in/out)
+            values = torch.randn(indices.shape[1]) * math.sqrt(
+                1 / synapses_per_neuron
+            )
+
+        self.sheet_size = sheet_size
+        self.num_neurons = sheet_size[0] * sheet_size[1]
+
         if sparse_format in ("coo", "csr"):
             weight = torch.sparse_coo_tensor(
                 indices,
@@ -182,20 +194,21 @@ class TopographicalCorticalSheet(nn.Module):
         return x
 
 
-class TopographicalCorticalRNN(nn.Module):
+class TopographicalRNN(nn.Module):
     def __init__(
         self,
-        sheet_size,
-        connectivity_std,
-        synapses_per_neuron,
-        num_timesteps,
-        pool_stride,
-        activation=nn.GELU,
-        sheet_bias=True,
-        sheet_mm_function="native",
-        sheet_sparse_format="coo",
-        sheet_batch_first=False,
-        **kwargs,
+        sheet_size: tuple[int, int] = (100, 100),
+        connectivity_std: float = 10,
+        synapses_per_neuron: int = 32,
+        num_timesteps: int = 100,
+        pool_stride: int = 4,
+        activation: nn.Module = nn.GELU,
+        sheet_bias: bool = True,
+        sheet_mm_function: str = "torch_sparse",
+        sheet_sparse_format: str = "torch_sparse",
+        sheet_batch_first: bool = False,
+        adjacency_matrix_path: str = None,
+        **kwargs: Any,
     ):
         """
         Initialize the TopographicalCorticalRNN object.
@@ -223,7 +236,7 @@ class TopographicalCorticalRNN(nn.Module):
         self.sheet_batch_first = sheet_batch_first
 
         # Create the CorticalSheet layer
-        self.cortical_sheet = TopographicalCorticalSheet(
+        self.cortical_sheet = TopographicalCorticalCell(
             sheet_size,
             connectivity_std,
             synapses_per_neuron,
@@ -231,6 +244,7 @@ class TopographicalCorticalRNN(nn.Module):
             sheet_mm_function,
             sheet_sparse_format,
             sheet_batch_first,
+            adjacency_matrix_path,
         )
 
         self.pool = nn.MaxPool2d(pool_stride, pool_stride)
