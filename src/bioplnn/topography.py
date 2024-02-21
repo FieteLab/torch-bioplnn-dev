@@ -19,6 +19,8 @@ class TopographicalCorticalCell(nn.Module):
         sparse_format: str = "torch_sparse",
         batch_first: bool = True,
         adjacency_matrix_path: str = None,
+        input_indices_path: str = None,
+        output_indices_path: str = None,
         **kwargs: Any,
     ):
         """
@@ -60,9 +62,9 @@ class TopographicalCorticalCell(nn.Module):
 
         if adjacency_matrix_path is not None:
             weight = torch.load(adjacency_matrix_path).coalesce()
-            sheet_size = weight.shape
             values = weight.values().float()
             indices = weight.indices().long()
+            self.num_neurons = values.shape[0]
         else:
             # Create adjacency matrix with normal distribution randomized weights
             indices = []
@@ -81,9 +83,10 @@ class TopographicalCorticalCell(nn.Module):
                             :, None
                         ],
                     )
-                    synapses = self.idx_2D_to_1D(synapses)
+                    synapses = self.idx_2D_to_1D(synapses, sheet_size)
                     synapse_root = torch.full_like(
-                        synapses, self.idx_2D_to_1D(torch.tensor((i, j)))
+                        synapses,
+                        self.idx_2D_to_1D(torch.tensor((i, j)), sheet_size),
                     )
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
@@ -94,8 +97,7 @@ class TopographicalCorticalCell(nn.Module):
                 1 / synapses_per_neuron
             )
 
-        self.sheet_size = sheet_size
-        self.num_neurons = sheet_size[0] * sheet_size[1]
+            self.num_neurons = sheet_size[0] * sheet_size[1]
 
         if sparse_format in ("coo", "csr"):
             weight = torch.sparse_coo_tensor(
@@ -129,7 +131,8 @@ class TopographicalCorticalCell(nn.Module):
         """
         self.weight.data = self.weight.data.coalesce()
 
-    def idx_1D_to_2D(self, x):
+    @staticmethod
+    def idx_1D_to_2D(x, sheet_size):
         """
         Convert a 1D index to a 2D index.
 
@@ -139,9 +142,10 @@ class TopographicalCorticalCell(nn.Module):
         Returns:
             torch.Tensor: 2D index.
         """
-        return torch.stack((x // self.sheet_size[1], x % self.sheet_size[1]))
+        return torch.stack((x // sheet_size[1], x % sheet_size[1]))
 
-    def idx_2D_to_1D(self, x):
+    @staticmethod
+    def idx_2D_to_1D(x, sheet_size):
         """
         Convert a 2D index to a 1D index.
 
@@ -151,7 +155,7 @@ class TopographicalCorticalCell(nn.Module):
         Returns:
             torch.Tensor: 1D index.
         """
-        return x[0] * self.sheet_size[1] + x[1]
+        return x[0] * sheet_size[1] + x[1]
 
     def forward(self, x):
         """
