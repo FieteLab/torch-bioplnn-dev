@@ -8,7 +8,7 @@ import torchvision
 from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR10, MNIST
 from torchvision.transforms import ToTensor, Resize
-from utils import image2v1
+from .utils import image2v1
 
 
 class V1Dataset:
