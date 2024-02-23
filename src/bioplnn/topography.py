@@ -6,6 +6,8 @@ import torchsparsegradutils as tsgu
 import scipy
 import numpy as np
 from typing import Any, Optional
+from warnings import warn
+from .utils import idx_2D_to_1D
 
 
 class TopographicalCorticalCell(nn.Module):
@@ -19,8 +21,6 @@ class TopographicalCorticalCell(nn.Module):
         sparse_format: str = "torch_sparse",
         batch_first: bool = True,
         adjacency_matrix_path: str = None,
-        input_indices_path: str = None,
-        output_indices_path: str = None,
         **kwargs: Any,
     ):
         """
@@ -83,10 +83,14 @@ class TopographicalCorticalCell(nn.Module):
                             :, None
                         ],
                     )
-                    synapses = self.idx_2D_to_1D(synapses, sheet_size)
+                    synapses = idx_2D_to_1D(
+                        synapses, sheet_size[0], sheet_size[1]
+                    )
                     synapse_root = torch.full_like(
                         synapses,
-                        self.idx_2D_to_1D(torch.tensor((i, j)), sheet_size),
+                        idx_2D_to_1D(
+                            torch.tensor((i, j)), sheet_size[0], sheet_size[1]
+                        ),
                     )
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
@@ -130,32 +134,6 @@ class TopographicalCorticalCell(nn.Module):
         Coalesce the weight matrix.
         """
         self.weight.data = self.weight.data.coalesce()
-
-    @staticmethod
-    def idx_1D_to_2D(x, sheet_size):
-        """
-        Convert a 1D index to a 2D index.
-
-        Args:
-            x (torch.Tensor): 1D index.
-
-        Returns:
-            torch.Tensor: 2D index.
-        """
-        return torch.stack((x // sheet_size[1], x % sheet_size[1]))
-
-    @staticmethod
-    def idx_2D_to_1D(x, sheet_size):
-        """
-        Convert a 2D index to a 1D index.
-
-        Args:
-            x (torch.Tensor): 2D index.
-
-        Returns:
-            torch.Tensor: 1D index.
-        """
-        return x[0] * sheet_size[1] + x[1]
 
     def forward(self, x):
         """
@@ -212,6 +190,8 @@ class TopographicalRNN(nn.Module):
         sheet_sparse_format: str = "torch_sparse",
         sheet_batch_first: bool = False,
         adjacency_matrix_path: str = None,
+        input_indices: str | torch.Tensor = None,
+        output_indices: str | torch.Tensor = None,
         **kwargs: Any,
     ):
         """
@@ -233,11 +213,44 @@ class TopographicalRNN(nn.Module):
             **kwargs: Additional keyword arguments.
         """
         super().__init__()
-        self.num_neurons = sheet_size[0] * sheet_size[1]
-        self.sheet_size = sheet_size
+        if sheet_size is not None and adjacency_matrix_path is not None:
+            warn(
+                "If adjacency_matrix_path is provided, sheet_size will be ignored"
+            )
         self.num_timesteps = num_timesteps
         self.activation = activation()
         self.sheet_batch_first = sheet_batch_first
+
+        if isinstance(input_indices, str):
+            if "npy" in input_indices:
+                input_indices = np.load(input_indices)
+                input_indices = torch.tensor(input_indices)
+            else:
+                input_indices = torch.load(input_indices)
+        else:
+            if input_indices is not None or not isinstance(
+                input_indices, torch.Tensor
+            ):
+                raise ValueError(
+                    "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
+                )
+
+        if isinstance(output_indices, str):
+            if "npy" in output_indices:
+                output_indices = np.load(output_indices)
+                output_indices = torch.tensor(output_indices)
+            else:
+                output_indices = torch.load(output_indices)
+        else:
+            if output_indices is not None or not isinstance(
+                output_indices, torch.Tensor
+            ):
+                raise ValueError(
+                    "output_indices must be a torch.Tensor or a path to a .npy or .pt file"
+                )
+
+        self.input_indices = input_indices
+        self.output_indices = output_indices
 
         # Create the CorticalSheet layer
         self.cortical_sheet = TopographicalCorticalCell(
@@ -251,11 +264,17 @@ class TopographicalRNN(nn.Module):
             adjacency_matrix_path,
         )
 
-        self.pool = nn.MaxPool2d(pool_stride, pool_stride)
+        self.num_neurons = self.cortical_sheet.num_neurons
+
+        num_out_neurons = (
+            self.num_neurons
+            if output_indices is None
+            else output_indices.shape[0]
+        )
 
         # Create output block
         self.out_block = nn.Sequential(
-            nn.Linear(self.num_neurons // (pool_stride**2), 1024),
+            nn.Linear(num_out_neurons, 1024),
             activation(),
             nn.Linear(1024, 10),
         )
@@ -265,19 +284,25 @@ class TopographicalRNN(nn.Module):
         Forward pass of the TopographicalCorticalRNN.
 
         Args:
-            x (torch.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_channels, num_neurons).
 
         Returns:
             torch.Tensor: Output tensor.
         """
-        # x: Dense (strided) tensor of shape (batch_size, 1, 32, 32)
-        batch_size = x.shape[0]
-
         # Coallesce weight matrix
         # self.cortical_sheet.coalesce()
 
-        # Flatten spatial and channel dimensions
-        x = x.view(batch_size, -1)
+        # Average out channel dimension if it exists
+        if len(x.shape) > 2:
+            x = x.flatten(2)
+            x = x.mean(dim=1)
+
+        if self.input_indices is not None:
+            input_x = torch.zeros(
+                x.shape[0], self.num_neurons, device=x.device, dtype=x.dtype
+            )
+            input_x[:, self.input_indices] = x
+            x = input_x
 
         # To avoid tranposing x before and after every iteration, we tranpose
         # before and after ALL iterations and do not tranpose within forward()
@@ -293,10 +318,8 @@ class TopographicalRNN(nn.Module):
         if not self.sheet_batch_first:
             x = x.t()
 
-        # Apply pooling
-        x = self.pool(x.view(batch_size, 1, *self.sheet_size)).view(
-            batch_size, -1
-        )
+        if self.output_indices is not None:
+            x = x[:, self.output_indices]
 
         # Return classification from out_block
-        return self.out_block(x.flatten(1))
+        return self.out_block(x)
