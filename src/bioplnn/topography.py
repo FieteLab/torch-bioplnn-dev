@@ -7,7 +7,7 @@ import scipy
 import numpy as np
 from typing import Any, Optional
 from warnings import warn
-from .utils import idx_2D_to_1D
+from bioplnn.utils import idx_2D_to_1D
 
 
 class TopographicalCorticalCell(nn.Module):
@@ -62,9 +62,7 @@ class TopographicalCorticalCell(nn.Module):
 
         if adjacency_matrix_path is not None:
             weight = torch.load(adjacency_matrix_path).coalesce()
-            values = weight.values().float()
             indices = weight.indices().long()
-            self.num_neurons = values.shape[0]
         else:
             # Create adjacency matrix with normal distribution randomized weights
             indices = []
@@ -97,11 +95,11 @@ class TopographicalCorticalCell(nn.Module):
             # Sort indices by synapses
             # indices = indices[:, torch.argsort(indices[0])]
             # Xavier initialization of values (synapses_per_neuron is the fan-in/out)
-            values = torch.randn(indices.shape[1]) * math.sqrt(
-                1 / synapses_per_neuron
-            )
 
-            self.num_neurons = sheet_size[0] * sheet_size[1]
+        values = torch.randn(indices.shape[1]) * math.sqrt(
+            1 / synapses_per_neuron
+        )
+        self.num_neurons = values.shape[0]
 
         if sparse_format in ("coo", "csr"):
             weight = torch.sparse_coo_tensor(
@@ -183,8 +181,6 @@ class TopographicalRNN(nn.Module):
         connectivity_std: float = 10,
         synapses_per_neuron: int = 32,
         num_timesteps: int = 100,
-        pool_stride: int = 4,
-        activation: nn.Module = nn.GELU,
         sheet_bias: bool = True,
         sheet_mm_function: str = "torch_sparse",
         sheet_sparse_format: str = "torch_sparse",
@@ -192,6 +188,7 @@ class TopographicalRNN(nn.Module):
         adjacency_matrix_path: str = None,
         input_indices: str | torch.Tensor = None,
         output_indices: str | torch.Tensor = None,
+        activation: str = "relu",
         **kwargs: Any,
     ):
         """
@@ -213,13 +210,24 @@ class TopographicalRNN(nn.Module):
             **kwargs: Additional keyword arguments.
         """
         super().__init__()
-        if sheet_size is not None and adjacency_matrix_path is not None:
+        if (
+            sheet_size is not None
+            or connectivity_std is not None
+            or synapses_per_neuron is not None
+        ) and adjacency_matrix_path is not None:
             warn(
-                "If adjacency_matrix_path is provided, sheet_size will be ignored"
+                "If adjacency_matrix_path is provided, sheet_size, connectivity_std, and synapses_per_neuron will be ignored"
             )
         self.num_timesteps = num_timesteps
-        self.activation = activation()
         self.sheet_batch_first = sheet_batch_first
+        if activation == "gelu":
+            activation = nn.GELU
+            self.activation = activation()
+        elif activation == "relu":
+            activation = nn.ReLU
+            self.activation = activation()
+        else:
+            raise ValueError(f"Invalid activation: {activation}")
 
         if isinstance(input_indices, str):
             if "npy" in input_indices:
@@ -227,13 +235,12 @@ class TopographicalRNN(nn.Module):
                 input_indices = torch.tensor(input_indices)
             else:
                 input_indices = torch.load(input_indices)
-        else:
-            if input_indices is not None or not isinstance(
-                input_indices, torch.Tensor
-            ):
-                raise ValueError(
-                    "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
-                )
+        elif input_indices is not None or not isinstance(
+            input_indices, torch.Tensor
+        ):
+            raise ValueError(
+                "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
+            )
 
         if isinstance(output_indices, str):
             if "npy" in output_indices:
@@ -274,9 +281,9 @@ class TopographicalRNN(nn.Module):
 
         # Create output block
         self.out_block = nn.Sequential(
-            nn.Linear(num_out_neurons, 1024),
+            nn.Linear(num_out_neurons, 64),
             activation(),
-            nn.Linear(1024, 10),
+            nn.Linear(64, 10),
         )
 
     def forward(self, x):

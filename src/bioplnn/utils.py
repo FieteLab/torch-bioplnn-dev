@@ -1,8 +1,3 @@
-import os
-import torchvision
-from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST, CIFAR10
-from .utils import CIFAR10_V1, MNIST_V1
 import torch
 import numpy as np
 import scipy
@@ -44,55 +39,6 @@ def idx_2D_to_1D(x, m, n):
 def print_mem_stats():
     f, t = torch.cuda.mem_get_info()
     print(f"Free/Total: {f/(1024**3):.2f}GB/{t/(1024**3):.2f}GB")
-
-
-def get_MNIST_V1_dataloaders(
-    root="./data",
-    retina_path="connection/V1_indices.npy",
-    batch_size=16,
-    num_workers=0,
-):
-    transform = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.1307,), (0.3081,)),
-        ]
-    )
-    # Load the MNIST dataset
-    mnist_train = MNIST_V1(
-        root=root,
-        train=True,
-        download=True,
-        transform=transform,
-        retina_path=retina_path,
-    )
-
-    # Load the MNIST test dataset
-    mnist_test = MNIST_V1(
-        root="./data",
-        train=False,
-        transform=transform,
-        download=True,
-        retina_path=retina_path,
-    )
-
-    train_loader = DataLoader(
-        dataset=mnist_train,
-        batch_size=batch_size,
-        shuffle=True,
-        pin_memory=torch.cuda.is_available(),
-        num_workers=num_workers,
-    )
-
-    test_loader = DataLoader(
-        dataset=mnist_test,
-        batch_size=batch_size,
-        shuffle=False,
-        pin_memory=torch.cuda.is_available(),
-        num_workers=num_workers,
-    )
-
-    return train_loader, test_loader
 
 
 def r_theta_mp(data):
