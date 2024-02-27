@@ -1,21 +1,21 @@
-import os
 import glob
+import os
 
 import numpy as np
-
 import torch
 import torchvision
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, MNIST
-from bioplnn.utils import image2v1, flatten_indices
+
+from bioplnn.utils import flatten_indices, image2v1
 
 
 class V1Dataset:
-    def prepare(self, image_top_corner, Nx, Ny, retina_radius):
+    def prepare(self, retina_path, image_top_corner, Nx, Ny, retina_radius):
         """
         Read cortex information.
         """
-        self.retina_indices = np.load(self.retina_path)
+        self.retina_indices = np.load(retina_path)
         self.flat_indices = torch.tensor(
             flatten_indices(self.retina_indices, Ny)
         )
@@ -51,9 +51,8 @@ class CIFAR10_V1(CIFAR10, V1Dataset):
         super().__init__(root, train, transform, target_transform, download)
 
         self.image_top_corrner = image_top_corner
-        self.retina_path = retina_path
         self.dual_hemisphere = dual_hemisphere
-        self.prepare(image_top_corner, Nx, Ny, retina_radius)
+        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
 
     def __getitem__(self, index):
         image, target = super().__getitem__(index)
@@ -79,9 +78,8 @@ class MNIST_V1(MNIST, V1Dataset):
         super().__init__(root, train, transform, target_transform, download)
 
         self.image_top_corrner = image_top_corner
-        self.retina_path = retina_path
         self.dual_hemisphere = dual_hemisphere
-        self.prepare(image_top_corner, Nx, Ny, retina_radius)
+        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
 
     def __getitem__(self, index):
         image, target = super().__getitem__(index)
@@ -90,7 +88,7 @@ class MNIST_V1(MNIST, V1Dataset):
 
 
 def get_MNIST_V1_dataloaders(
-    root="./data",
+    root="data",
     retina_path="connection/V1_indices.npy",
     batch_size=16,
     num_workers=0,

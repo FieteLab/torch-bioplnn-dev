@@ -1,7 +1,8 @@
-import torch
 import numpy as np
 import scipy
 import scipy.interpolate
+import torch
+from torch.profiler import ProfilerActivity, profile, record_function
 
 
 class AttrDict(dict):
@@ -39,6 +40,28 @@ def idx_2D_to_1D(x, m, n):
 def print_mem_stats():
     f, t = torch.cuda.mem_get_info()
     print(f"Free/Total: {f/(1024**3):.2f}GB/{t/(1024**3):.2f}GB")
+
+
+def count_parameters(model):
+    total_params = 0
+    for param in model.parameters():
+        num_params = (
+            param._nnz()
+            if param.layout
+            in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
+            else param.numel()
+        )
+        total_params += num_params
+    return total_params
+
+
+def profile(fn, kwargs, sort_by="cuda_time_total", row_limit=50):
+    with profile(
+        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        record_shapes=True,
+    ) as prof:
+        fn(kwargs)
+    return prof.key_averages.table(sort_by=sort_by, row_limit=row_limit)
 
 
 def r_theta_mp(data):

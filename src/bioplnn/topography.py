@@ -1,12 +1,14 @@
 import math
+from typing import Any, Optional
+from warnings import warn
+
+import numpy as np
+import scipy
 import torch
 import torch.nn as nn
 import torch_sparse
 import torchsparsegradutils as tsgu
-import scipy
-import numpy as np
-from typing import Any, Optional
-from warnings import warn
+
 from bioplnn.utils import idx_2D_to_1D
 
 
@@ -20,7 +22,7 @@ class TopographicalCorticalCell(nn.Module):
         mm_function: str = "torch_sparse",
         sparse_format: str = "torch_sparse",
         batch_first: bool = True,
-        adjacency_matrix_path: str = None,
+        adjacency_matrix_path: str | None = None,
         **kwargs: Any,
     ):
         """
@@ -61,8 +63,28 @@ class TopographicalCorticalCell(nn.Module):
             raise ValueError(f"Invalid mm_function: {mm_function}")
 
         if adjacency_matrix_path is not None:
-            weight = torch.load(adjacency_matrix_path).coalesce()
-            indices = weight.indices().long()
+            adj = torch.load(adjacency_matrix_path).coalesce()
+            indices = adj.indices().long()
+            identity = indices.unique().tile(2, 1)
+            indices = torch.cat([indices, identity], 1)
+            indices, _ = torch_sparse.coalesce(
+                indices,
+                torch.ones(indices.shape[1]),
+                adj.shape[0],
+                adj.shape[1],
+            )
+            # fan_in = indices[0].unique(return_counts=True)[1].float().mean()
+            # fan_out = indices[1].unique(return_counts=True)[1].float().mean()
+            # values = torch.randn(indices.shape[1]) * math.sqrt(
+            #     2 / (fan_in + fan_out)
+            # )
+            values = torch.randn(indices.shape[1])
+            for i in range(2):
+                _, inv, count = indices[0].unique(
+                    return_inverse=True, return_counts=True
+                )
+                scale = torch.sqrt(1 / count)
+                values[inv] = values[inv] * scale.repeat_interleave(count)
         else:
             # Create adjacency matrix with normal distribution randomized weights
             indices = []
@@ -86,19 +108,21 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapse_root = torch.full_like(
                         synapses,
-                        idx_2D_to_1D(
-                            torch.tensor((i, j)), sheet_size[0], sheet_size[1]
+                        int(
+                            idx_2D_to_1D(
+                                torch.tensor((i, j)),
+                                sheet_size[0],
+                                sheet_size[1],
+                            )
                         ),
                     )
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
-            # Sort indices by synapses
-            # indices = indices[:, torch.argsort(indices[0])]
-            # Xavier initialization of values (synapses_per_neuron is the fan-in/out)
+            # Xavier initialization of values (synapses_per_neuron is the fan_in + fan_out)
+            values = torch.randn(indices.shape[1]) * math.sqrt(
+                1 / synapses_per_neuron
+            )
 
-        values = torch.randn(indices.shape[1]) * math.sqrt(
-            1 / synapses_per_neuron
-        )
         self.num_neurons = values.shape[0]
 
         if sparse_format in ("coo", "csr"):
@@ -317,9 +341,11 @@ class TopographicalRNN(nn.Module):
         if not self.sheet_batch_first:
             x = x.t()
 
+        input_x = x
+
         # Pass the input through the CorticalSheet layer num_timesteps times
         for _ in range(self.num_timesteps):
-            x = self.activation(self.cortical_sheet(x))
+            x = self.activation(self.cortical_sheet(input_x + x))
 
         # Transpose back
         if not self.sheet_batch_first:
