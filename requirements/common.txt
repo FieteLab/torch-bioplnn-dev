@@ -1,0 +1,14 @@
+jupyterlab
+ipykernel
+numpy 
+opencv-python
+torchsummary
+scipy 
+scikit-learn 
+pandas 
+matplotlib
+mne
+wandb
+accelerate
+lightning
+torchsparsegradutils

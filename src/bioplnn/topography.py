@@ -23,7 +23,7 @@ class TopographicalCorticalCell(nn.Module):
         sparse_format: str = "torch_sparse",
         batch_first: bool = True,
         adjacency_matrix_path: str | None = None,
-        **kwargs: Any,
+        self_recurrence: bool = False,
     ):
         """
         Initialize the TopographicalCorticalSheet object.
@@ -65,26 +65,13 @@ class TopographicalCorticalCell(nn.Module):
         if adjacency_matrix_path is not None:
             adj = torch.load(adjacency_matrix_path).coalesce()
             indices = adj.indices().long()
-            identity = indices.unique().tile(2, 1)
-            indices = torch.cat([indices, identity], 1)
-            indices, _ = torch_sparse.coalesce(
-                indices,
-                torch.ones(indices.shape[1]),
-                adj.shape[0],
-                adj.shape[1],
-            )
-            # fan_in = indices[0].unique(return_counts=True)[1].float().mean()
-            # fan_out = indices[1].unique(return_counts=True)[1].float().mean()
-            # values = torch.randn(indices.shape[1]) * math.sqrt(
-            #     2 / (fan_in + fan_out)
-            # )
-            values = torch.randn(indices.shape[1])
-            for i in range(2):
-                _, inv, count = indices[0].unique(
-                    return_inverse=True, return_counts=True
-                )
-                scale = torch.sqrt(1 / count)
-                values[inv] = values[inv] * scale.repeat_interleave(count)
+            # add identity connection to indices
+            if self_recurrence:
+                identity = indices.unique().tile(2, 1)
+                indices = torch.cat([indices, identity], 1)
+            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
+            scale = torch.sqrt(2 / fan_in.float())
+            values = torch.randn(indices.shape[1]) * scale[inv]
         else:
             # Create adjacency matrix with normal distribution randomized weights
             indices = []
@@ -99,13 +86,9 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
-                            :, None
-                        ],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
                     )
-                    synapses = idx_2D_to_1D(
-                        synapses, sheet_size[0], sheet_size[1]
-                    )
+                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -119,11 +102,9 @@ class TopographicalCorticalCell(nn.Module):
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
             # Xavier initialization of values (synapses_per_neuron is the fan_in + fan_out)
-            values = torch.randn(indices.shape[1]) * math.sqrt(
-                1 / synapses_per_neuron
-            )
+            values = torch.randn(indices.shape[1]) * math.sqrt(1 / synapses_per_neuron)
 
-        self.num_neurons = values.shape[0]
+        self.num_neurons = indices.max().item() + 1
 
         if sparse_format in ("coo", "csr"):
             weight = torch.sparse_coo_tensor(
@@ -147,9 +128,7 @@ class TopographicalCorticalCell(nn.Module):
         # self.weight.register_hook(lambda grad: print(grad))
 
         # Initialize the bias vector
-        self.bias = (
-            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
-        )
+        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
 
     def coalesce(self):
         """
@@ -201,19 +180,19 @@ class TopographicalCorticalCell(nn.Module):
 class TopographicalRNN(nn.Module):
     def __init__(
         self,
-        sheet_size: tuple[int, int] = (100, 100),
+        sheet_size: tuple[int, int] = (256, 256),
         connectivity_std: float = 10,
         synapses_per_neuron: int = 32,
-        num_timesteps: int = 100,
-        sheet_bias: bool = True,
-        sheet_mm_function: str = "torch_sparse",
-        sheet_sparse_format: str = "torch_sparse",
+        bias: bool = True,
+        mm_function: str = "torch_sparse",
+        sparse_format: str = "torch_sparse",
         sheet_batch_first: bool = False,
         adjacency_matrix_path: str = None,
+        self_recurrence: bool = False,
+        num_timesteps: int = 100,
         input_indices: str | torch.Tensor = None,
         output_indices: str | torch.Tensor = None,
         activation: str = "relu",
-        **kwargs: Any,
     ):
         """
         Initialize the TopographicalCorticalRNN object.
@@ -259,9 +238,7 @@ class TopographicalRNN(nn.Module):
                 input_indices = torch.tensor(input_indices)
             else:
                 input_indices = torch.load(input_indices)
-        elif input_indices is not None or not isinstance(
-            input_indices, torch.Tensor
-        ):
+        elif input_indices is not None or not isinstance(input_indices, torch.Tensor):
             raise ValueError(
                 "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
             )
@@ -285,20 +262,19 @@ class TopographicalRNN(nn.Module):
 
         # Create the CorticalSheet layer
         self.cortical_sheet = TopographicalCorticalCell(
-            sheet_size,
-            connectivity_std,
-            synapses_per_neuron,
-            sheet_bias,
-            sheet_mm_function,
-            sheet_sparse_format,
-            sheet_batch_first,
-            adjacency_matrix_path,
+            sheet_size=sheet_size,
+            connectivity_std=connectivity_std,
+            synapses_per_neuron=synapses_per_neuron,
+            bias=bias,
+            mm_function=mm_function,
+            sparse_format=sparse_format,
+            batch_first=sheet_batch_first,
+            adjacency_matrix_path=adjacency_matrix_path,
+            self_recurrence=self_recurrence,
         )
 
-        self.num_neurons = self.cortical_sheet.num_neurons
-
         num_out_neurons = (
-            self.num_neurons
+            self.cortical_sheet.num_neurons
             if output_indices is None
             else output_indices.shape[0]
         )
@@ -330,7 +306,10 @@ class TopographicalRNN(nn.Module):
 
         if self.input_indices is not None:
             input_x = torch.zeros(
-                x.shape[0], self.num_neurons, device=x.device, dtype=x.dtype
+                x.shape[0],
+                self.cortical_sheet.num_neurons,
+                device=x.device,
+                dtype=x.dtype,
             )
             input_x[:, self.input_indices] = x
             x = input_x

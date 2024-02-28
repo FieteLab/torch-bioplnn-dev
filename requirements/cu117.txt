@@ -1,0 +1,7 @@
+-r common.txt
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+-f https://data.pyg.org/whl/torch-2.0.0+cu117.html
+torch-scatter 
+torch-sparse
