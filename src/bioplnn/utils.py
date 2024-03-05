@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 import scipy.interpolate
 import torch
+from torch import nn
 from torch.profiler import ProfilerActivity, profile, record_function
 
 
@@ -12,6 +13,29 @@ class AttrDict(dict):
         for k, v in self.items():
             if isinstance(v, dict):
                 self[k] = AttrDict(v)
+
+
+def get_activation_class(activation):
+    if activation == "relu":
+        return nn.ReLU
+    elif activation == "tanh":
+        return nn.Tanh
+    elif activation == "sigmoid":
+        return nn.Sigmoid
+    elif activation == "softplus":
+        return nn.Softplus
+    elif activation == "softsign":
+        return nn.Softsign
+    elif activation == "elu":
+        return nn.ELU
+    elif activation == "selu":
+        return nn.SELU
+    elif activation == "gelu":
+        return nn.GELU
+    elif activation == "leaky_relu":
+        return nn.LeakyReLU
+    else:
+        raise ValueError(f"Activation function {activation} not supported.")
 
 
 def idx_1D_to_2D(x, m, n):
@@ -50,14 +74,15 @@ def count_parameters(model):
     for param in model.parameters():
         num_params = (
             param._nnz()
-            if param.layout in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
+            if param.layout
+            in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
             else param.numel()
         )
         total_params += num_params
     return total_params
 
 
-def profile(fn, kwargs, sort_by="cuda_time_total", row_limit=50):
+def profile_fn(fn, kwargs, sort_by="cuda_time_total", row_limit=50):
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
         record_shapes=True,
@@ -93,7 +118,9 @@ def image2v1(
     image_x, image_y = image.shape[1:]  # (C, H, W)
     img_ind = np.zeros((2, image_x, image_y))
     img_ind[0, :, :] = (
-        np.tile(0 + np.arange(image_x), (image_y, 1)).T / image_x * image_top_corner[0]
+        np.tile(0 + np.arange(image_x), (image_y, 1)).T
+        / image_x
+        * image_top_corner[0]
     )
     img_ind[1, :, :] = (
         np.tile(np.arange(image_y) - image_y // 2, (image_x, 1))
@@ -104,7 +131,9 @@ def image2v1(
 
     flat_img_ind = img_ind.reshape((2, image_x * image_y))
 
-    normed_indices_retina = normalize_for_mp(retina_indices, N_x, N_y, retina_radius)
+    normed_indices_retina = normalize_for_mp(
+        retina_indices, N_x, N_y, retina_radius
+    )
     r_indices, theta_indices = r_theta_mp(normed_indices_retina)
 
     v_field_x = r_indices * np.cos(theta_indices)
