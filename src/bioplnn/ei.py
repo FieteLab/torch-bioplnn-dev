@@ -160,6 +160,31 @@ class Conv2dEIRNNCell(nn.Module):
             torch.zeros(batch_size, (self.h_inh_dim), *self.input_size),
         )
 
+    def init_output(self, batch_size):
+        """
+        Initializes the output tensor for the cRNN_EI model.
+
+        Args:
+            batch_size (int): The size of the input batch.
+
+        Returns:
+            torch.Tensor: The initialized output tensor.
+        """
+        return (
+            torch.zeros(
+                batch_size,
+                self.h_exc_dim,
+                self.input_size[0] // 2,
+                self.input_size[1] // 2,
+            ),
+            torch.zeros(
+                batch_size,
+                self.h_inh_dim,
+                self.input_size[0] // 2,
+                self.input_size[1] // 2,
+            ),
+        )
+
     def out_exc_dim_flat(self):
         return self.h_exc_dim * (self.input_size[0] // 2) * (self.input_size[1] // 2)
 
@@ -376,6 +401,15 @@ class Conv2dEIRNN(nn.Module):
     def _init_fb(self, batch_size):
         return self._init_hidden(batch_size)
 
+    def _init_output(self, batch_size):
+        init_excs = []
+        init_inhs = []
+        for layer in self.layers:
+            init_exc, init_inh = layer.init_output(batch_size)
+            init_excs.append(init_exc)
+            init_inhs.append(init_inh)
+        return init_excs, init_inhs
+
     @staticmethod
     def _check_kernel_size_consistency(kernel_size):
         if not (
@@ -409,32 +443,40 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor after pooling of shape (b, hidden_dim*2, h', w').
         """
-        batch_size = cue.size(0)
+        batch_size = cue.shape[0]
         h_excs, h_inhs = self._init_hidden(batch_size)
-        fb_prev_excs, fb_prev_inhs = self._init_fb(batch_size)
-        fb_excs, fb_inhs = self._init_fb(batch_size)
 
-        for _ in range(self.num_steps):
-            for i, layer in enumerate(self.layers):
-                (
-                    h_excs[i],
-                    h_inhs[i],
-                    out_exc,
-                    out_inh,
-                ) = layer(
-                    input_exc=cue if i == 0 else out_exc,
-                    input_inh=(torch.zeros_like(cue) if i == 0 else out_inh),
-                    h_exc=h_excs[i],
-                    h_inh=h_inhs[i],
-                    fb_exc=fb_prev_excs[i] if self.use_fb else None,
-                    fb_inh=fb_prev_inhs[i] if self.use_fb else None,
-                )
-                for j in self.fb_adjacency[i]:
-                    fb_excs[j] += self.fb_exc_convs[(i, j)](out_exc)
-                    fb_inhs[j] += self.fb_inh_convs[(i, j)](out_inh)
-            fb_prev_excs = fb_excs
-            fb_prev_inhs = fb_inhs
+        for input in (cue, mixture):
+            out_excs, out_inhs = self._init_output(batch_size)
+            fb_prev_excs, fb_prev_inhs = self._init_fb(batch_size)
             fb_excs, fb_inhs = self._init_fb(batch_size)
+            for t in range(self.num_steps):
+                upper = min(t, len(self.layers) - 1)
+                lower = 0
+                # lower = max(len(self.layers) - self.num_steps + t, 0)
+                for i in range(upper, lower - 1, -1):
+                    layer = self.layers[i]
+                    (
+                        h_excs[i],
+                        h_inhs[i],
+                        out_excs[i],
+                        out_inhs[i],
+                    ) = layer(
+                        input_exc=input if i == 0 else out_excs[i - 1],
+                        input_inh=(
+                            torch.zeros_like(input) if i == 0 else out_inhs[i - 1]
+                        ),
+                        h_exc=h_excs[i],
+                        h_inh=h_inhs[i],
+                        fb_exc=fb_prev_excs[i] if self.use_fb else None,
+                        fb_inh=fb_prev_inhs[i] if self.use_fb else None,
+                    )
+                    for j in self.fb_adjacency[i]:
+                        fb_excs[j] += self.fb_exc_convs[(i, j)](out_excs[i])
+                        fb_inhs[j] += self.fb_inh_convs[(i, j)](out_inhs[i])
+                fb_prev_excs = fb_excs
+                fb_prev_inhs = fb_inhs
+                fb_excs, fb_inhs = self._init_fb(batch_size)
 
-        out = self.out_layer(out_exc.flatten(1))
+        out = self.out_layer(out_excs[-1].flatten(1))
         return out
