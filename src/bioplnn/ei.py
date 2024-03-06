@@ -1,7 +1,8 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from typing import Optional
 
 
 class LinearExc(nn.Linear):
@@ -100,23 +101,18 @@ class Conv2dEIRNNCell(nn.Module):
             print("Warning: using ReLU activation will have no effect")
             self.activation = nn.ReLU()
         else:
-            raise ValueError(
-                "Only 'tanh' and 'relu' activations are supported."
-            )
+            raise ValueError("Only 'tanh' and 'relu' activations are supported.")
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
         self.tau_exc = nn.Parameter(
             torch.randn((1, cur_exc_dim, *input_size), requires_grad=True)
         )
         self.tau_inh = nn.Parameter(
-            torch.randn((1, cur_inh_dim, *input_size), requires_grad=True)
-            + 0.5
+            torch.randn((1, cur_inh_dim, *input_size), requires_grad=True) + 0.5
         )
 
         # Initialize excitatory convolutional layers
-        exc_channels = (
-            input_dim + cur_exc_dim + (prev_inh_dim if use_h_prev else 0)
-        )
+        exc_channels = input_dim + cur_exc_dim + (prev_inh_dim if use_h_prev else 0)
         self.conv_exc = Conv2dPositive(
             in_channels=exc_channels,
             out_channels=cur_exc_dim + cur_inh_dim,
@@ -184,12 +180,8 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: The initialized inhibitory hidden state tensor.
         """
         return (
-            Variable(
-                torch.zeros(batch_size, (self.cur_exc_dim), *self.input_size)
-            ),
-            Variable(
-                torch.zeros(batch_size, (self.cur_inh_dim), *self.input_size)
-            ),
+            Variable(torch.zeros(batch_size, (self.cur_exc_dim), *self.input_size)),
+            Variable(torch.zeros(batch_size, (self.cur_inh_dim), *self.input_size)),
         )
 
     def forward(
@@ -218,9 +210,7 @@ class Conv2dEIRNNCell(nn.Module):
         exc_input = [input, h_cur_exc]
         if self.use_h_prev:
             if h_prev_exc is None:
-                raise ValueError(
-                    "If use_h_prev is True, h_prev_exc must be provided."
-                )
+                raise ValueError("If use_h_prev is True, h_prev_exc must be provided.")
             exc_input.append(h_prev_exc)
 
         exc_input = torch.cat(exc_input, dim=1)
@@ -234,9 +224,7 @@ class Conv2dEIRNNCell(nn.Module):
         inh_input = []
         if self.use_h_prev:
             if h_prev_inh is None:
-                raise ValueError(
-                    "If use_h_prev is True, h_prev_inh must be provided."
-                )
+                raise ValueError("If use_h_prev is True, h_prev_inh must be provided.")
             inh_input.append(h_prev_inh)
 
         inh_input = torch.cat(inh_input, dim=1)
@@ -291,9 +279,7 @@ class Conv2dEIRNN(nn.Module):
         use_fb: bool = False,
         fb_exc_dim: int | list[int] | None = None,
         fb_inh_dim: int | list[int] | None = None,
-        fb_exc_kernel_size: (
-            tuple[int, int] | list[tuple[int, int]] | None
-        ) = None,
+        fb_exc_kernel_size: tuple[int, int] | list[tuple[int, int]] | None = None,
         fb_inh_kernel_sizes: (
             list[tuple[int, int]] | list[list[tuple[int, int]]] | None
         ) = None,
@@ -330,9 +316,7 @@ class Conv2dEIRNN(nn.Module):
         self.input_dims = self._extend_for_multilayer(input_dim, num_layers)
         self.exc_dims = self._extend_for_multilayer(exc_dim, num_layers)
         self.inh_dims = self._extend_for_multilayer(inh_dim, num_layers)
-        self.exc_kernel_sizes = self._extend_for_multilayer(
-            exc_kernel_size, num_layers
-        )
+        self.exc_kernel_sizes = self._extend_for_multilayer(exc_kernel_size, num_layers)
         self.inh_kernel_sizes = self._extend_for_multilayer(
             inh_kernel_sizes, num_layers, depth=1
         )
@@ -341,12 +325,8 @@ class Conv2dEIRNN(nn.Module):
         )
 
         if use_fb:
-            self.fb_exc_dims = self._extend_for_multilayer(
-                fb_exc_dim, num_layers
-            )
-            self.fb_inh_dims = self._extend_for_multilayer(
-                fb_inh_dim, num_layers
-            )
+            self.fb_exc_dims = self._extend_for_multilayer(fb_exc_dim, num_layers)
+            self.fb_inh_dims = self._extend_for_multilayer(fb_inh_dim, num_layers)
             self.fb_exc_kernel_sizes = self._extend_for_multilayer(
                 fb_exc_kernel_size, num_layers
             )
@@ -357,9 +337,7 @@ class Conv2dEIRNN(nn.Module):
         self.pool_kernel_sizes = self._extend_for_multilayer(
             pool_kernel_size, num_layers
         )
-        self.pool_strides = self._extend_for_multilayer(
-            pool_stride, num_layers
-        )
+        self.pool_strides = self._extend_for_multilayer(pool_stride, num_layers)
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
         self.layers = nn.ModuleList()
@@ -442,12 +420,10 @@ class Conv2dEIRNN(nn.Module):
         batch_size = input.size(0)
         h_exc, h_inh = self._init_hidden(batch_size)
         fb_exc = [
-            torch.zeros(batch_size, d, *self.input_size)
-            for d in self.fb_exc_dims
+            torch.zeros(batch_size, d, *self.input_size) for d in self.fb_exc_dims
         ]
         fb_inh = [
-            torch.zeros(batch_size, d, *self.input_size)
-            for d in self.fb_inh_dims
+            torch.zeros(batch_size, d, *self.input_size) for d in self.fb_inh_dims
         ]
 
         for _ in range(self.num_iterations):
@@ -458,16 +434,14 @@ class Conv2dEIRNN(nn.Module):
                     h_cur_inh=h_inh,
                     h_prev_exc=h_exc if self.use_h_prev else None,
                     h_prev_inh=h_inh if self.use_h_prev else None,
-                    fb_exc=h_exc if self.use_fb else None,
+                    fb_exc=fb_exc if self.use_fb else None,
                     fb_inh=h_inh if self.use_fb else None,
                 )
             fb_exc = [
-                torch.zeros(batch_size, d, *self.input_size)
-                for d in self.fb_exc_dims
+                torch.zeros(batch_size, d, *self.input_size) for d in self.fb_exc_dims
             ]
             fb_inh = [
-                torch.zeros(batch_size, d, *self.input_size)
-                for d in self.fb_inh_dims
+                torch.zeros(batch_size, d, *self.input_size) for d in self.fb_inh_dims
             ]
         return h_exc
 
@@ -534,20 +508,14 @@ class RecAttnModel(nn.Module):
         self.kernel_size = kernel_size
 
         # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
-        self.kernel_size = self._extend_for_multilayer(
-            self.kernel_size, num_layers
-        )
-        self.hidden_dim = self._extend_for_multilayer(
-            self.hidden_dim, num_layers
-        )
+        self.kernel_size = self._extend_for_multilayer(self.kernel_size, num_layers)
+        self.hidden_dim = self._extend_for_multilayer(self.hidden_dim, num_layers)
         if not len(self.kernel_size) == len(self.hidden_dim) == num_layers:
             raise ValueError("Inconsistent list length.")
 
         self.inhib_conv_kernel_sizes = inhib_conv_kernel_sizes
         self.inhib_scale_factors = inhib_scale_factors
-        assert len(self.inhib_scale_factors) == len(
-            self.inhib_conv_kernel_sizes
-        )
+        assert len(self.inhib_scale_factors) == len(self.inhib_conv_kernel_sizes)
 
         self.dtype = dtype
         self.num_layers = num_layers
@@ -561,11 +529,7 @@ class RecAttnModel(nn.Module):
 
         # TODO: readout only from the exc cells, not both exc and inh
         self.fc = nn.Linear(
-            self.hidden_dim[-1]
-            * self.input_size[-1]
-            // 2
-            * self.input_size[-1]
-            // 2,
+            self.hidden_dim[-1] * self.input_size[-1] // 2 * self.input_size[-1] // 2,
             fc_size,
         )
         self.classification = nn.Linear(fc_size, num_classes)
@@ -597,9 +561,7 @@ class RecAttnModel(nn.Module):
                     dt=dt,
                 )
             )
-            attn_blocks.append(
-                SimpleAttentionalGain(xh // 2, self.hidden_dim[i])
-            )
+            attn_blocks.append(SimpleAttentionalGain(xh // 2, self.hidden_dim[i]))
 
         # convert python list to pytorch module
         self.cell_list = nn.ModuleList(cell_list)
@@ -671,9 +633,7 @@ class RecAttnModel(nn.Module):
                 # Attention block #
                 ###################
                 # h = self.attn_blocks[layer_idx](cue_activities[layer_idx], h)
-                out = self.attn_blocks[layer_idx](
-                    cue_activities[layer_idx][0], out
-                )
+                out = self.attn_blocks[layer_idx](cue_activities[layer_idx][0], out)
 
                 output_inner.append(out)
 
@@ -726,10 +686,7 @@ class RecAttnModel(nn.Module):
         for cell in self.cell_list:
             for scale, conv in zip(self.inhib_scale_factors, cell.inhib_convs):
                 inhib_loss += (
-                    scale
-                    * torch.linalg.norm(
-                        conv.weight, dim=(-2, -1), ord=2
-                    ).mean()
+                    scale * torch.linalg.norm(conv.weight, dim=(-2, -1), ord=2).mean()
                 )
 
         # calculate cross entropy loss
