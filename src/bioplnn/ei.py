@@ -186,7 +186,11 @@ class Conv2dEIRNNCell(nn.Module):
         )
 
     def out_exc_dim_flat(self):
-        return self.h_exc_dim * (self.input_size[0] // 2) * (self.input_size[1] // 2)
+        return (
+            self.h_exc_dim
+            * (self.input_size[0] // 2)
+            * (self.input_size[1] // 2)
+        )
 
     def forward(
         self,
@@ -241,14 +245,20 @@ class Conv2dEIRNNCell(nn.Module):
 
         # Euler update for the cell state
         self.tau_exc = torch.sigmoid(self.tau_exc)
-        h_next_exc = (1 - self.tau_exc) * h_exc + (self.tau_exc) * cnm_exc_with_inh
+        h_next_exc = (1 - self.tau_exc) * h_exc + (
+            self.tau_exc
+        ) * cnm_exc_with_inh
 
         self.tau_inh = torch.sigmoid(self.tau_inh)
-        h_next_inh = (1 - self.tau_inh) * h_inh + (self.tau_inh) * cnm_inh_with_inh
+        h_next_inh = (1 - self.tau_inh) * h_inh + (
+            self.tau_inh
+        ) * cnm_inh_with_inh
 
         # Pool the output
         out = self.out_pool(torch.cat([h_next_exc, h_next_inh], dim=1))
-        out_exc, out_inh = torch.split(out, [self.h_exc_dim, self.h_inh_dim], dim=1)
+        out_exc, out_inh = torch.split(
+            out, [self.h_exc_dim, self.h_inh_dim], dim=1
+        )
 
         return h_next_exc, h_next_inh, out_exc, out_inh
 
@@ -267,7 +277,9 @@ class Conv2dEIRNN(nn.Module):
         num_steps: int,
         num_classes: int,
         use_fb: bool = False,
-        fb_exc_kernel_size: Optional[tuple[int, int] | list[tuple[int, int]]] = None,
+        fb_exc_kernel_size: Optional[
+            tuple[int, int] | list[tuple[int, int]]
+        ] = None,
         fb_inh_kernel_sizes: Optional[
             list[tuple[int, int]] | list[list[tuple[int, int]]]
         ] = None,
@@ -302,7 +314,9 @@ class Conv2dEIRNN(nn.Module):
         self.input_size = input_size
         self.exc_dims = self._extend_for_multilayer(exc_dim, num_layers)
         self.inh_dims = self._extend_for_multilayer(inh_dim, num_layers)
-        self.exc_kernel_sizes = self._extend_for_multilayer(exc_kernel_size, num_layers)
+        self.exc_kernel_sizes = self._extend_for_multilayer(
+            exc_kernel_size, num_layers
+        )
         self.inh_kernel_sizes = self._extend_for_multilayer(
             inh_kernel_sizes, num_layers, depth=1
         )
@@ -313,7 +327,9 @@ class Conv2dEIRNN(nn.Module):
         self.pool_kernel_sizes = self._extend_for_multilayer(
             pool_kernel_size, num_layers
         )
-        self.pool_strides = self._extend_for_multilayer(pool_stride, num_layers)
+        self.pool_strides = self._extend_for_multilayer(
+            pool_stride, num_layers
+        )
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
         activation_class = get_activation_class(activation)
@@ -356,15 +372,21 @@ class Conv2dEIRNN(nn.Module):
                         kernel_size=1,
                         bias=True,
                     )
-                    self.fb_exc_convs[(i, j)] = nn.Sequential(upsample, conv_exc)
-                    self.fb_exc_convs[(i, j)] = nn.Sequential(upsample, conv_inh)
+                    self.fb_exc_convs[(i, j)] = nn.Sequential(
+                        upsample, conv_exc
+                    )
+                    self.fb_exc_convs[(i, j)] = nn.Sequential(
+                        upsample, conv_inh
+                    )
 
         self.layers = nn.ModuleList()
         for i in range(num_layers):
             self.layers.append(
                 Conv2dEIRNNCell(
                     input_size=input_size,
-                    input_exc_dim=(input_dim if i == 0 else self.exc_dims[i - 1]),
+                    input_exc_dim=(
+                        input_dim if i == 0 else self.exc_dims[i - 1]
+                    ),
                     input_inh_dim=(0 if i == 0 else self.inh_dims[i - 1]),
                     h_exc_dim=self.exc_dims[i],
                     h_inh_dim=self.inh_dims[i],
@@ -464,7 +486,9 @@ class Conv2dEIRNN(nn.Module):
                     ) = layer(
                         input_exc=input if i == 0 else out_excs[i - 1],
                         input_inh=(
-                            torch.zeros_like(input) if i == 0 else out_inhs[i - 1]
+                            torch.zeros_like(input)
+                            if i == 0
+                            else out_inhs[i - 1]
                         ),
                         h_exc=h_excs[i],
                         h_inh=h_inhs[i],

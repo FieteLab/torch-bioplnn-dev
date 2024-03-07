@@ -4,6 +4,7 @@ import scipy.interpolate
 import torch
 from torch import nn
 from torch.profiler import ProfilerActivity, profile, record_function
+from types import SimpleNamespace
 
 
 class AttrDict(dict):
@@ -13,6 +14,14 @@ class AttrDict(dict):
         for k, v in self.items():
             if isinstance(v, dict):
                 self[k] = AttrDict(v)
+
+
+# class AttrDict2(SimpleNamespace):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         for k, v in self.__dict__.items():
+#             if isinstance(v, dict):
+#                 self.__dict__[k] = AttrDict2(v)
 
 
 def get_activation_class(activation):
