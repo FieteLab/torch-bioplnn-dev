@@ -69,9 +69,7 @@ class TopographicalCorticalCell(nn.Module):
             if self_recurrence:
                 identity = indices.unique().tile(2, 1)
                 indices = torch.cat([indices, identity], 1)
-            _, inv, fan_in = indices[0].unique(
-                return_inverse=True, return_counts=True
-            )
+            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
         else:
@@ -88,13 +86,9 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
-                            :, None
-                        ],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
                     )
-                    synapses = idx_2D_to_1D(
-                        synapses, sheet_size[0], sheet_size[1]
-                    )
+                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -108,9 +102,7 @@ class TopographicalCorticalCell(nn.Module):
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
             # Xavier initialization of values (synapses_per_neuron is the fan_in + fan_out)
-            values = torch.randn(indices.shape[1]) * math.sqrt(
-                1 / synapses_per_neuron
-            )
+            values = torch.randn(indices.shape[1]) * math.sqrt(1 / synapses_per_neuron)
 
         self.num_neurons = indices.max().item() + 1
 
@@ -136,9 +128,7 @@ class TopographicalCorticalCell(nn.Module):
         # self.weight.register_hook(lambda grad: print(grad))
 
         # Initialize the bias vector
-        self.bias = (
-            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
-        )
+        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
 
     def coalesce(self):
         """
@@ -196,7 +186,7 @@ class TopographicalRNN(nn.Module):
         bias: bool = True,
         mm_function: str = "torch_sparse",
         sparse_format: str = "torch_sparse",
-        sheet_batch_first: bool = False,
+        batch_first: bool = True,
         adjacency_matrix_path: str = None,
         self_recurrence: bool = False,
         num_timesteps: int = 100,
@@ -232,7 +222,7 @@ class TopographicalRNN(nn.Module):
                 "If adjacency_matrix_path is provided, sheet_size, connectivity_std, and synapses_per_neuron will be ignored"
             )
         self.num_timesteps = num_timesteps
-        self.sheet_batch_first = sheet_batch_first
+        self.batch_first = batch_first
         if activation == "gelu":
             activation = nn.GELU
             self.activation = activation()
@@ -248,9 +238,7 @@ class TopographicalRNN(nn.Module):
                 input_indices = torch.tensor(input_indices)
             else:
                 input_indices = torch.load(input_indices)
-        elif input_indices is not None or not isinstance(
-            input_indices, torch.Tensor
-        ):
+        elif input_indices is not None or not isinstance(input_indices, torch.Tensor):
             raise ValueError(
                 "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
             )
@@ -280,7 +268,7 @@ class TopographicalRNN(nn.Module):
             bias=bias,
             mm_function=mm_function,
             sparse_format=sparse_format,
-            batch_first=sheet_batch_first,
+            batch_first=False,
             adjacency_matrix_path=adjacency_matrix_path,
             self_recurrence=self_recurrence,
         )
@@ -329,7 +317,7 @@ class TopographicalRNN(nn.Module):
         # To avoid tranposing x before and after every iteration, we tranpose
         # before and after ALL iterations and do not tranpose within forward()
         # of self.cortical_sheet
-        if not self.sheet_batch_first:
+        if self.batch_first:
             x = x.t()
 
         input_x = x
@@ -339,7 +327,7 @@ class TopographicalRNN(nn.Module):
             x = self.activation(self.cortical_sheet(input_x + x))
 
         # Transpose back
-        if not self.sheet_batch_first:
+        if self.batch_first:
             x = x.t()
 
         if self.output_indices is not None:

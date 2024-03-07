@@ -4,10 +4,10 @@ model:
   connectivity_std: 10
   synapses_per_neuron: 32
   num_timesteps: 100
-  sheet_bias: True
-  sheet_mm_function: torch_sparse
-  sheet_sparse_format: torch_sparse
-  sheet_batch_first: False
+  bias: True
+  mm_function: torch_sparse
+  sparse_format: torch_sparse
+  batch_first: True
   adjacency_matrix_path: connection/sparse.pt
   self_recurrence: True
   input_indices: connection/V1_indices_flat.pt
