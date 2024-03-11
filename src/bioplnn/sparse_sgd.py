@@ -9,16 +9,28 @@ from torch.optim.optimizer import (
     _foreach_doc,
     _maximize_doc,
     _use_grad_for_differentiable,
+    required,
 )
+from torch.utils._foreach_utils import _group_tensors_by_device_and_dtype
 
-__all__ = ["SGD", "sgd"]
+
+def is_csr(tensor: Tensor) -> bool:
+    return tensor.layout == torch.sparse_csr
+
+
+def is_coo(tensor: Tensor) -> bool:
+    return tensor.layout == torch.sparse_coo
+
+
+def is_coo_or_csr(tensor: Tensor) -> bool:
+    return is_coo(tensor) or is_csr(tensor)
 
 
 class SparseSGD(Optimizer):
     def __init__(
         self,
         params,
-        lr=1e-3,
+        lr=required,
         momentum=0,
         dampening=0,
         weight_decay=0,
@@ -28,12 +40,14 @@ class SparseSGD(Optimizer):
         foreach: Optional[bool] = None,
         differentiable: bool = False,
     ):
-        if lr < 0.0:
-            raise ValueError(f"Invalid learning rate: {lr}")
+        if lr is not required and lr < 0.0:
+            raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
-            raise ValueError(f"Invalid momentum value: {momentum}")
+            raise ValueError("Invalid momentum value: {}".format(momentum))
         if weight_decay < 0.0:
-            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
+            raise ValueError(
+                "Invalid weight_decay value: {}".format(weight_decay)
+            )
 
         defaults = dict(
             lr=lr,
@@ -68,7 +82,7 @@ class SparseSGD(Optimizer):
             if p.grad is not None:
                 params_with_grad.append(p)
                 d_p_list.append(p.grad)
-                if p.grad.is_sparse:
+                if is_coo_or_csr(p.grad):
                     has_sparse_grad = True
 
                 state = self.state[p]
@@ -125,8 +139,9 @@ class SparseSGD(Optimizer):
         return loss
 
 
-SGD.__doc__ = (
-    r"""Implements stochastic gradient descent (optionally with momentum).
+SparseSGD.__doc__ = (
+    r"""\
+    Implements stochastic gradient descent (optionally with momentum).
 
     .. math::
        \begin{aligned}
@@ -161,19 +176,23 @@ SGD.__doc__ = (
     Nesterov momentum is based on the formula from
     `On the importance of initialization and momentum in deep learning`__.
     """
-    + rf"""
+    + r"""
     Args:
         params (iterable): iterable of parameters to optimize or dicts defining
             parameter groups
-        lr (float, optional): learning rate (default: 1e-3)
+        lr (float): learning rate
         momentum (float, optional): momentum factor (default: 0)
         weight_decay (float, optional): weight decay (L2 penalty) (default: 0)
         dampening (float, optional): dampening for momentum (default: 0)
         nesterov (bool, optional): enables Nesterov momentum (default: False)
-        {_maximize_doc}
-        {_foreach_doc}
-        {_differentiable_doc}
-    """
+        {maximize}
+        {foreach}
+        {differentiable}
+    """.format(
+        maximize=_maximize_doc,
+        foreach=_foreach_doc,
+        differentiable=_differentiable_doc,
+    )
     + r"""
 
     Example:
@@ -256,22 +275,63 @@ def sgd(
         )
 
     if foreach and not torch.jit.is_scripting():
-        func = _multi_tensor_sgd
-    else:
-        func = _single_tensor_sgd
+        dense_params = []
+        dense_d_p_list = []
+        dense_momentum_buffer_list = []
+        sparse_params = []
+        sparse_d_p_list = []
+        sparse_momentum_buffer_list = []
+        for i, param in enumerate(params):
+            if is_csr(param):
+                sparse_params.append(param)
+                sparse_d_p_list.append(d_p_list[i])
+                sparse_momentum_buffer_list.append(momentum_buffer_list[i])
+            else:
+                if is_coo(param):
+                    has_sparse_grad = True
+                dense_params.append(param)
+                dense_d_p_list.append(d_p_list[i])
+                dense_momentum_buffer_list.append(momentum_buffer_list[i])
 
-    func(
-        params,
-        d_p_list,
-        momentum_buffer_list,
-        weight_decay=weight_decay,
-        momentum=momentum,
-        lr=lr,
-        dampening=dampening,
-        nesterov=nesterov,
-        has_sparse_grad=has_sparse_grad,
-        maximize=maximize,
-    )
+        if sparse_params:
+            _single_tensor_sgd(
+                sparse_params,
+                sparse_d_p_list,
+                sparse_momentum_buffer_list,
+                weight_decay=weight_decay,
+                momentum=momentum,
+                lr=lr,
+                dampening=dampening,
+                nesterov=nesterov,
+                has_sparse_grad=True,
+                maximize=maximize,
+            )
+
+        _multi_tensor_sgd(
+            dense_params,
+            dense_d_p_list,
+            dense_momentum_buffer_list,
+            weight_decay=weight_decay,
+            momentum=momentum,
+            lr=lr,
+            dampening=dampening,
+            nesterov=nesterov,
+            has_sparse_grad=has_sparse_grad,
+            maximize=maximize,
+        )
+    else:
+        _single_tensor_sgd(
+            params,
+            d_p_list,
+            momentum_buffer_list,
+            weight_decay=weight_decay,
+            momentum=momentum,
+            lr=lr,
+            dampening=dampening,
+            nesterov=nesterov,
+            has_sparse_grad=has_sparse_grad,
+            maximize=maximize,
+        )
 
 
 def _single_tensor_sgd(
@@ -328,31 +388,22 @@ def _multi_tensor_sgd(
     if len(params) == 0:
         return
 
-    grouped_tensors = Optimizer._group_tensors_by_device_and_dtype(
+    grouped_tensors = _group_tensors_by_device_and_dtype(
         [params, grads, momentum_buffer_list], with_indices=True
     )
     for (
         device_params,
         device_grads,
         device_momentum_buffer_list,
-    ), indices in grouped_tensors.values():
-        device_has_sparse_grad = has_sparse_grad and any(
-            grad.is_sparse for grad in device_grads
-        )
-
+        indices,
+    ) in grouped_tensors.values():
         if maximize:
-            device_grads = torch._foreach_neg(device_grads)
+            device_grads = torch._foreach_neg(tuple(device_grads))  # type: ignore[assignment]
 
         if weight_decay != 0:
-            # Re-use the intermediate memory (device_grads) already allocated for maximize
-            if maximize:
-                torch._foreach_add_(
-                    device_grads, device_params, alpha=weight_decay
-                )
-            else:
-                device_grads = torch._foreach_add(
-                    device_grads, device_params, alpha=weight_decay
-                )
+            device_grads = torch._foreach_add(
+                device_grads, device_params, alpha=weight_decay
+            )
 
         if momentum != 0:
             bufs = []
@@ -388,7 +439,7 @@ def _multi_tensor_sgd(
             else:
                 device_grads = bufs
 
-        if not device_has_sparse_grad:
+        if not has_sparse_grad:
             torch._foreach_add_(device_params, device_grads, alpha=-lr)
         else:
             # foreach APIs don't support sparse

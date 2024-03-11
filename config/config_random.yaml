@@ -1,6 +1,6 @@
 # Data and Model parameters
 model:
-  sheet_size: (150, 300)
+  sheet_size: [150, 300]
   connectivity_std: 10
   synapses_per_neuron: 32
   num_timesteps: 100
@@ -8,7 +8,7 @@ model:
   mm_function: torch_sparse
   sparse_format: torch_sparse
   batch_first: True
-  adjacency_matrix_path: connection/sparse.pt
+  adjacency_matrix_path: null
   self_recurrence: True
   input_indices: connection/V1_indices_flat.pt
   output_indices: connection/V4_indices_flat.pt
@@ -23,7 +23,7 @@ optimizer:
   fn: sgd
   lr: 0.001
   momentum: 0.9
-criterion: cross_entropy 
+criterion: cross_entropy
 wandb: False
 train:
   epochs: 30

@@ -1,13 +1,13 @@
 import os
 
 import torch
-import wandb
 from tqdm import tqdm
 
+import wandb
 from bioplnn.dataset import get_MNIST_V1_dataloaders
+from bioplnn.sparse_sgd import SparseSGD
 from bioplnn.topography import TopographicalRNN
 from bioplnn.utils import AttrDict
-from bioplnn.sparse_sgd import SparseSGD
 
 
 def train_iter(
@@ -115,7 +115,7 @@ def train(config):
             lr=config.optimizer.lr,
             momentum=config.optimizer.momentum,
         )
-    if config.optimizer.fn == "sparse_sgd":
+    elif config.optimizer.fn == "sparse_sgd":
         optimizer = SparseSGD(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -194,7 +194,9 @@ if __name__ == "__main__":
     import yaml
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config.yaml")
+    parser.add_argument(
+        "--config", type=str, default="config/config_random.yaml"
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
