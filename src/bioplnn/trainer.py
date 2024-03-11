@@ -7,6 +7,7 @@ from tqdm import tqdm
 from bioplnn.dataset import get_MNIST_V1_dataloaders
 from bioplnn.topography import TopographicalRNN
 from bioplnn.utils import AttrDict
+from bioplnn.sparse_sgd import SparseSGD
 
 
 def train_iter(
@@ -22,7 +23,9 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
@@ -112,13 +115,23 @@ def train(config):
             lr=config.optimizer.lr,
             momentum=config.optimizer.momentum,
         )
+    if config.optimizer.fn == "sparse_sgd":
+        optimizer = SparseSGD(
+            model.parameters(),
+            lr=config.optimizer.lr,
+            momentum=config.optimizer.momentum,
+        )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     train_loader, test_loader = get_MNIST_V1_dataloaders(
         root=config.data.dir,
@@ -136,7 +149,14 @@ def train(config):
     for epoch in range(config.train.epochs):
         # Train the model
         train_loss, train_acc = train_iter(
-            config, model, optimizer, criterion, train_loader, wandb_log, epoch, device
+            config,
+            model,
+            optimizer,
+            criterion,
+            train_loader,
+            wandb_log,
+            epoch,
+            device,
         )
 
         # Evaluate the model on the test set
@@ -157,7 +177,9 @@ def train(config):
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)

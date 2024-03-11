@@ -14,7 +14,7 @@ from torch.optim.optimizer import (
 __all__ = ["SGD", "sgd"]
 
 
-class SGD(Optimizer):
+class SparseSGD(Optimizer):
     def __init__(
         self,
         params,
@@ -46,7 +46,9 @@ class SGD(Optimizer):
             differentiable=differentiable,
         )
         if nesterov and (momentum <= 0 or dampening != 0):
-            raise ValueError("Nesterov momentum requires a momentum and zero dampening")
+            raise ValueError(
+                "Nesterov momentum requires a momentum and zero dampening"
+            )
         super().__init__(params, defaults)
 
     def __setstate__(self, state):
@@ -57,7 +59,9 @@ class SGD(Optimizer):
             group.setdefault("foreach", None)
             group.setdefault("differentiable", False)
 
-    def _init_group(self, group, params_with_grad, d_p_list, momentum_buffer_list):
+    def _init_group(
+        self, group, params_with_grad, d_p_list, momentum_buffer_list
+    ):
         has_sparse_grad = False
 
         for p in group["params"]:
@@ -112,7 +116,9 @@ class SGD(Optimizer):
             )
 
             # update momentum_buffers in state
-            for p, momentum_buffer in zip(params_with_grad, momentum_buffer_list):
+            for p, momentum_buffer in zip(
+                params_with_grad, momentum_buffer_list
+            ):
                 state = self.state[p]
                 state["momentum_buffer"] = momentum_buffer
 
@@ -245,7 +251,9 @@ def sgd(
             foreach = False
 
     if foreach and torch.jit.is_scripting():
-        raise RuntimeError("torch.jit.script not supported with foreach optimizers")
+        raise RuntimeError(
+            "torch.jit.script not supported with foreach optimizers"
+        )
 
     if foreach and not torch.jit.is_scripting():
         func = _multi_tensor_sgd
@@ -338,7 +346,9 @@ def _multi_tensor_sgd(
         if weight_decay != 0:
             # Re-use the intermediate memory (device_grads) already allocated for maximize
             if maximize:
-                torch._foreach_add_(device_grads, device_params, alpha=weight_decay)
+                torch._foreach_add_(
+                    device_grads, device_params, alpha=weight_decay
+                )
             else:
                 device_grads = torch._foreach_add(
                     device_grads, device_params, alpha=weight_decay
@@ -362,12 +372,14 @@ def _multi_tensor_sgd(
                 bufs = []
                 for i in range(len(device_momentum_buffer_list)):
                     if device_momentum_buffer_list[i] is None:
-                        buf = device_momentum_buffer_list[i] = momentum_buffer_list[
-                            indices[i]
-                        ] = torch.clone(device_grads[i]).detach()
+                        buf = device_momentum_buffer_list[i] = (
+                            momentum_buffer_list[indices[i]]
+                        ) = torch.clone(device_grads[i]).detach()
                     else:
                         buf = device_momentum_buffer_list[i]
-                        buf.mul_(momentum).add_(device_grads[i], alpha=1 - dampening)
+                        buf.mul_(momentum).add_(
+                            device_grads[i], alpha=1 - dampening
+                        )
 
                     bufs.append(buf)
 

@@ -69,7 +69,9 @@ class TopographicalCorticalCell(nn.Module):
             if self_recurrence:
                 identity = indices.unique().tile(2, 1)
                 indices = torch.cat([indices, identity], 1)
-            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
+            _, inv, fan_in = indices[0].unique(
+                return_inverse=True, return_counts=True
+            )
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
         else:
@@ -86,9 +88,13 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
+                            :, None
+                        ],
                     )
-                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
+                    synapses = idx_2D_to_1D(
+                        synapses, sheet_size[0], sheet_size[1]
+                    )
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -102,7 +108,9 @@ class TopographicalCorticalCell(nn.Module):
                     indices.append(torch.stack((synapses, synapse_root)))
             indices = torch.cat(indices, dim=1)
             # Xavier initialization of values (synapses_per_neuron is the fan_in + fan_out)
-            values = torch.randn(indices.shape[1]) * math.sqrt(1 / synapses_per_neuron)
+            values = torch.randn(indices.shape[1]) * math.sqrt(
+                1 / synapses_per_neuron
+            )
 
         self.num_neurons = indices.max().item() + 1
 
@@ -128,7 +136,9 @@ class TopographicalCorticalCell(nn.Module):
         # self.weight.register_hook(lambda grad: print(grad))
 
         # Initialize the bias vector
-        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        self.bias = (
+            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        )
 
     def coalesce(self):
         """
@@ -238,7 +248,9 @@ class TopographicalRNN(nn.Module):
                 input_indices = torch.tensor(input_indices)
             else:
                 input_indices = torch.load(input_indices)
-        elif input_indices is not None or not isinstance(input_indices, torch.Tensor):
+        elif input_indices is not None or not isinstance(
+            input_indices, torch.Tensor
+        ):
             raise ValueError(
                 "input_indices must be a torch.Tensor or a path to a .npy or .pt file"
             )
