@@ -1,6 +1,7 @@
 import os
 
 import torch
+from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
 import wandb
@@ -38,6 +39,7 @@ def train_iter(
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
+        clip_grad_value_(model.parameters(), config.train.grad_clip)
         optimizer.step()
 
         # Update statistics

@@ -13,6 +13,7 @@ model:
   input_indices: connection/V1_indices_flat.pt
   output_indices: connection/V4_indices_flat.pt
   activation: relu
+  initialization: he
 # Training parameters
 data:
   dir: data
@@ -24,8 +25,9 @@ optimizer:
   lr: 0.001
   momentum: 0.9
 criterion: cross_entropy
-wandb: False
+wandb: True
 train:
   epochs: 30
   log_freq: 50
   model_dir: models
+  grad_clip: 1.0

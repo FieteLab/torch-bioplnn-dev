@@ -3,7 +3,6 @@ from typing import Any, Optional
 from warnings import warn
 
 import numpy as np
-import scipy
 import torch
 import torch.nn as nn
 import torch_sparse
@@ -24,6 +23,7 @@ class TopographicalCorticalCell(nn.Module):
         batch_first: bool = True,
         adjacency_matrix_path: str | None = None,
         self_recurrence: bool = False,
+        initialization: str = "identity",
     ):
         """
         Initialize the TopographicalCorticalSheet object.
@@ -62,6 +62,7 @@ class TopographicalCorticalCell(nn.Module):
         else:
             raise ValueError(f"Invalid mm_function: {mm_function}")
 
+        # Load adjacency matrix if provided
         if adjacency_matrix_path is not None:
             adj = torch.load(adjacency_matrix_path).coalesce()
             indices = adj.indices().long()
@@ -74,9 +75,12 @@ class TopographicalCorticalCell(nn.Module):
             )
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
+
+        # Create adjacency matrix with normal distribution randomized weights
         else:
-            # Create adjacency matrix with normal distribution randomized weights
             indices = []
+            if initialization == "identity":
+                values = []
             for i in range(sheet_size[0]):
                 for j in range(sheet_size[1]):
                     synapses = (
@@ -106,11 +110,26 @@ class TopographicalCorticalCell(nn.Module):
                         ),
                     )
                     indices.append(torch.stack((synapses, synapse_root)))
+                    if initialization == "identity":
+                        values.append(
+                            torch.cat(
+                                [
+                                    torch.zeros(synapses_per_neuron),
+                                    torch.ones(1),
+                                ]
+                            )
+                        )
             indices = torch.cat(indices, dim=1)
-            # Xavier initialization of values (synapses_per_neuron is the fan_in + fan_out)
-            values = torch.randn(indices.shape[1]) * math.sqrt(
-                1 / synapses_per_neuron
-            )
+
+            # He initialization of values (synapses_per_neuron is the fan_in)
+            if initialization == "he":
+                values = torch.randn(indices.shape[1]) * math.sqrt(
+                    2 / synapses_per_neuron
+                )
+            elif initialization == "identity":
+                values = torch.cat(values)
+            else:
+                raise ValueError(f"Invalid initialization: {initialization}")
 
         self.num_neurons = indices.max().item() + 1
 
@@ -203,6 +222,7 @@ class TopographicalRNN(nn.Module):
         input_indices: str | torch.Tensor = None,
         output_indices: str | torch.Tensor = None,
         activation: str = "relu",
+        initialization: str = "identity",
     ):
         """
         Initialize the TopographicalCorticalRNN object.
@@ -283,6 +303,7 @@ class TopographicalRNN(nn.Module):
             batch_first=False,
             adjacency_matrix_path=adjacency_matrix_path,
             self_recurrence=self_recurrence,
+            initialization=initialization,
         )
 
         num_out_neurons = (
