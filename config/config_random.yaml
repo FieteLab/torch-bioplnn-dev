@@ -6,14 +6,13 @@ model:
   num_timesteps: 100
   bias: True
   mm_function: torch_sparse
-  sparse_format: torch_sparse
+  sparse_format: null
   batch_first: True
   adjacency_matrix_path: null
   self_recurrence: True
   input_indices: connection/V1_indices_flat.pt
   output_indices: connection/V4_indices_flat.pt
   activation: relu
-  initialization: he
 # Training parameters
 data:
   dir: data
