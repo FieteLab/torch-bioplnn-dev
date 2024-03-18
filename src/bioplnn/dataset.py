@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 
 import numpy as np
 import torch
@@ -33,33 +34,6 @@ class V1Dataset:
         )
 
 
-class CIFAR10_V1(CIFAR10, V1Dataset):
-    def __init__(
-        self,
-        root,
-        train=True,
-        transform=None,
-        target_transform=None,
-        download=False,
-        retina_path="connection/V1_indices.npy",
-        image_top_corner=(4, 4),
-        Nx=150,
-        Ny=300,
-        retina_radius=80,
-        dual_hemisphere=False,
-    ):
-        super().__init__(root, train, transform, target_transform, download)
-
-        self.image_top_corrner = image_top_corner
-        self.dual_hemisphere = dual_hemisphere
-        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
-
-    def __getitem__(self, index):
-        image, target = super().__getitem__(index)
-        v1 = self.image2v1(image)
-        return v1, target
-
-
 class MNIST_V1(MNIST, V1Dataset):
     def __init__(
         self,
@@ -87,38 +61,91 @@ class MNIST_V1(MNIST, V1Dataset):
         return v1, target
 
 
-def get_MNIST_V1_dataloaders(
+class CIFAR10_V1(CIFAR10, V1Dataset):
+    def __init__(
+        self,
+        root,
+        train=True,
+        transform=None,
+        target_transform=None,
+        download=False,
+        retina_path="connection/V1_indices.npy",
+        image_top_corner=(4, 4),
+        Nx=150,
+        Ny=300,
+        retina_radius=80,
+        dual_hemisphere=False,
+    ):
+        super().__init__(root, train, transform, target_transform, download)
+
+        self.image_top_corrner = image_top_corner
+        self.dual_hemisphere = dual_hemisphere
+        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
+
+    def __getitem__(self, index):
+        image, target = super().__getitem__(index)
+        v1 = self.image2v1(image)
+        return v1, target
+
+
+def get_dataloaders(
+    dataset="mnist",
     root="data",
-    retina_path="connection/V1_indices.npy",
+    retina_path=None,
     batch_size=16,
     num_workers=0,
 ):
-    transform = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.1307,), (0.3081,)),
-        ]
-    )
+    retina_path_arg = dict()
+    if dataset == "mnist":
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize((0.1307,), (0.3081,)),
+            ]
+        )
+        if dataset == "mnist":
+            dataset = MNIST
+        elif dataset == "mnist_v1":
+            dataset = MNIST_V1
+            retina_path_arg = {"retina_path": retina_path}
+    elif dataset.startswith("cifar"):
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)
+                ),
+            ]
+        )
+        if dataset == "cifar":
+            dataset = CIFAR10
+        elif dataset == "cifar_v1":
+            dataset = CIFAR10_V1
+            retina_path_arg = {"retina_path": retina_path}
+    else:
+        raise NotImplementedError(f"Dataset {dataset} not implemented")
+
     # Load the MNIST dataset
-    mnist_train = MNIST_V1(
+
+    train_set = dataset(
         root=root,
         train=True,
         download=True,
         transform=transform,
-        retina_path=retina_path,
+        **retina_path_arg,
     )
 
     # Load the MNIST test dataset
-    mnist_test = MNIST_V1(
+    test_set = dataset(
         root="./data",
         train=False,
         transform=transform,
         download=True,
-        retina_path=retina_path,
+        **retina_path_arg,
     )
 
     train_loader = DataLoader(
-        dataset=mnist_train,
+        dataset=train_set,
         batch_size=batch_size,
         shuffle=True,
         pin_memory=torch.cuda.is_available(),
@@ -126,7 +153,7 @@ def get_MNIST_V1_dataloaders(
     )
 
     test_loader = DataLoader(
-        dataset=mnist_test,
+        dataset=test_set,
         batch_size=batch_size,
         shuffle=False,
         pin_memory=torch.cuda.is_available(),

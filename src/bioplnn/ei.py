@@ -294,15 +294,15 @@ class Conv2dEIRNN(nn.Module):
         pyr_dim: int | list[int],
         int_1_dim: int | list[int],
         int_2_dim: int | list[int],
-        exc_kernel_size: tuple[int, int] | list[tuple[int, int]],
-        inh_kernel_size: tuple[int, int] | list[tuple[int, int]],
+        exc_kernel_size: list[int, int] | list[list[int, int]],
+        inh_kernel_size: list[int, int] | list[list[int, int]],
         num_layers: int,
         num_steps: int,
         num_classes: int,
         use_fb: bool = False,
         fb_adjacency: Optional[torch.Tensor] = None,
-        pool_kernel_size: tuple[int, int] | list[tuple[int, int]] = (5, 5),
-        pool_stride: tuple[int, int] | list[tuple[int, int]] = (2, 2),
+        pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
+        pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
         bias: bool | list[bool] = True,
         activation: str = "relu",
         fc_dim: int = 1024,
@@ -329,52 +329,27 @@ class Conv2dEIRNN(nn.Module):
         """
         super().__init__()
         self.input_size = input_size
+        self.use_fb = use_fb
         self.pyr_dims = self._extend_for_multilayer(pyr_dim, num_layers)
         self.int_1_dims = self._extend_for_multilayer(int_1_dim, num_layers)
         self.int_2_dims = self._extend_for_multilayer(int_2_dim, num_layers)
         self.exc_kernel_sizes = self._extend_for_multilayer(
-            exc_kernel_size, num_layers
+            exc_kernel_size, num_layers, depth=1
         )
         self.inh_kernel_sizes = self._extend_for_multilayer(
-            inh_kernel_size, num_layers
+            inh_kernel_size, num_layers, depth=1
         )
         self.num_steps = num_steps
         self.pool_kernel_sizes = self._extend_for_multilayer(
-            pool_kernel_size, num_layers
+            pool_kernel_size, num_layers, depth=1
         )
         self.pool_strides = self._extend_for_multilayer(
-            pool_stride, num_layers
+            pool_stride, num_layers, depth=1
         )
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
         activation_class = get_activation_class(activation)
         self.activation = activation_class()
-
-        if use_fb:
-            if (
-                fb_adjacency.dim() != 2
-                or fb_adjacency.shape[0] != num_layers
-                or fb_adjacency.shape[1] != num_layers
-            ):
-                raise ValueError(
-                    "The the dimensions of fb_adjacency must match number of layers."
-                )
-            self.fb_adjacency = []
-            self.fb_convs = dict()
-            for row in fb_adjacency:
-                row = row.nonzero().squeeze().tolist()
-                self.fb_adjacency.append(row)
-                for j in row:
-                    upsample = nn.Upsample(
-                        size=self.layers[j].input_size, mode="bilinear"
-                    )
-                    conv_exc = Conv2dPositive(
-                        in_channels=self.layers[i].h_pyr_dim,
-                        out_channels=self.layers[j].h_pyr_dim,
-                        kernel_size=1,
-                        bias=True,
-                    )
-                    self.fb_convs[(i, j)] = nn.Sequential(upsample, conv_exc)
 
         self.layers = nn.ModuleList()
         for i in range(num_layers):
@@ -398,6 +373,36 @@ class Conv2dEIRNN(nn.Module):
                 input_size[0] // self.pool_strides[i][0],
                 input_size[1] // self.pool_strides[i][1],
             )
+
+        if use_fb:
+            try:
+                fb_adjacency = torch.load(fb_adjacency)
+            except:
+                fb_adjacency = torch.tensor(fb_adjacency)
+            if (
+                fb_adjacency.dim() != 2
+                or fb_adjacency.shape[0] != num_layers
+                or fb_adjacency.shape[1] != num_layers
+            ):
+                raise ValueError(
+                    "The the dimensions of fb_adjacency must match number of layers."
+                )
+            self.fb_adjacency = []
+            self.fb_convs = dict()
+            for row in fb_adjacency:
+                row = row.nonzero().squeeze(1).tolist()
+                self.fb_adjacency.append(row)
+                for j in row:
+                    upsample = nn.Upsample(
+                        size=self.layers[j].input_size, mode="bilinear"
+                    )
+                    conv_exc = Conv2dPositive(
+                        in_channels=self.layers[i].h_pyr_dim,
+                        out_channels=self.layers[j].h_pyr_dim,
+                        kernel_size=1,
+                        bias=True,
+                    )
+                    self.fb_convs[(i, j)] = nn.Sequential(upsample, conv_exc)
 
         self.out_layer = nn.Sequential(
             nn.Linear(
@@ -431,11 +436,11 @@ class Conv2dEIRNN(nn.Module):
     def _extend_for_multilayer(param, num_layers, depth=0):
         inner = param
         for _ in range(depth):
-            if not isinstance(inner, list):
+            if not isinstance(inner, (list, tuple)):
                 raise ValueError("depth exceeds the depth of param.")
             inner = inner[0]
 
-        if not isinstance(inner, list):
+        if not isinstance(inner, (list, tuple)):
             param = [param] * num_layers
         return param
 
@@ -451,11 +456,11 @@ class Conv2dEIRNN(nn.Module):
         """
         batch_size = cue.shape[0]
         h_pyrs, h_int_1s, h_int_2s = self._init_hidden(batch_size)
+        fbs_prev = self._init_fb(batch_size)
+        fbs = self._init_fb(batch_size)
 
         for input in (cue, mixture):
             outs = [None] * len(self.layers)
-            fbs_prev = self._init_fb(batch_size)
-            fbs = self._init_fb(batch_size)
             for t in range(self.num_steps):
                 upper = min(t, len(self.layers) - 1)
                 lower = 0

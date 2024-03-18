@@ -1,0 +1,38 @@
+# Data and Model parameters
+model:
+  input_size: [28, 28]
+  input_dim: 1
+  pyr_dim: 4
+  int_1_dim: 4
+  int_2_dim: 4
+  exc_kernel_size: [3, 3]
+  inh_kernel_size: [3, 3]
+  num_layers: 2
+  num_steps: 100
+  num_classes: 10
+  use_fb: True
+  fb_adjacency: connection/fb_adjacency.pt
+  pool_kernel_size: [5, 5]
+  pool_stride: [2, 2]
+  bias: True
+  activation: relu
+  fc_dim: 256
+# Training parameters
+data:
+  dataset: mnist
+  dir: data
+  batch_size: 16
+  num_workers: 0
+optimizer: 
+  fn: adam
+  lr: 0.001
+  momentum: 0.9
+  beta1: 0.9
+  beta2: 0.999
+criterion: cross_entropy
+wandb: False
+train:
+  epochs: 30
+  log_freq: 50
+  model_dir: models
+  grad_clip: 1.0

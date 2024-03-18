@@ -6,15 +6,14 @@ import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-from bioplnn.dataset import get_MNIST_V1_dataloaders
-from bioplnn.sparse_sgd import SparseSGD
-from bioplnn.topography import TopographicalRNN
+from bioplnn.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict
+from bioplnn.dataset import get_dataloaders
 
 
 def train_iter(
     config: AttrDict,
-    model: TopographicalRNN,
+    model: Conv2dEIRNN,
     optimizer: torch.optim.Optimizer,
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
@@ -27,7 +26,7 @@ def train_iter(
 
     Args:
         config (AttrDict): Configuration parameters.
-        model (TopographicalRNN): The model to be trained.
+        model (Conv2dEIRNN): The model to be trained.
         optimizer (torch.optim.Optimizer): The optimizer used for training.
         criterion (torch.nn.Module): The loss function.
         train_loader (torch.utils.data.DataLoader): The training data loader.
@@ -48,20 +47,24 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
         labels = labels.to(device)
 
+        cue, mixture = images.split(config.data.batch_size // 2, dim=0)
+
         # Forward pass
-        outputs = model(images)
+        outputs = model(cue, mixture)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        clip_grad_value_(model.parameters(), config.train.grad_clip)
+        clip_grad_norm_(model.parameters(), config.train.grad_clip)
         optimizer.step()
 
         # Update statistics
@@ -99,7 +102,7 @@ def train_iter(
 
 
 def eval_iter(
-    model: TopographicalRNN,
+    model: Conv2dEIRNN,
     criterion: torch.nn.Module,
     test_loader: torch.utils.data.DataLoader,
     wandb_log: Callable[[dict[str, float, int]], None],
@@ -110,7 +113,7 @@ def eval_iter(
     Perform a single evaluation iteration.
 
     Args:
-        model (TopographicalRNN): The model to be evaluated.
+        model (Conv2dEIRNN): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
         test_loader (torch.utils.data.DataLoader): The test data loader.
         wandb_log (function): Function to log evaluation statistics to Weights & Biases.
@@ -158,46 +161,38 @@ def train(config: AttrDict) -> None:
         config (AttrDict): Configuration parameters.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = TopographicalRNN(**config.model).to(device)
+    model = Conv2dEIRNN(**config.model).to(device)
 
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
-        if config.model.sparse_format == "csr":
-            raise ValueError("sgd is not supported with csr: Use sparse_sgd instead")
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=config.optimizer.lr,
             momentum=config.optimizer.momentum,
         )
     elif config.optimizer.fn == "adam":
-        if config.model.sparse_format in ("coo", "csr"):
-            raise ValueError("adam is not supported with csr: Use sparse_sgd instead")
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=config.optimizer.lr,
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
-    elif config.optimizer.fn == "sparse_sgd":
-        if config.model.mm_function == "torch_sparse":
-            raise ValueError("sparse_sgd is not supported with torch_sparse")
-        optimizer = SparseSGD(
-            model.parameters(),
-            lr=config.optimizer.lr,
-            momentum=config.optimizer.momentum,
-        )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     # Get the data loaders
-    train_loader, test_loader = get_MNIST_V1_dataloaders(
+    train_loader, test_loader = get_dataloaders(
+        dataset=config.data.dataset,
         root=config.data.dir,
-        retina_path=config.data.retina_path,
         batch_size=config.data.batch_size,
         num_workers=config.data.num_workers,
     )
@@ -240,7 +235,9 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)
@@ -255,7 +252,7 @@ if __name__ == "__main__":
     import yaml
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config_random.yaml")
+    parser.add_argument("--config", type=str, default="config/config_ei.yaml")
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
