@@ -1,4 +1,4 @@
-from math import prod
+from math import prod, ceil
 from typing import Optional
 
 import torch
@@ -8,33 +8,26 @@ from torch.autograd import Variable
 from bioplnn.utils import get_activation_class
 
 
-class LinearExc(nn.Linear):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, x):
-        self.weight = torch.relu(self.weight)
-        return super().forward(x)
-
-
-class LinearInh(nn.Linear):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, x):
-        self.weight = -torch.relu(-self.weight)
-        return super().forward(x)
-
-
 class Conv2dPositive(nn.Conv2d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def forward(self, x):
-        self.weight = torch.relu(self.weight)
+        self.weight.data = torch.relu(self.weight.data)
         if self.bias is not None:
-            self.bias = torch.relu(self.bias)
+            self.bias.data = torch.relu(self.bias.data)
         return super().forward(x)
+
+
+class ConvTranspose2dPositive(nn.ConvTranspose2d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        self.weight.data = torch.relu(self.weight.data)
+        if self.bias is not None:
+            self.bias.data = torch.relu(self.bias.data)
+        return super().forward(*args, **kwargs)
 
 
 class Conv2dEIRNNCell(nn.Module):
@@ -42,12 +35,11 @@ class Conv2dEIRNNCell(nn.Module):
         self,
         input_size: tuple[int, int],
         input_dim: int,
-        h_pyr_dim: int,
-        h_int_1_dim: int,
-        h_int_2_dim: int,
-        exc_kernel_size: tuple[int, int],
-        inh_kernel_size: tuple[int, int],
-        use_fb: bool = False,
+        h_pyr_dim: int = 4,
+        h_inter_dims: tuple[int] = (4),
+        fb_dim: int = 0,
+        exc_kernel_size: tuple[int, int] = (5, 5),
+        inh_kernel_size: tuple[int, int] = (5, 5),
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
@@ -74,40 +66,62 @@ class Conv2dEIRNNCell(nn.Module):
         """
         super().__init__()
         self.input_size = input_size
+        self.inter_size = (ceil(input_size[0] / 2), ceil(input_size[1] / 2))
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
-        self.h_int_1_dim = h_int_1_dim
-        self.h_int_2_dim = h_int_2_dim
-        self.use_fb = use_fb
+        self.h_inter_dims = h_inter_dims
+        self.num_inter = len(h_inter_dims)
+        if self.num_inter not in (1, 2, 4):
+            raise ValueError(
+                "The length of h_inter_dims must be 1, 2, or 4. "
+                f"Got {self.num_inter}."
+            )
+        self.h_inter_dims_sum = sum(h_inter_dims)
+        self.fb_dim = fb_dim
+        self.use_fb = fb_dim > 0
         self.pool_stride = pool_stride
         self.activation = get_activation_class(activation)()
+        self.out_shape = (
+            1,
+            h_pyr_dim,
+            ceil(input_size[0] / 2),
+            ceil(input_size[1] / 2),
+        )
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
         self.tau_pyr = nn.Parameter(
             torch.randn((1, h_pyr_dim, *input_size), requires_grad=True)
         )
-        self.tau_int_1 = nn.Parameter(
-            torch.randn((1, h_int_1_dim, *input_size), requires_grad=True)
-            + 0.5
-        )
-        self.tau_int_2 = nn.Parameter(
-            torch.randn((1, h_int_2_dim, *input_size), requires_grad=True)
+        self.tau_inter = nn.Parameter(
+            torch.randn(
+                (1, self.h_inter_dims_sum, *self.inter_size),
+                requires_grad=True,
+            )
             + 0.5
         )
 
         # Initialize excitatory convolutional layers
-        self.conv_exc = Conv2dPositive(
+        self.conv_exc_pyr = Conv2dPositive(
             in_channels=input_dim + h_pyr_dim,
-            out_channels=h_pyr_dim + h_int_1_dim + h_int_2_dim,
+            out_channels=h_pyr_dim,
             kernel_size=exc_kernel_size,
             padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
             bias=bias,
         )
 
-        if use_fb:
-            self.conv_exc_fb = Conv2dPositive(
-                in_channels=h_pyr_dim,
-                out_channels=h_pyr_dim + h_int_1_dim + h_int_2_dim,
+        self.conv_exc_inter = Conv2dPositive(
+            in_channels=input_dim + h_pyr_dim,
+            out_channels=self.h_inter_dims_sum,
+            kernel_size=exc_kernel_size,
+            stride=2,
+            padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+            bias=bias,
+        )
+
+        if self.use_fb:
+            self.conv_exc_pyr_fb = Conv2dPositive(
+                in_channels=fb_dim,
+                out_channels=h_pyr_dim,
                 kernel_size=exc_kernel_size,
                 padding=(
                     exc_kernel_size[0] // 2,
@@ -115,24 +129,33 @@ class Conv2dEIRNNCell(nn.Module):
                 ),
                 bias=bias,
             )
+            self.conv_exc_inter_fb = Conv2dPositive(
+                in_channels=fb_dim,
+                out_channels=self.h_inter_dims_sum,
+                kernel_size=exc_kernel_size,
+                stride=2,
+                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                bias=bias,
+            )
 
         # Initialize inhibitory convolutional layers
-        self.conv_inh_1 = Conv2dPositive(
-            in_channels=h_int_1_dim,
-            out_channels=h_pyr_dim + h_int_1_dim + h_int_2_dim,
-            kernel_size=inh_kernel_size,
-            stride=1,
-            padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
-            bias=False,
-        )
-        self.conv_inh_2 = Conv2dPositive(
-            in_channels=h_int_1_dim,
-            out_channels=h_pyr_dim + h_int_1_dim + h_int_2_dim,
-            kernel_size=inh_kernel_size,
-            stride=1,
-            padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
-            bias=False,
-        )
+        self.convs_inh = nn.ModuleList()
+        self.inh_out_dims = [
+            h_pyr_dim,
+            self.h_inter_dims_sum,
+            h_pyr_dim,
+            h_pyr_dim,
+        ]
+        for i, h_inter_dim in enumerate(h_inter_dims):
+            conv = ConvTranspose2dPositive(
+                in_channels=h_inter_dim,
+                out_channels=self.inh_out_dims[i],
+                kernel_size=inh_kernel_size,
+                stride=1 if i == 1 else 2,
+                padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
+                bias=bias,
+            )
+            self.convs_inh.append(conv)
 
         # Initialize output pooling layer
         self.out_pool = nn.AvgPool2d(
@@ -154,8 +177,7 @@ class Conv2dEIRNNCell(nn.Module):
         """
         return (
             torch.zeros(batch_size, self.h_pyr_dim, *self.input_size),
-            torch.zeros(batch_size, self.h_int_1_dim, *self.input_size),
-            torch.zeros(batch_size, self.h_int_2_dim, *self.input_size),
+            torch.zeros(batch_size, self.h_inter_dims_sum, *self.inter_size),
         )
 
     def init_fb(self, batch_size):
@@ -170,20 +192,11 @@ class Conv2dEIRNNCell(nn.Module):
         """
         return torch.zeros(batch_size, self.h_pyr_dim, *self.input_size)
 
-    def out_shape(self):
-        return (
-            1,
-            self.h_pyr_dim,
-            (self.input_size[0] // self.pool_stride[0]),
-            (self.input_size[1] // self.pool_stride[1]),
-        )
-
     def forward(
         self,
         input: torch.Tensor,
         h_pyr: torch.Tensor,
-        h_int_1: torch.Tensor,
-        h_int_2: torch.Tensor,
+        h_inter: torch.Tensor,
         fb: torch.Tensor = None,
     ):
         """
@@ -200,90 +213,66 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: Output tensor after pooling of shape (b, c_hidden*2, h', w').
         """
         # Compute the excitations
-        cnm_exc = torch.cat([input, h_pyr], dim=1)
-        cnm_exc = self.conv_exc(cnm_exc)
-        cnm_exc_pyr_b, cnm_exc_int_1, cnm_exc_int_2 = torch.split(
-            cnm_exc,
-            [self.h_pyr_dim, self.h_int_1_dim, self.h_int_2_dim],
-            dim=1,
-        )
+        # TODO: Add flag for toggling input to interneurons
+        batch_size = input.shape[0]
+        exc = torch.cat([input, h_pyr], dim=1)
+        exc_pyr_basal = self.conv_exc_pyr(exc)
+        exc_inter = self.conv_exc_inter(exc)
 
         if self.use_fb:
             if fb is None:
                 raise ValueError("If use_fb is True, fb_exc must be provided.")
-            cnm_exc_fb = self.conv_exc_fb(fb)
-            cnm_exc_pyr_a, cnm_exc_fb_int_1, cnm_exc_fb_int_2 = torch.split(
-                cnm_exc_fb,
-                [self.h_pyr_dim, self.h_int_1_dim, self.h_int_2_dim],
-                dim=1,
-            )
+            exc_pyr_apical = self.conv_exc_pyr_fb(fb)
+            exc_fb_inter = self.conv_exc_inter_fb(fb)
+        else:
+            exc_pyr_apical = 0
+            exc_fb_inter = 0
 
         # Compute the inhibitions
-        cnm_inh_1 = self.conv_inh_1(h_int_1)
-        cnm_inh_2 = self.conv_inh_2(h_int_2)
-        (
-            cnm_inh_pyr_a,
-            cnm_inh_1_int_1,
-            cnm_inh_1_int_2,
-        ) = torch.split(
-            cnm_inh_1,
-            [self.h_pyr_dim, self.h_int_1_dim, self.h_int_2_dim],
-            dim=1,
-        )
-        (
-            cnm_inh_pyr_b,
-            cnm_inh_2_int_1,
-            cnm_inh_2_int_2,
-        ) = torch.split(
-            cnm_inh_2,
-            [self.h_pyr_dim, self.h_int_1_dim, self.h_int_2_dim],
-            dim=1,
-        )
-
+        h_inters = torch.split(h_inter, self.h_inter_dims, dim=1)
+        inhs = [0] * 4
+        for i in range(self.num_inter):
+            inhs[i] = self.convs_inh[i](
+                h_inters[i],
+                output_size=(
+                    batch_size,
+                    self.inh_out_dims[i],
+                    self.inter_size[0] if i == 1 else self.input_size[0],
+                    self.inter_size[1] if i == 1 else self.input_size[1],
+                ),
+            )
+        inh_pyr_soma = inhs[0]
+        inh_inter = 0
+        inh_pyr_basal = 0
+        inh_pyr_apical = 0
+        if self.num_inter >= 2:
+            inh_inter = inhs[1]
+        if self.num_inter == 4:
+            inh_pyr_basal = inhs[2]
+            inh_pyr_apical = inhs[3]
+        # TODO: Have less
         # Computer candidate neural memory (cnm) states
-        cnm_pyr_b = self.activation(cnm_exc_pyr_b - cnm_inh_pyr_b)
-        if self.use_fb:
-            cnm_pyr_a = self.activation(cnm_exc_pyr_a - cnm_inh_pyr_a)
-            cnm_pyr = cnm_pyr_a + cnm_pyr_b
-            cnm_int_1 = self.activation(
-                cnm_exc_int_1
-                + cnm_exc_fb_int_1
-                - cnm_inh_1_int_1
-                - cnm_inh_2_int_1
-            )
-            cnm_int_2 = self.activation(
-                cnm_exc_int_2
-                + cnm_exc_fb_int_2
-                - cnm_inh_1_int_2
-                - cnm_inh_2_int_2
-            )
-        else:
-            cnm_pyr = cnm_pyr_b
-            cnm_int_1 = self.activation(
-                cnm_exc_int_1 - cnm_inh_1_int_1 - cnm_inh_2_int_1
-            )
-            cnm_int_2 = self.activation(
-                cnm_exc_int_2 - cnm_inh_1_int_2 - cnm_inh_2_int_2
-            )
+        pyr_basal = torch.relu(exc_pyr_basal - inh_pyr_basal)
+        try:
+            pyr_apical = torch.relu(exc_pyr_apical - inh_pyr_apical)
+        except ValueError:
+            pyr_apical = 0
+        cnm_pyr = torch.relu(
+            self.activation(pyr_apical + pyr_basal) - inh_pyr_soma
+        )
+        cnm_inter = self.activation(exc_inter + exc_fb_inter - inh_inter)
 
         # Euler update for the cell state
-        self.tau_pyr = torch.sigmoid(self.tau_pyr)
-        h_next_pyr = (1 - self.tau_pyr) * h_pyr + self.tau_pyr * cnm_pyr
+        tau_pyr = torch.sigmoid(self.tau_pyr)
+        h_next_pyr = (1 - tau_pyr) * h_pyr + tau_pyr * cnm_pyr
 
-        self.tau_int_1 = torch.sigmoid(self.tau_int_1)
-        h_next_int_1 = (
-            1 - self.tau_int_1
-        ) * h_int_1 + self.tau_int_1 * cnm_int_1
-
-        self.tau_int_2 = torch.sigmoid(self.tau_int_2)
-        h_next_int_2 = (
-            1 - self.tau_int_2
-        ) * h_int_2 + self.tau_int_2 * cnm_int_2
+        tau_inter = torch.sigmoid(self.tau_inter)
+        h_next_inter = (1 - tau_inter) * h_inter + tau_inter * cnm_inter
 
         # Pool the output
         out = self.out_pool(h_next_pyr)
 
-        return h_next_pyr, h_next_int_1, h_next_int_2, out
+        return h_next_pyr, h_next_inter, out
 
 
 class Conv2dEIRNN(nn.Module):
@@ -291,15 +280,14 @@ class Conv2dEIRNN(nn.Module):
         self,
         input_size: tuple[int, int],
         input_dim: int,
-        pyr_dim: int | list[int],
-        int_1_dim: int | list[int],
-        int_2_dim: int | list[int],
+        h_pyr_dim: int | list[int],
+        h_inter_dims: list[int] | list[list[int]],
+        fb_dim: int | list[int],
         exc_kernel_size: list[int, int] | list[list[int, int]],
         inh_kernel_size: list[int, int] | list[list[int, int]],
         num_layers: int,
         num_steps: int,
         num_classes: int,
-        use_fb: bool = False,
         fb_adjacency: Optional[torch.Tensor] = None,
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
@@ -328,11 +316,11 @@ class Conv2dEIRNN(nn.Module):
             activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "tanh".
         """
         super().__init__()
-        self.input_size = input_size
-        self.use_fb = use_fb
-        self.pyr_dims = self._extend_for_multilayer(pyr_dim, num_layers)
-        self.int_1_dims = self._extend_for_multilayer(int_1_dim, num_layers)
-        self.int_2_dims = self._extend_for_multilayer(int_2_dim, num_layers)
+        self.h_pyr_dims = self._extend_for_multilayer(h_pyr_dim, num_layers)
+        self.h_inter_dims = self._extend_for_multilayer(
+            h_inter_dims, num_layers, depth=1
+        )
+        self.fb_dims = self._extend_for_multilayer(fb_dim, num_layers)
         self.exc_kernel_sizes = self._extend_for_multilayer(
             exc_kernel_size, num_layers, depth=1
         )
@@ -348,33 +336,20 @@ class Conv2dEIRNN(nn.Module):
         )
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
+        self.input_sizes = [input_size]
+        for i in range(num_layers - 1):
+            self.input_sizes.append(
+                (
+                    ceil(self.input_sizes[i][0] / self.pool_strides[i][0]),
+                    ceil(self.input_sizes[i][1] / self.pool_strides[i][1]),
+                )
+            )
+
         activation_class = get_activation_class(activation)
         self.activation = activation_class()
 
-        self.layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.layers.append(
-                Conv2dEIRNNCell(
-                    input_size=input_size,
-                    input_dim=(input_dim if i == 0 else self.pyr_dims[i - 1]),
-                    h_pyr_dim=self.pyr_dims[i],
-                    h_int_1_dim=self.int_1_dims[i],
-                    h_int_2_dim=self.int_2_dims[i],
-                    exc_kernel_size=self.exc_kernel_sizes[i],
-                    inh_kernel_size=self.inh_kernel_sizes[i],
-                    use_fb=use_fb,
-                    pool_kernel_size=self.pool_kernel_sizes[i],
-                    pool_stride=self.pool_strides[i],
-                    bias=self.biases[i],
-                    activation=activation,
-                )
-            )
-            input_size = (
-                input_size[0] // self.pool_strides[i][0],
-                input_size[1] // self.pool_strides[i][1],
-            )
-
-        if use_fb:
+        self.use_fb = [False] * num_layers
+        if fb_adjacency is not None:
             try:
                 fb_adjacency = torch.load(fb_adjacency)
             except:
@@ -387,26 +362,52 @@ class Conv2dEIRNN(nn.Module):
                 raise ValueError(
                     "The the dimensions of fb_adjacency must match number of layers."
                 )
+            if fb_adjacency.count_nonzero() == 0:
+                raise ValueError(
+                    "fb_adjacency must be a non-zero tensor if provided."
+                )
+
             self.fb_adjacency = []
             self.fb_convs = dict()
-            for row in fb_adjacency:
+            for i, row in enumerate(fb_adjacency):
                 row = row.nonzero().squeeze(1).tolist()
                 self.fb_adjacency.append(row)
                 for j in row:
+                    self.use_fb[j] = True
                     upsample = nn.Upsample(
-                        size=self.layers[j].input_size, mode="bilinear"
+                        size=self.input_sizes[j], mode="bilinear"
                     )
                     conv_exc = Conv2dPositive(
-                        in_channels=self.layers[i].h_pyr_dim,
-                        out_channels=self.layers[j].h_pyr_dim,
+                        in_channels=self.h_pyr_dims[i],
+                        out_channels=self.fb_dims[j],
                         kernel_size=1,
                         bias=True,
                     )
                     self.fb_convs[(i, j)] = nn.Sequential(upsample, conv_exc)
 
+        self.layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.layers.append(
+                Conv2dEIRNNCell(
+                    input_size=self.input_sizes[i],
+                    input_dim=(
+                        input_dim if i == 0 else self.h_pyr_dims[i - 1]
+                    ),
+                    h_pyr_dim=self.h_pyr_dims[i],
+                    h_inter_dims=self.h_inter_dims[i],
+                    fb_dim=self.fb_dims[i] if self.use_fb[i] else 0,
+                    exc_kernel_size=self.exc_kernel_sizes[i],
+                    inh_kernel_size=self.inh_kernel_sizes[i],
+                    pool_kernel_size=self.pool_kernel_sizes[i],
+                    pool_stride=self.pool_strides[i],
+                    bias=self.biases[i],
+                    activation=activation,
+                )
+            )
+
         self.out_layer = nn.Sequential(
             nn.Linear(
-                prod(self.layers[-1].out_shape()[1:]),
+                prod(self.layers[-1].out_shape[1:]),
                 fc_dim,
             ),
             activation_class(),
@@ -416,14 +417,12 @@ class Conv2dEIRNN(nn.Module):
 
     def _init_hidden(self, batch_size):
         h_pyrs = []
-        h_int_1s = []
-        h_int_2s = []
+        h_inters = []
         for layer in self.layers:
-            h_pyr, h_int_1, h_int_2 = layer.init_hidden(batch_size)
+            h_pyr, h_inter = layer.init_hidden(batch_size)
             h_pyrs.append(h_pyr)
-            h_int_1s.append(h_int_1)
-            h_int_2s.append(h_int_2)
-        return h_pyrs, h_int_1s, h_int_2s
+            h_inters.append(h_inter)
+        return h_pyrs, h_inters
 
     def _init_fb(self, batch_size):
         h_fbs = []
@@ -455,7 +454,7 @@ class Conv2dEIRNN(nn.Module):
             torch.Tensor: Output tensor after pooling of shape (b, hidden_dim*2, h', w').
         """
         batch_size = cue.shape[0]
-        h_pyrs, h_int_1s, h_int_2s = self._init_hidden(batch_size)
+        h_pyrs, h_inters = self._init_hidden(batch_size)
         fbs_prev = self._init_fb(batch_size)
         fbs = self._init_fb(batch_size)
 
@@ -467,12 +466,11 @@ class Conv2dEIRNN(nn.Module):
                 # lower = max(len(self.layers) - self.num_steps + t, 0)
                 for i in range(upper, lower - 1, -1):
                     layer = self.layers[i]
-                    (h_pyrs[i], h_int_1s[i], h_int_2s[i], outs[i]) = layer(
+                    (h_pyrs[i], h_inters[i], outs[i]) = layer(
                         input=input if i == 0 else outs[i - 1],
                         h_pyr=h_pyrs[i],
-                        h_int_1=h_int_1s[i],
-                        h_int_2=h_int_2s[i],
-                        fb=fbs_prev[i] if self.use_fb else None,
+                        h_inter=h_inters[i],
+                        fb=fbs_prev[i] if self.use_fb[i] else None,
                     )
                     for j in self.fb_adjacency[i]:
                         fbs[j] += self.fb_convs[(i, j)](outs[i])

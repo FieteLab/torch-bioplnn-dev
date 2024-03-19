@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch_sparse
 import torchsparsegradutils as tsgu
+import matplotlib.pyplot as plt
+from matplotlib import animation
 
 from bioplnn.utils import get_activation_class, idx_2D_to_1D
 
@@ -74,7 +76,9 @@ class TopographicalCorticalCell(nn.Module):
             if self_recurrence:
                 identity = indices.unique().tile(2, 1)
                 indices = torch.cat([indices, identity], 1)
-            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
+            _, inv, fan_in = indices[0].unique(
+                return_inverse=True, return_counts=True
+            )
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
 
@@ -94,9 +98,13 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
+                            :, None
+                        ],
                     )
-                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
+                    synapses = idx_2D_to_1D(
+                        synapses, sheet_size[0], sheet_size[1]
+                    )
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -121,7 +129,9 @@ class TopographicalCorticalCell(nn.Module):
 
             # He initialization of values (synapses_per_neuron is the fan_in)
             # if initialization == "he":
-            values = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
+            values = torch.randn(indices.shape[1]) * math.sqrt(
+                2 / synapses_per_neuron
+            )
             # elif initialization == "identity":
             #     values = torch.cat(values)
             # else:
@@ -146,7 +156,9 @@ class TopographicalCorticalCell(nn.Module):
         self.weight = nn.Parameter(weight)  # type: ignore
 
         # Initialize the bias vector
-        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        self.bias = (
+            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        )
 
     def coalesce(self):
         """
@@ -198,7 +210,7 @@ class TopographicalCorticalCell(nn.Module):
 class TopographicalRNN(nn.Module):
     def __init__(
         self,
-        sheet_size: tuple[int, int] = (256, 256),
+        sheet_size: tuple[int, int] = (150, 300),
         connectivity_std: float = 10,
         synapses_per_neuron: int = 32,
         bias: bool = True,
@@ -291,7 +303,41 @@ class TopographicalRNN(nn.Module):
             nn.Linear(64, 10),
         )
 
-    def forward(self, x):
+    def visualize(self, activations, fps=4):
+        """
+        Visualize the forward pass of the TopographicalCorticalRNN.
+
+        Args:
+            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_channels, num_neurons).
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        for i in range(len(activations)):
+            activations[i] = activations[i].reshape(1, *self.sheet_size)
+
+        # First set up the figure, the axis, and the plot element we want to animate
+        fig = plt.figure(figsize=(8, 8))
+
+        im = plt.imshow(
+            activations[0], interpolation="none", aspect="auto", vmin=0, vmax=1
+        )
+
+        def animate_func(i):
+            if i % fps == 0:
+                print(".", end="")
+
+            im.set_array(activations[i])
+            return [im]
+
+        anim = animation.FuncAnimation(
+            fig,
+            animate_func,
+            frames=len(activations),
+            interval=1000 / fps,  # in ms
+        )
+
+    def forward(self, x, return_activations=False):
         """
         Forward pass of the TopographicalCorticalRNN.
 
@@ -326,8 +372,13 @@ class TopographicalRNN(nn.Module):
         input_x = x
 
         # Pass the input through the CorticalSheet layer num_timesteps times
+        if return_activations:
+            activations = [x.detach().cpu()]
+
         for _ in range(self.num_timesteps):
             x = self.activation(self.cortical_sheet(input_x + x))
+            if return_activations:
+                activations.append(x.detach().cpu())
 
         # Transpose back
         if self.batch_first:
@@ -337,4 +388,7 @@ class TopographicalRNN(nn.Module):
             x = x[:, self.output_indices]
 
         # Return classification from out_block
-        return self.out_block(x)
+        if return_activations:
+            return self.out_block(x), activations
+        else:
+            return self.out_block(x)

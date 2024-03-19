@@ -2,16 +2,18 @@
 model:
   input_size: [28, 28]
   input_dim: 1
-  pyr_dim: 4
-  int_1_dim: 4
-  int_2_dim: 4
-  exc_kernel_size: [3, 3]
-  inh_kernel_size: [3, 3]
-  num_layers: 2
+  h_pyr_dim: 4
+  h_inter_dims: [4, 4, 4, 4]
+  fb_dim: 4
+  exc_kernel_size: [5, 5]
+  inh_kernel_size: [5, 5]
+  num_layers: 3
   num_steps: 100
   num_classes: 10
-  use_fb: True
-  fb_adjacency: connection/fb_adjacency.pt
+  fb_adjacency: 
+  - [0, 0, 0]
+  - [1, 0, 0]
+  - [1, 1, 0]
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True

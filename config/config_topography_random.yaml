@@ -15,6 +15,7 @@ model:
   activation: relu
 # Training parameters
 data:
+  dataset: mnist
   dir: data
   retina_path: connection/V1_indices.npy
   batch_size: 16

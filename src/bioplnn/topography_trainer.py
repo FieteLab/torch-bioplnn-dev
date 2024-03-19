@@ -12,7 +12,7 @@ from bioplnn.topography import TopographicalRNN
 from bioplnn.utils import AttrDict
 
 
-def train_iter(
+def train_epoch(
     config: AttrDict,
     model: TopographicalRNN,
     optimizer: torch.optim.Optimizer,
@@ -48,14 +48,17 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(images)
+        outputs, activations = model(images, return_activations=True)
+        model.visualize(activations, fps=4)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
@@ -98,7 +101,7 @@ def train_iter(
     return train_loss, train_acc
 
 
-def eval_iter(
+def eval_epoch(
     model: TopographicalRNN,
     criterion: torch.nn.Module,
     test_loader: torch.utils.data.DataLoader,
@@ -163,7 +166,9 @@ def train(config: AttrDict) -> None:
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
         if config.model.sparse_format == "csr":
-            raise ValueError("sgd is not supported with csr: Use sparse_sgd instead")
+            raise ValueError(
+                "sgd is not supported with csr: Use sparse_sgd instead"
+            )
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -171,7 +176,9 @@ def train(config: AttrDict) -> None:
         )
     elif config.optimizer.fn == "adam":
         if config.model.sparse_format in ("coo", "csr"):
-            raise ValueError("adam is not supported with csr: Use sparse_sgd instead")
+            raise ValueError(
+                "adam is not supported with csr: Use sparse_sgd instead"
+            )
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -186,13 +193,17 @@ def train(config: AttrDict) -> None:
             momentum=config.optimizer.momentum,
         )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     # Get the data loaders
     train_loader, test_loader = get_MNIST_V1_dataloaders(
@@ -211,7 +222,7 @@ def train(config: AttrDict) -> None:
 
     for epoch in range(config.train.epochs):
         # Train the model
-        train_loss, train_acc = train_iter(
+        train_loss, train_acc = train_epoch(
             config,
             model,
             optimizer,
@@ -223,7 +234,7 @@ def train(config: AttrDict) -> None:
         )
 
         # Evaluate the model on the test set
-        test_loss, test_acc = eval_iter(
+        test_loss, test_acc = eval_epoch(
             model, criterion, test_loader, wandb_log, epoch, device
         )
 
@@ -240,7 +251,9 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)
@@ -255,7 +268,9 @@ if __name__ == "__main__":
     import yaml
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config_random.yaml")
+    parser.add_argument(
+        "--config", type=str, default="config/config_random.yaml"
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:

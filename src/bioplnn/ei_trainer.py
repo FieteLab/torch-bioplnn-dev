@@ -56,6 +56,7 @@ def train_iter(
         labels = labels.to(device)
 
         cue, mixture = images.split(config.data.batch_size // 2, dim=0)
+        labels = labels[config.data.batch_size // 2 :, ...]
 
         # Forward pass
         outputs = model(cue, mixture)
