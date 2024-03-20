@@ -5,8 +5,8 @@ model:
   synapses_per_neuron: 32
   num_timesteps: 100
   bias: True
-  mm_function: torch_sparse
-  sparse_format: null
+  mm_function: tsgu
+  sparse_format: csr
   batch_first: True
   adjacency_matrix_path: null
   self_recurrence: True
@@ -15,17 +15,21 @@ model:
   activation: relu
 # Training parameters
 data:
-  dataset: mnist
-  dir: data
+  dataset: mnist_v1
+  root: data
   retina_path: connection/V1_indices.npy
   batch_size: 16
   num_workers: 0
 optimizer: 
-  fn: sgd
+  fn: sparse_sgd
   lr: 0.001
   momentum: 0.9
 criterion: cross_entropy
-wandb: True
+wandb: False
+visualization:
+  visualize: False
+  save_path: visualizations/test.gif
+  fps: 4
 train:
   epochs: 30
   log_freq: 50

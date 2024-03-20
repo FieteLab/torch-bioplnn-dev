@@ -22,7 +22,7 @@ model:
 # Training parameters
 data:
   dataset: mnist
-  dir: data
+  root: data
   batch_size: 16
   num_workers: 0
 optimizer: 
@@ -34,7 +34,9 @@ optimizer:
 criterion: cross_entropy
 wandb: False
 train:
+  compile: True
   epochs: 30
   log_freq: 50
   model_dir: models
+  grad_clip_type: norm
   grad_clip: 1.0

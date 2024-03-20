@@ -2,13 +2,13 @@ import os
 from typing import Callable
 
 import torch
-import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
+import wandb
+from bioplnn.dataset import get_dataloaders
 from bioplnn.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict
-from bioplnn.dataset import get_dataloaders
 
 
 def train_iter(
@@ -37,6 +37,14 @@ def train_iter(
     Returns:
         tuple: A tuple containing the training loss and accuracy.
     """
+    if config.train.grad_clip_type == "norm":
+        clip_grad_ = clip_grad_norm_
+    elif config.train.grad_clip_type == "value":
+        clip_grad_ = clip_grad_value_
+    else:
+        raise NotImplementedError(
+            f"Gradient clipping type {config.train.grad_clip_type} not implemented"
+        )
     model.train()
     train_loss = 0.0
     train_correct = 0
@@ -47,9 +55,7 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(
-            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
-        ),
+        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
@@ -60,12 +66,13 @@ def train_iter(
 
         # Forward pass
         outputs = model(cue, mixture)
+        clip_grad_(model.parameters(), config.train.grad_clip)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        clip_grad_norm_(model.parameters(), config.train.grad_clip)
+
         optimizer.step()
 
         # Update statistics
@@ -178,17 +185,13 @@ def train(config: AttrDict) -> None:
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
     else:
-        raise NotImplementedError(
-            f"Optimizer {config.optimizer.fn} not implemented"
-        )
+        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(
-            f"Criterion {config.criterion} not implemented"
-        )
+        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
     train_loader, test_loader = get_dataloaders(
@@ -236,9 +239,7 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(
-            os.path.join(config.train.model_dir, "model.pt")
-        )
+        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
         torch.save(model, file_path)
         try:
             os.remove(link_path)

@@ -2,12 +2,12 @@ import math
 from typing import Any, Optional
 from warnings import warn
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch_sparse
 import torchsparsegradutils as tsgu
-import matplotlib.pyplot as plt
 from matplotlib import animation
 
 from bioplnn.utils import get_activation_class, idx_2D_to_1D
@@ -47,15 +47,17 @@ class TopographicalCorticalCell(nn.Module):
         """
         super().__init__()
         # Save the sparse matrix multiplication function
+        self.sheet_size = sheet_size
         self.sparse_format = sparse_format
         self.batch_first = batch_first
 
         # Select the sparse matrix multiplication function
         if mm_function == "torch_sparse":
-            if sparse_format is not None:
+            if sparse_format is not None and sparse_format != "torch_sparse":
                 raise ValueError(
                     "sparse_format must not be specified if mm_function is 'torch_sparse'"
                 )
+            self.sparse_format = "torch_sparse"
             self.mm_function = torch_sparse.spmm
         elif mm_function in ("native", "tsgu"):
             if sparse_format not in ("coo", "csr"):
@@ -76,9 +78,7 @@ class TopographicalCorticalCell(nn.Module):
             if self_recurrence:
                 identity = indices.unique().tile(2, 1)
                 indices = torch.cat([indices, identity], 1)
-            _, inv, fan_in = indices[0].unique(
-                return_inverse=True, return_counts=True
-            )
+            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
 
@@ -98,13 +98,9 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
-                            :, None
-                        ],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
                     )
-                    synapses = idx_2D_to_1D(
-                        synapses, sheet_size[0], sheet_size[1]
-                    )
+                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -129,15 +125,13 @@ class TopographicalCorticalCell(nn.Module):
 
             # He initialization of values (synapses_per_neuron is the fan_in)
             # if initialization == "he":
-            values = torch.randn(indices.shape[1]) * math.sqrt(
-                2 / synapses_per_neuron
-            )
+            values = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
             # elif initialization == "identity":
             #     values = torch.cat(values)
             # else:
             #     raise ValueError(f"Invalid initialization: {initialization}")
 
-        self.num_neurons = indices.max().item() + 1
+        self.num_neurons = self.sheet_size[0] * self.sheet_size[1]
 
         if mm_function == "torch_sparse":
             indices, weight = torch_sparse.coalesce(
@@ -156,9 +150,7 @@ class TopographicalCorticalCell(nn.Module):
         self.weight = nn.Parameter(weight)  # type: ignore
 
         # Initialize the bias vector
-        self.bias = (
-            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
-        )
+        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
 
     def coalesce(self):
         """
@@ -186,19 +178,18 @@ class TopographicalCorticalCell(nn.Module):
 
         # Perform sparse matrix multiplication with or without bias
         if self.sparse_format == "torch_sparse":
-            x = self.mm_function(
-                self.indices,
-                self.weight,
-                self.num_neurons,  # type: ignore
-                self.num_neurons,
-                x,
+            x = (
+                self.mm_function(
+                    self.indices,
+                    self.weight,
+                    self.num_neurons,  # type: ignore
+                    self.num_neurons,
+                    x,
+                )
+                + self.bias
             )
         else:
-            x = (
-                self.mm_function(self.weight, x)  # type: ignore
-                if self.bias is None
-                else self.mm_function(self.weight, x)  # type: ignore
-            )
+            x = self.mm_function(self.weight, x) + self.bias
 
         # Transpose output back to batch first
         if self.batch_first:
@@ -303,7 +294,7 @@ class TopographicalRNN(nn.Module):
             nn.Linear(64, 10),
         )
 
-    def visualize(self, activations, fps=4):
+    def visualize(self, activations, save_path=None, fps=4):
         """
         Visualize the forward pass of the TopographicalCorticalRNN.
 
@@ -314,7 +305,7 @@ class TopographicalRNN(nn.Module):
             torch.Tensor: Output tensor.
         """
         for i in range(len(activations)):
-            activations[i] = activations[i].reshape(1, *self.sheet_size)
+            activations[i] = activations[i][0].reshape(*self.cortical_sheet.sheet_size)
 
         # First set up the figure, the axis, and the plot element we want to animate
         fig = plt.figure(figsize=(8, 8))
@@ -337,7 +328,22 @@ class TopographicalRNN(nn.Module):
             interval=1000 / fps,  # in ms
         )
 
-    def forward(self, x, return_activations=False):
+        if save_path is not None:
+            anim.save(
+                save_path,
+                fps=fps,
+            )
+        else:
+            plt.show()
+
+    def forward(
+        self,
+        x,
+        visualize=False,
+        visualization_save_path=None,
+        visualization_fps=4,
+        return_activations=False,
+    ):
         """
         Forward pass of the TopographicalCorticalRNN.
 
@@ -372,23 +378,36 @@ class TopographicalRNN(nn.Module):
         input_x = x
 
         # Pass the input through the CorticalSheet layer num_timesteps times
-        if return_activations:
-            activations = [x.detach().cpu()]
+        if visualize or return_activations:
+            activations = [x.t().detach().cpu()]
 
         for _ in range(self.num_timesteps):
             x = self.activation(self.cortical_sheet(input_x + x))
-            if return_activations:
-                activations.append(x.detach().cpu())
+            if visualize or return_activations:
+                activations.append(x.t().detach().cpu())
 
         # Transpose back
         if self.batch_first:
             x = x.t()
 
+        # Select output indices if provided
         if self.output_indices is not None:
             x = x[:, self.output_indices]
+
+        # Visualize if required
+        if visualize:
+            self.visualize(activations, visualization_save_path, visualization_fps)
 
         # Return classification from out_block
         if return_activations:
             return self.out_block(x), activations
         else:
             return self.out_block(x)
+
+
+if __name__ == "__main__":
+    import os
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_path, "topography_trainer.py")) as file:
+        exec(file.read())

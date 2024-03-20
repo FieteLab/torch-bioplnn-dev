@@ -2,11 +2,11 @@ import os
 from typing import Callable
 
 import torch
-import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-from bioplnn.dataset import get_MNIST_V1_dataloaders
+import wandb
+from bioplnn.dataset import get_dataloaders
 from bioplnn.sparse_sgd import SparseSGD
 from bioplnn.topography import TopographicalRNN
 from bioplnn.utils import AttrDict
@@ -48,23 +48,20 @@ def train_epoch(
 
     bar = tqdm(
         train_loader,
-        desc=(
-            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
-        ),
+        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
         labels = labels.to(device)
 
         # Forward pass
-        outputs, activations = model(images, return_activations=True)
-        model.visualize(activations, fps=4)
+        outputs = model(images)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        clip_grad_value_(model.parameters(), config.train.grad_clip)
+        # clip_grad_value_(model.parameters(), config.train.grad_clip, foreach=False)
         optimizer.step()
 
         # Update statistics
@@ -166,9 +163,7 @@ def train(config: AttrDict) -> None:
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
         if config.model.sparse_format == "csr":
-            raise ValueError(
-                "sgd is not supported with csr: Use sparse_sgd instead"
-            )
+            raise ValueError("sgd is not supported with csr: Use sparse_sgd instead")
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -176,9 +171,7 @@ def train(config: AttrDict) -> None:
         )
     elif config.optimizer.fn == "adam":
         if config.model.sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "adam is not supported with csr: Use sparse_sgd instead"
-            )
+            raise ValueError("adam is not supported with csr: Use sparse_sgd instead")
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -193,21 +186,18 @@ def train(config: AttrDict) -> None:
             momentum=config.optimizer.momentum,
         )
     else:
-        raise NotImplementedError(
-            f"Optimizer {config.optimizer.fn} not implemented"
-        )
+        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(
-            f"Criterion {config.criterion} not implemented"
-        )
+        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
-    train_loader, test_loader = get_MNIST_V1_dataloaders(
-        root=config.data.dir,
+    train_loader, test_loader = get_dataloaders(
+        dataset=config.data.dataset,
+        root=config.data.root,
         retina_path=config.data.retina_path,
         batch_size=config.data.batch_size,
         num_workers=config.data.num_workers,
@@ -238,6 +228,21 @@ def train(config: AttrDict) -> None:
             model, criterion, test_loader, wandb_log, epoch, device
         )
 
+        if config.visualization.visualize:
+            images, _ = next(iter(test_loader))
+            images = images.to(device)
+            save_path = None
+            if config.visualization.save_path is not None:
+                save_path = (
+                    f"{os.path.splitext(config.visualization.save_path)[0]}_{epoch}.gif"
+                )
+            model(
+                images,
+                visualize=True,
+                visualization_save_path=save_path,
+                visualization_fps=config.visualization.fps,
+            )
+
         # Print the epoch statistics
         print(
             f"Epoch [{epoch}/{config.train.epochs}] | "
@@ -251,9 +256,7 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(
-            os.path.join(config.train.model_dir, "model.pt")
-        )
+        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
         torch.save(model, file_path)
         try:
             os.remove(link_path)
@@ -269,7 +272,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=str, default="config/config_random.yaml"
+        "--config", type=str, default="config/config_topography_random.yaml"
     )
     args = parser.parse_args()
 

@@ -2,6 +2,6 @@
 torch
 torchvision
 torchaudio
--f https://data.pyg.org/whl/torch-2.2.1+cpu.html
+-f https://data.pyg.org/whl/torch-2.2.1+cu121.html
 torch-scatter 
 torch-sparse

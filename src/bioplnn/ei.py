@@ -1,9 +1,8 @@
-from math import prod, ceil
+from math import ceil, prod
 from typing import Optional
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from bioplnn.utils import get_activation_class
 
@@ -164,7 +163,7 @@ class Conv2dEIRNNCell(nn.Module):
             padding=(pool_kernel_size[0] // 2, pool_kernel_size[1] // 2),
         )
 
-    def init_hidden(self, batch_size):
+    def init_hidden(self, batch_size, device=None):
         """
         Initializes the hidden state tensor for the cRNN_EI model.
 
@@ -176,11 +175,13 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: The initialized inhibitory hidden state tensor.
         """
         return (
-            torch.zeros(batch_size, self.h_pyr_dim, *self.input_size),
-            torch.zeros(batch_size, self.h_inter_dims_sum, *self.inter_size),
+            torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device),
+            torch.zeros(
+                batch_size, self.h_inter_dims_sum, *self.inter_size, device=device
+            ),
         )
 
-    def init_fb(self, batch_size):
+    def init_fb(self, batch_size, device=None):
         """
         Initializes the output tensor for the cRNN_EI model.
 
@@ -190,7 +191,7 @@ class Conv2dEIRNNCell(nn.Module):
         Returns:
             torch.Tensor: The initialized output tensor.
         """
-        return torch.zeros(batch_size, self.h_pyr_dim, *self.input_size)
+        return torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device)
 
     def forward(
         self,
@@ -257,9 +258,7 @@ class Conv2dEIRNNCell(nn.Module):
             pyr_apical = torch.relu(exc_pyr_apical - inh_pyr_apical)
         except ValueError:
             pyr_apical = 0
-        cnm_pyr = torch.relu(
-            self.activation(pyr_apical + pyr_basal) - inh_pyr_soma
-        )
+        cnm_pyr = torch.relu(self.activation(pyr_apical + pyr_basal) - inh_pyr_soma)
         cnm_inter = self.activation(exc_inter + exc_fb_inter - inh_inter)
 
         # Euler update for the cell state
@@ -352,7 +351,7 @@ class Conv2dEIRNN(nn.Module):
         if fb_adjacency is not None:
             try:
                 fb_adjacency = torch.load(fb_adjacency)
-            except:
+            except AttributeError:
                 fb_adjacency = torch.tensor(fb_adjacency)
             if (
                 fb_adjacency.dim() != 2
@@ -363,36 +362,32 @@ class Conv2dEIRNN(nn.Module):
                     "The the dimensions of fb_adjacency must match number of layers."
                 )
             if fb_adjacency.count_nonzero() == 0:
-                raise ValueError(
-                    "fb_adjacency must be a non-zero tensor if provided."
-                )
+                raise ValueError("fb_adjacency must be a non-zero tensor if provided.")
 
             self.fb_adjacency = []
-            self.fb_convs = dict()
+            self.fb_convs = nn.ModuleDict()
             for i, row in enumerate(fb_adjacency):
                 row = row.nonzero().squeeze(1).tolist()
                 self.fb_adjacency.append(row)
                 for j in row:
                     self.use_fb[j] = True
-                    upsample = nn.Upsample(
-                        size=self.input_sizes[j], mode="bilinear"
-                    )
+                    upsample = nn.Upsample(size=self.input_sizes[j], mode="bilinear")
                     conv_exc = Conv2dPositive(
                         in_channels=self.h_pyr_dims[i],
                         out_channels=self.fb_dims[j],
                         kernel_size=1,
                         bias=True,
                     )
-                    self.fb_convs[(i, j)] = nn.Sequential(upsample, conv_exc)
+                    self.fb_convs[f"fb_conv_{i}_{j}"] = nn.Sequential(
+                        upsample, conv_exc
+                    )
 
         self.layers = nn.ModuleList()
         for i in range(num_layers):
             self.layers.append(
                 Conv2dEIRNNCell(
                     input_size=self.input_sizes[i],
-                    input_dim=(
-                        input_dim if i == 0 else self.h_pyr_dims[i - 1]
-                    ),
+                    input_dim=(input_dim if i == 0 else self.h_pyr_dims[i - 1]),
                     h_pyr_dim=self.h_pyr_dims[i],
                     h_inter_dims=self.h_inter_dims[i],
                     fb_dim=self.fb_dims[i] if self.use_fb[i] else 0,
@@ -415,19 +410,19 @@ class Conv2dEIRNN(nn.Module):
             nn.Linear(fc_dim, num_classes),
         )
 
-    def _init_hidden(self, batch_size):
+    def _init_hidden(self, batch_size, device=None):
         h_pyrs = []
         h_inters = []
         for layer in self.layers:
-            h_pyr, h_inter = layer.init_hidden(batch_size)
+            h_pyr, h_inter = layer.init_hidden(batch_size, device=device)
             h_pyrs.append(h_pyr)
             h_inters.append(h_inter)
         return h_pyrs, h_inters
 
-    def _init_fb(self, batch_size):
+    def _init_fb(self, batch_size, device=None):
         h_fbs = []
         for layer in self.layers:
-            h_fb = layer.init_fb(batch_size)
+            h_fb = layer.init_fb(batch_size, device=device)
             h_fbs.append(h_fb)
         return h_fbs
 
@@ -453,10 +448,11 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor after pooling of shape (b, hidden_dim*2, h', w').
         """
+        device = cue.device
         batch_size = cue.shape[0]
-        h_pyrs, h_inters = self._init_hidden(batch_size)
-        fbs_prev = self._init_fb(batch_size)
-        fbs = self._init_fb(batch_size)
+        h_pyrs, h_inters = self._init_hidden(batch_size, device=device)
+        fbs_prev = self._init_fb(batch_size, device=device)
+        fbs = self._init_fb(batch_size, device=device)
 
         for input in (cue, mixture):
             outs = [None] * len(self.layers)
@@ -473,9 +469,9 @@ class Conv2dEIRNN(nn.Module):
                         fb=fbs_prev[i] if self.use_fb[i] else None,
                     )
                     for j in self.fb_adjacency[i]:
-                        fbs[j] += self.fb_convs[(i, j)](outs[i])
+                        fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i])
                 fbs_prev = fbs
-                fbs = self._init_fb(batch_size)
+                fbs = self._init_fb(batch_size, device=device)
 
         out = self.out_layer(outs[-1].flatten(1))
         return out

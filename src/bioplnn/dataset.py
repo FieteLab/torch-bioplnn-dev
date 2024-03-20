@@ -17,9 +17,7 @@ class V1Dataset:
         Read cortex information.
         """
         self.retina_indices = np.load(retina_path)
-        self.flat_indices = torch.tensor(
-            flatten_indices(self.retina_indices, Ny)
-        )
+        self.flat_indices = torch.tensor(flatten_indices(self.retina_indices, Ny))
         self.Nx = Nx
         self.Ny = Ny
         self.retina_radius = retina_radius
@@ -96,7 +94,7 @@ def get_dataloaders(
     num_workers=0,
 ):
     retina_path_arg = dict()
-    if dataset == "mnist":
+    if dataset.startswith("mnist"):
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.ToTensor(),
