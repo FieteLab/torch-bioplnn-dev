@@ -33,8 +33,13 @@ optimizer:
   beta2: 0.999
 criterion: cross_entropy
 wandb: False
+compile:
+  disable: False
+  fullgraph: True
+  dynamic: null
+  backend: inductor
+  mode: "max-autotune"
 train:
-  compile: True
   epochs: 30
   log_freq: 50
   model_dir: models

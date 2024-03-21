@@ -436,6 +436,10 @@ class Conv2dEIRNN(nn.Module):
 
         if not isinstance(inner, (list, tuple)):
             param = [param] * num_layers
+        elif len(param) != num_layers:
+            raise ValueError(
+                "The length of param must match the number of layers if it is a list."
+            )
         return param
 
     def forward(self, cue: torch.Tensor, mixture: torch.Tensor):
@@ -475,3 +479,11 @@ class Conv2dEIRNN(nn.Module):
 
         out = self.out_layer(outs[-1].flatten(1))
         return out
+
+
+if __name__ == "__main__":
+    import os
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_path, "ei_trainer.py")) as file:
+        exec(file.read())

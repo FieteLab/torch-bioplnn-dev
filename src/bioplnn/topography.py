@@ -294,7 +294,7 @@ class TopographicalRNN(nn.Module):
             nn.Linear(64, 10),
         )
 
-    def visualize(self, activations, save_path=None, fps=4):
+    def visualize(self, activations, save_path=None, fps=4, frames=None):
         """
         Visualize the forward pass of the TopographicalCorticalRNN.
 
@@ -304,6 +304,8 @@ class TopographicalRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
+        if frames is not None:
+            activations = activations[frames[0] : frames[1]]
         for i in range(len(activations)):
             activations[i] = activations[i][0].reshape(*self.cortical_sheet.sheet_size)
 
@@ -342,6 +344,7 @@ class TopographicalRNN(nn.Module):
         visualize=False,
         visualization_save_path=None,
         visualization_fps=4,
+        visualization_frames=None,
         return_activations=False,
     ):
         """
@@ -396,7 +399,12 @@ class TopographicalRNN(nn.Module):
 
         # Visualize if required
         if visualize:
-            self.visualize(activations, visualization_save_path, visualization_fps)
+            self.visualize(
+                activations,
+                visualization_save_path,
+                visualization_fps,
+                visualization_frames,
+            )
 
         # Return classification from out_block
         if return_activations:

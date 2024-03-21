@@ -61,8 +61,8 @@ def train_iter(
         images = images.to(device)
         labels = labels.to(device)
 
-        cue, mixture = images.split(config.data.batch_size // 2, dim=0)
-        labels = labels[config.data.batch_size // 2 :, ...]
+        cue, mixture = images.split(config.data.batch_size, dim=0)
+        labels = labels[config.data.batch_size :, ...]
 
         # Forward pass
         outputs = model(cue, mixture)
@@ -168,8 +168,19 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Conv2dEIRNN(**config.model).to(device)
+
+    # Compile the model if requested
+    model = torch.compile(
+        model,
+        fullgraph=config.compile.fullgraph,
+        dynamic=config.compile.dynamic,
+        backend=config.compile.backend,
+        mode=config.compile.mode,
+        disable=config.compile.disable,
+    )
 
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
@@ -196,8 +207,8 @@ def train(config: AttrDict) -> None:
     # Get the data loaders
     train_loader, test_loader = get_dataloaders(
         dataset=config.data.dataset,
-        root=config.data.dir,
-        batch_size=config.data.batch_size,
+        root=config.data.root,
+        batch_size=config.data.batch_size * 2,
         num_workers=config.data.num_workers,
     )
 

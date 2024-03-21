@@ -61,7 +61,19 @@ def train_epoch(
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        # clip_grad_value_(model.parameters(), config.train.grad_clip, foreach=False)
+        if not config.train.grad_clip.disable:
+            if config.train.grad_clip.type == "norm":
+                clip_grad_norm_(
+                    model.parameters(), config.train.grad_clip.value, foreach=False
+                )
+            elif config.train.grad_clip.type == "value":
+                clip_grad_value_(
+                    model.parameters(), config.train.grad_clip.value, foreach=False
+                )
+            else:
+                raise NotImplementedError(
+                    f"Gradient clipping type {config.train.grad_clip.type} not implemented"
+                )
         optimizer.step()
 
         # Update statistics
@@ -211,6 +223,21 @@ def train(config: AttrDict) -> None:
         wandb_log = lambda x: None
 
     for epoch in range(config.train.epochs):
+        if not config.visualize.disable:
+            images, _ = next(iter(test_loader))
+            images = images.to(device)
+            save_path = None
+            if config.visualize.save_path is not None:
+                save_path = (
+                    f"{os.path.splitext(config.visualize.save_path)[0]}_{epoch}.gif"
+                )
+            model(
+                images,
+                visualize=True,
+                visualization_save_path=save_path,
+                visualization_fps=config.visualize.fps,
+                visualization_frames=config.visualize.frames,
+            )
         # Train the model
         train_loss, train_acc = train_epoch(
             config,
@@ -227,21 +254,6 @@ def train(config: AttrDict) -> None:
         test_loss, test_acc = eval_epoch(
             model, criterion, test_loader, wandb_log, epoch, device
         )
-
-        if config.visualization.visualize:
-            images, _ = next(iter(test_loader))
-            images = images.to(device)
-            save_path = None
-            if config.visualization.save_path is not None:
-                save_path = (
-                    f"{os.path.splitext(config.visualization.save_path)[0]}_{epoch}.gif"
-                )
-            model(
-                images,
-                visualize=True,
-                visualization_save_path=save_path,
-                visualization_fps=config.visualization.fps,
-            )
 
         # Print the epoch statistics
         print(

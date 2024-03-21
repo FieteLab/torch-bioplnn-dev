@@ -298,7 +298,7 @@ def sgd(
         sparse_d_p_list = []
         sparse_momentum_buffer_list = []
         for i, param in enumerate(params):
-            if is_csr(param) or is_csr(d_p_list[i].grad):
+            if is_csr(param) or is_csr(d_p_list[i]):
                 sparse_params.append(param)
                 sparse_d_p_list.append(d_p_list[i])
                 sparse_momentum_buffer_list.append(momentum_buffer_list[i])
