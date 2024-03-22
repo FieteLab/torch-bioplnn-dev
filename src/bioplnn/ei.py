@@ -175,9 +175,14 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: The initialized inhibitory hidden state tensor.
         """
         return (
-            torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device),
             torch.zeros(
-                batch_size, self.h_inter_dims_sum, *self.inter_size, device=device
+                batch_size, self.h_pyr_dim, *self.input_size, device=device
+            ),
+            torch.zeros(
+                batch_size,
+                self.h_inter_dims_sum,
+                *self.inter_size,
+                device=device,
             ),
         )
 
@@ -191,7 +196,9 @@ class Conv2dEIRNNCell(nn.Module):
         Returns:
             torch.Tensor: The initialized output tensor.
         """
-        return torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device)
+        return torch.zeros(
+            batch_size, self.h_pyr_dim, *self.input_size, device=device
+        )
 
     def forward(
         self,
@@ -258,7 +265,9 @@ class Conv2dEIRNNCell(nn.Module):
             pyr_apical = torch.relu(exc_pyr_apical - inh_pyr_apical)
         except ValueError:
             pyr_apical = 0
-        cnm_pyr = torch.relu(self.activation(pyr_apical + pyr_basal) - inh_pyr_soma)
+        cnm_pyr = torch.relu(
+            self.activation(pyr_apical + pyr_basal) - inh_pyr_soma
+        )
         cnm_inter = self.activation(exc_inter + exc_fb_inter - inh_inter)
 
         # Euler update for the cell state
@@ -291,7 +300,7 @@ class Conv2dEIRNN(nn.Module):
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
         bias: bool | list[bool] = True,
-        activation: str = "relu",
+        activation: str = "tanh",
         fc_dim: int = 1024,
     ):
         """
@@ -300,19 +309,20 @@ class Conv2dEIRNN(nn.Module):
         Args:
             input_size (tuple[int, int]): Height and width of input tensor as (height, width).
             input_dim (int): Number of channels of input tensor.
-            hidden_dim (int): Number of channels of hidden tensor.
+            h_pyr_dim (int | list[int]): Number of channels of the pyramidal neurons or a list of number of channels for each layer.
+            h_inter_dims (list[int] | list[list[int]]): Number of channels of the interneurons or a list of number of channels for each layer.
+            fb_dim (int | list[int]): Number of channels of the feedback activationsor a list of number of channels for each layer.
+            exc_kernel_size (list[int, int] | list[list[int, int]]): Size of the kernel for excitatory convolutions or a list of kernel sizes for each layer.
+            inh_kernel_size (list[int, int] | list[list[int, int]]): Size of the kernel for inhibitory convolutions or a list of kernel sizes for each layer.
             num_layers (int): Number of layers in the RNN.
-            num_iterations (int): Number of iterations to perform in each layer.
-            exc_kernel_size (tuple[int, int]): Size of the kernel for excitatory convolution.
-            inhib_kernel_sizes (list[tuple[int, int]]): Sizes of the kernels for inhibitory convolutions.
-            use_h_prev (bool, optional): Whether to use previous hidden states as input. Default is False.
-            use_fb (bool, optional): Whether to use fb from previous layers as input. Default is False.
-            pool_kernel_size (tuple[int, int], optional): Size of the kernel for pooling. Default is (5, 5).
-            pool_stride (tuple[int, int], optional): Stride of the pooling operation. Default is (2, 2).
-            bias (bool, optional): Whether or not to add the bias. Default is True.
-            euler (bool, optional): Whether to use Euler updates for the cell state. Default is True.
-            dt (int, optional): Time step for Euler updates. Default is 1.
-            activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "tanh".
+            num_steps (int): Number of iterations to perform in each layer.
+            num_classes (int): Number of output classes.
+            fb_adjacency (Optional[torch.Tensor], optional): Adjacency matrix for feedback connections. Default is None.
+            pool_kernel_size (list[int, int] | list[list[int, int]], optional): Size of the kernel for pooling or a list of kernel sizes for each layer. Default is (5, 5).
+            pool_stride (list[int, int] | list[list[int, int]], optional): Stride of the pooling operation or a list of strides for each layer. Default is (2, 2).
+            bias (bool | list[bool], optional): Whether or not to add the bias or a list of booleans indicating whether to add bias for each layer. Default is True.
+            activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is 'tanh'.
+            fc_dim (int, optional): Dimension of the fully connected layer. Default is 1024.
         """
         super().__init__()
         self.h_pyr_dims = self._extend_for_multilayer(h_pyr_dim, num_layers)
@@ -362,7 +372,9 @@ class Conv2dEIRNN(nn.Module):
                     "The the dimensions of fb_adjacency must match number of layers."
                 )
             if fb_adjacency.count_nonzero() == 0:
-                raise ValueError("fb_adjacency must be a non-zero tensor if provided.")
+                raise ValueError(
+                    "fb_adjacency must be a non-zero tensor if provided."
+                )
 
             self.fb_adjacency = []
             self.fb_convs = nn.ModuleDict()
@@ -371,7 +383,9 @@ class Conv2dEIRNN(nn.Module):
                 self.fb_adjacency.append(row)
                 for j in row:
                     self.use_fb[j] = True
-                    upsample = nn.Upsample(size=self.input_sizes[j], mode="bilinear")
+                    upsample = nn.Upsample(
+                        size=self.input_sizes[j], mode="bilinear"
+                    )
                     conv_exc = Conv2dPositive(
                         in_channels=self.h_pyr_dims[i],
                         out_channels=self.fb_dims[j],
@@ -387,7 +401,9 @@ class Conv2dEIRNN(nn.Module):
             self.layers.append(
                 Conv2dEIRNNCell(
                     input_size=self.input_sizes[i],
-                    input_dim=(input_dim if i == 0 else self.h_pyr_dims[i - 1]),
+                    input_dim=(
+                        input_dim if i == 0 else self.h_pyr_dims[i - 1]
+                    ),
                     h_pyr_dim=self.h_pyr_dims[i],
                     h_inter_dims=self.h_inter_dims[i],
                     fb_dim=self.fb_dims[i] if self.use_fb[i] else 0,
