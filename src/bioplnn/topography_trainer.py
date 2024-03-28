@@ -48,7 +48,9 @@ def train_epoch(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
@@ -64,11 +66,15 @@ def train_epoch(
         if not config.train.grad_clip.disable:
             if config.train.grad_clip.type == "norm":
                 clip_grad_norm_(
-                    model.parameters(), config.train.grad_clip.value, foreach=False
+                    model.parameters(),
+                    config.train.grad_clip.value,
+                    foreach=False,
                 )
             elif config.train.grad_clip.type == "value":
                 clip_grad_value_(
-                    model.parameters(), config.train.grad_clip.value, foreach=False
+                    model.parameters(),
+                    config.train.grad_clip.value,
+                    foreach=False,
                 )
             else:
                 raise NotImplementedError(
@@ -175,7 +181,9 @@ def train(config: AttrDict) -> None:
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
         if config.model.sparse_format == "csr":
-            raise ValueError("sgd is not supported with csr: Use sparse_sgd instead")
+            raise ValueError(
+                "sgd is not supported with csr: Use sparse_sgd instead"
+            )
         optimizer = torch.optim.SGD(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -183,7 +191,9 @@ def train(config: AttrDict) -> None:
         )
     elif config.optimizer.fn == "adam":
         if config.model.sparse_format in ("coo", "csr"):
-            raise ValueError("adam is not supported with csr: Use sparse_sgd instead")
+            raise ValueError(
+                "adam is not supported with csr: Use sparse_sgd instead"
+            )
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=config.optimizer.lr,
@@ -198,13 +208,17 @@ def train(config: AttrDict) -> None:
             momentum=config.optimizer.momentum,
         )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     # Get the data loaders
     train_loader, test_loader = get_dataloaders(
@@ -223,21 +237,6 @@ def train(config: AttrDict) -> None:
         wandb_log = lambda x: None
 
     for epoch in range(config.train.epochs):
-        if not config.visualize.disable:
-            images, _ = next(iter(test_loader))
-            images = images.to(device)
-            save_path = None
-            if config.visualize.save_path is not None:
-                save_path = (
-                    f"{os.path.splitext(config.visualize.save_path)[0]}_{epoch}.gif"
-                )
-            model(
-                images,
-                visualize=True,
-                visualization_save_path=save_path,
-                visualization_fps=config.visualize.fps,
-                visualization_frames=config.visualize.frames,
-            )
         # Train the model
         train_loss, train_acc = train_epoch(
             config,
@@ -255,6 +254,20 @@ def train(config: AttrDict) -> None:
             model, criterion, test_loader, wandb_log, epoch, device
         )
 
+        if not config.visualize.disable:
+            images, _ = next(iter(test_loader))
+            images = images.to(device)
+            save_path = None
+            if config.visualize.save_path is not None:
+                save_path = f"{os.path.splitext(config.visualize.save_path)[0]}_{epoch}.gif"
+            model(
+                images,
+                visualize=True,
+                visualization_save_path=save_path,
+                visualization_fps=config.visualize.fps,
+                visualization_frames=config.visualize.frames,
+            )
+
         # Print the epoch statistics
         print(
             f"Epoch [{epoch}/{config.train.epochs}] | "
@@ -268,7 +281,9 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)

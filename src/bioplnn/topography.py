@@ -64,9 +64,10 @@ class TopographicalCorticalCell(nn.Module):
                 raise ValueError(
                     "sparse_format must be 'coo' or 'csr' if mm_function is 'native' or 'tsgu'"
                 )
-            self.mm_function = torch.sparse.mm
-        elif mm_function == "tsgu":
-            self.mm_function = tsgu.sparse_mm
+            if mm_function == "native":
+                self.mm_function = torch.sparse.mm
+            else:
+                self.mm_function = tsgu.sparse_mm
         else:
             raise ValueError(f"Invalid mm_function: {mm_function}")
 
@@ -78,7 +79,9 @@ class TopographicalCorticalCell(nn.Module):
             if self_recurrence:
                 identity = indices.unique().tile(2, 1)
                 indices = torch.cat([indices, identity], 1)
-            _, inv, fan_in = indices[0].unique(return_inverse=True, return_counts=True)
+            _, inv, fan_in = indices[0].unique(
+                return_inverse=True, return_counts=True
+            )
             scale = torch.sqrt(2 / fan_in.float())
             values = torch.randn(indices.shape[1]) * scale[inv]
 
@@ -98,9 +101,13 @@ class TopographicalCorticalCell(nn.Module):
                     )
                     synapses = synapses.clamp(
                         torch.tensor((0, 0))[:, None],
-                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[:, None],
+                        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1))[
+                            :, None
+                        ],
                     )
-                    synapses = idx_2D_to_1D(synapses, sheet_size[0], sheet_size[1])
+                    synapses = idx_2D_to_1D(
+                        synapses, sheet_size[0], sheet_size[1]
+                    )
                     synapse_root = torch.full_like(
                         synapses,
                         int(
@@ -125,7 +132,9 @@ class TopographicalCorticalCell(nn.Module):
 
             # He initialization of values (synapses_per_neuron is the fan_in)
             # if initialization == "he":
-            values = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
+            values = torch.randn(indices.shape[1]) * math.sqrt(
+                2 / synapses_per_neuron
+            )
             # elif initialization == "identity":
             #     values = torch.cat(values)
             # else:
@@ -150,7 +159,9 @@ class TopographicalCorticalCell(nn.Module):
         self.weight = nn.Parameter(weight)  # type: ignore
 
         # Initialize the bias vector
-        self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        self.bias = (
+            nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
+        )
 
     def coalesce(self):
         """
@@ -204,6 +215,7 @@ class TopographicalRNN(nn.Module):
         sheet_size: tuple[int, int] = (150, 300),
         connectivity_std: float = 10,
         synapses_per_neuron: int = 32,
+        num_classes: int = 10,
         bias: bool = True,
         mm_function: str = "torch_sparse",
         sparse_format: str = "torch_sparse",
@@ -291,7 +303,7 @@ class TopographicalRNN(nn.Module):
         self.out_block = nn.Sequential(
             nn.Linear(num_out_neurons, 64),
             self.activation,
-            nn.Linear(64, 10),
+            nn.Linear(64, num_classes),
         )
 
     def visualize(self, activations, save_path=None, fps=4, frames=None):
@@ -307,7 +319,9 @@ class TopographicalRNN(nn.Module):
         if frames is not None:
             activations = activations[frames[0] : frames[1]]
         for i in range(len(activations)):
-            activations[i] = activations[i][0].reshape(*self.cortical_sheet.sheet_size)
+            activations[i] = activations[i][0].reshape(
+                *self.cortical_sheet.sheet_size
+            )
 
         # First set up the figure, the axis, and the plot element we want to animate
         fig = plt.figure(figsize=(8, 8))

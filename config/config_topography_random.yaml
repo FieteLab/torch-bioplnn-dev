@@ -5,8 +5,9 @@ model:
   synapses_per_neuron: 32
   num_timesteps: 100
   bias: True
-  mm_function: tsgu
-  sparse_format: csr
+  num_classes: 10
+  mm_function: torch_sparse
+  sparse_format: torch_sparse
   batch_first: True
   adjacency_matrix_path: null
   self_recurrence: True
@@ -21,7 +22,7 @@ data:
   batch_size: 16
   num_workers: 0
 optimizer: 
-  fn: sparse_sgd
+  fn: sgd
   lr: 0.001
   momentum: 0.9
 criterion: cross_entropy
