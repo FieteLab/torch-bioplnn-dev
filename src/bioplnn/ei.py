@@ -78,6 +78,11 @@ class Conv2dEIRNNCell(nn.Module):
         self.h_inter_dims_sum = sum(h_inter_dims)
         self.fb_dim = fb_dim
         self.use_fb = fb_dim > 0
+        if self.num_inter == 4 and not self.use_fb:
+            raise ValueError(
+                "If num_inter is 4, fb_dim must be greater than 0."
+                f"Got {self.num_inter} and {fb_dim}."
+            )
         self.pool_stride = pool_stride
         self.activation = get_activation_class(activation)()
         self.out_shape = (
@@ -109,13 +114,25 @@ class Conv2dEIRNNCell(nn.Module):
         )
 
         self.conv_exc_inter = Conv2dPositive(
-            in_channels=input_dim + h_pyr_dim,
+            in_channels=(
+                h_pyr_dim if self.num_inter == 4 else h_pyr_dim + input_dim
+            ),
             out_channels=self.h_inter_dims_sum,
             kernel_size=exc_kernel_size,
             stride=2,
             padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
             bias=bias,
         )
+
+        if self.num_inter == 4:
+            self.conv_exc_inter_input = Conv2dPositive(
+                in_channels=input_dim,
+                out_channels=h_inter_dim[2],
+                kernel_size=exc_kernel_size,
+                stride=2,
+                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                bias=bias,
+            )
 
         if self.use_fb:
             self.conv_exc_pyr_fb = Conv2dPositive(
@@ -130,7 +147,11 @@ class Conv2dEIRNNCell(nn.Module):
             )
             self.conv_exc_inter_fb = Conv2dPositive(
                 in_channels=fb_dim,
-                out_channels=self.h_inter_dims_sum,
+                out_channels=(
+                    h_inter_dims[3]
+                    if self.num_inter == 4
+                    else self.h_inter_dims_sum
+                ),
                 kernel_size=exc_kernel_size,
                 stride=2,
                 padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
@@ -142,8 +163,8 @@ class Conv2dEIRNNCell(nn.Module):
         self.inh_out_dims = [
             h_pyr_dim,
             self.h_inter_dims_sum,
-            h_pyr_dim,
-            h_pyr_dim,
+            h_pyr_dim + h_inter_dim[3] if self.num_inter == 4 else None,
+            h_pyr_dim + h_inter_dim[2] if self.num_inter == 4 else None,
         ]
         for i, h_inter_dim in enumerate(h_inter_dims):
             conv = ConvTranspose2dPositive(
@@ -222,10 +243,15 @@ class Conv2dEIRNNCell(nn.Module):
         """
         # Compute the excitations
         # TODO: Add flag for toggling input to interneurons
+        device = input.device
         batch_size = input.shape[0]
-        exc = torch.cat([input, h_pyr], dim=1)
-        exc_pyr_basal = self.conv_exc_pyr(exc)
-        exc_inter = self.conv_exc_inter(exc)
+        exc_cat = torch.cat([input, h_pyr], dim=1)
+        exc_pyr_basal = self.conv_exc_pyr(torch.cat([input, h_pyr], dim=1))
+        if self.num_inter == 4:
+            exc_inter = self.conv_exc_inter(h_pyr)
+            exc_inter_input = self.conv_exc_inter_input(input)
+        else:
+            exc_inter = self.conv_exc_inter(exc_cat)
 
         if self.use_fb:
             if fb is None:
@@ -256,8 +282,12 @@ class Conv2dEIRNNCell(nn.Module):
         if self.num_inter >= 2:
             inh_inter = inhs[1]
         if self.num_inter == 4:
-            inh_pyr_basal = inhs[2]
-            inh_pyr_apical = inhs[3]
+            inh_pyr_basal, inh_inter_3 = torch.split(
+                inhs[2], [self.h_pyr_dim, self.h_inter_dims[3]], dim=1
+            )
+            inh_pyr_apical, inh_inter_2 = torch.split(
+                inhs[3], [self.h_pyr_dim, self.h_inter_dims[2]], dim=1
+            )
         # TODO: Have less
         # Computer candidate neural memory (cnm) states
         pyr_basal = torch.relu(exc_pyr_basal - inh_pyr_basal)
@@ -268,7 +298,14 @@ class Conv2dEIRNNCell(nn.Module):
         cnm_pyr = torch.relu(
             self.activation(pyr_apical + pyr_basal) - inh_pyr_soma
         )
-        cnm_inter = self.activation(exc_inter + exc_fb_inter - inh_inter)
+        if self.num_inter == 4:
+            start = sum(self.h_inter_dims[:2])
+            end = start + self.h_inter_dims[2]
+            exc_inter[:, start:end, ...] = exc_inter_input - inh_inter_2
+            start = sum(self.h_inter_dims[:3])
+            exc_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
+        else:
+            cnm_inter = self.activation(exc_inter + exc_fb_inter - inh_inter)
 
         # Euler update for the cell state
         tau_pyr = torch.sigmoid(self.tau_pyr)

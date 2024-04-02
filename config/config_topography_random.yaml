@@ -6,8 +6,8 @@ model:
   num_timesteps: 100
   bias: True
   num_classes: 10
-  mm_function: torch_sparse
-  sparse_format: torch_sparse
+  mm_function: native
+  sparse_format: coo
   batch_first: True
   adjacency_matrix_path: null
   self_recurrence: True
