@@ -37,10 +37,12 @@ def train_iter(
     Returns:
         tuple: A tuple containing the training loss and accuracy.
     """
-    if config.train.grad_clip_type == "norm":
-        clip_grad_ = clip_grad_norm_
-    elif config.train.grad_clip_type == "value":
-        clip_grad_ = clip_grad_value_
+    if config.train.grad_clip.disable:
+        clip_grad_ = lambda x, y: None
+    elif config.train.grad_clip.type == "norm":
+        clip_grad_ = lambda x, y: clip_grad_norm_(x, y, foreach=False)
+    elif config.train.grad_clip.type == "value":
+        clip_grad_ = lambda x, y: clip_grad_value_(x, y, foreach=False)
     else:
         raise NotImplementedError(
             f"Gradient clipping type {config.train.grad_clip_type} not implemented"
@@ -66,13 +68,12 @@ def train_iter(
 
         # Forward pass
         outputs = model(cue, mixture)
-        clip_grad_(model.parameters(), config.train.grad_clip)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-
+        clip_grad_(model.parameters(), config.train.grad_clip.value)
         optimizer.step()
 
         # Update statistics
@@ -214,7 +215,7 @@ def train(config: AttrDict) -> None:
 
     # Initialize Weights & Biases
     if config.wandb:
-        wandb.init(project="Cortical RNN", config=config)
+        wandb.init(project="EI RNN", config=config)
         wandb_log = lambda x: wandb.log(x)
     else:
         wandb_log = lambda x: None
