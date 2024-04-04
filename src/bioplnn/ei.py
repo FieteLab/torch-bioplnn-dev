@@ -467,7 +467,7 @@ class Conv2dEIRNN(nn.Module):
                 nn.Dropout(),
                 nn.Linear(fc_dim, num_classes),
             )
-            if num_classes is not None
+            if num_classes is not None and num_classes > 0
             else nn.Identity()
         )
 
@@ -503,23 +503,28 @@ class Conv2dEIRNN(nn.Module):
             )
         return param
 
-    def forward(self, cue: torch.Tensor, mixture: torch.Tensor):
+    def forward(self, cue: Optional[torch.Tensor], mixture: torch.Tensor):
         """
         Performs forward pass of the Conv2dEIRNN.
 
         Args:
-            input (torch.Tensor): Input tensor of shape (b, c, h, w) or (b, s, c, h, w), where s is sequence length.
+            cue (torch.Tensor): Input of shape (b, c, h, w) or (b, s, c, h, w), where s is sequence length.
+                Used to "prime" the network with a cue stimulus. Optional.
+            mixture (torch.Tensor): Input tensor of shape (b, c, h, w) or (b, s, c, h, w), where s is sequence length.
+                The primary stimulus to be processed.
 
         Returns:
             torch.Tensor: Output tensor after pooling of shape (b, n), where n is the number of classes.
         """
-        device = cue.device
-        batch_size = cue.shape[0]
+        device = mixture.device
+        batch_size = mixture.shape[0]
         h_pyrs, h_inters = self._init_hidden(batch_size, device=device)
         fbs_prev = self._init_fb(batch_size, device=device)
         fbs = self._init_fb(batch_size, device=device)
 
         for stimulation in (cue, mixture):
+            if stimulation is None:
+                continue
             outs = [None] * len(self.layers)
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:

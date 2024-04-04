@@ -17,14 +17,14 @@ model:
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
-  activation: relu
+  activation: tanh
   fc_dim: 256
 # Training parameters
 data:
   dataset: mnist
   root: data
-  batch_size: 16
-  num_workers: 0
+  batch_size: 32
+  num_workers: 4
 optimizer: 
   fn: adam
   lr: 0.001
@@ -32,7 +32,6 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: cross_entropy
-wandb: True
 compile:
   disable: True
   fullgraph: True
@@ -41,9 +40,10 @@ compile:
   mode: "max-autotune"
 train:
   epochs: 30
-  log_freq: 5
+  log_freq: 50
   model_dir: models
   grad_clip:
     disable: True
     type: norm
     value: 1.0
+wandb: True

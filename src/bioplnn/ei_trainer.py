@@ -63,11 +63,8 @@ def train_iter(
         images = images.to(device)
         labels = labels.to(device)
 
-        cue, mixture = images.split(config.data.batch_size, dim=0)
-        labels = labels[config.data.batch_size :, ...]
-
         # Forward pass
-        outputs = model(cue, mixture)
+        outputs = model(None, images)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
@@ -143,7 +140,7 @@ def eval_iter(
             labels = labels.to(device)
 
             # Forward pass
-            outputs = model(images)
+            outputs = model(None, images)
             loss = criterion(outputs, labels)
 
             # Update statistics
@@ -209,7 +206,7 @@ def train(config: AttrDict) -> None:
     train_loader, test_loader = get_dataloaders(
         dataset=config.data.dataset,
         root=config.data.root,
-        batch_size=config.data.batch_size * 2,
+        batch_size=config.data.batch_size,
         num_workers=config.data.num_workers,
     )
 
