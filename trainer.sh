@@ -3,12 +3,12 @@
 #SBATCH -t 08:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH -N 1
-#SBATCH -c 1
+#SBATCH -c 4
 #SBATCH --constraint=rocky8
-#SBATCH --mem 30G
+#SBATCH --mem 80G
 #SBATCH -o trainer.out
 
 source ~/.bashrc
-conda activate pytorch-3.10
+conda activate pytorch
 
-python src/bioplnn/trainer.py --config config/config_random.yaml
+python src/bioplnn/ei_trainer.py --config config/config_ei.yaml

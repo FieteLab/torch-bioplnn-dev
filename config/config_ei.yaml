@@ -8,7 +8,7 @@ model:
   exc_kernel_size: [5, 5]
   inh_kernel_size: [5, 5]
   num_layers: 3
-  num_steps: 100
+  num_steps: 20
   num_classes: 10
   fb_adjacency: 
   - [0, 0, 0]
@@ -17,14 +17,14 @@ model:
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
-  activation: relu
+  activation: tanh
   fc_dim: 256
 # Training parameters
 data:
   dataset: mnist
   root: data
-  batch_size: 16
-  num_workers: 0
+  batch_size: 32
+  num_workers: 4
 optimizer: 
   fn: adam
   lr: 0.001
@@ -32,9 +32,8 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: cross_entropy
-wandb: False
 compile:
-  disable: False
+  disable: True
   fullgraph: True
   dynamic: null
   backend: inductor
@@ -43,5 +42,8 @@ train:
   epochs: 30
   log_freq: 50
   model_dir: models
-  grad_clip_type: norm
-  grad_clip: 1.0
+  grad_clip:
+    disable: True
+    type: norm
+    value: 1.0
+wandb: True
