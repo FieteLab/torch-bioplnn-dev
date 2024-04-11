@@ -2,10 +2,10 @@ import os
 from typing import Callable
 
 import torch
+import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-import wandb
 from bioplnn.dataset import get_dataloaders
 from bioplnn.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict
