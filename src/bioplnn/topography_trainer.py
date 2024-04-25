@@ -1,6 +1,7 @@
 import os
 from typing import Callable
 
+from numpy import clip
 import torch
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
@@ -46,6 +47,21 @@ def train_epoch(
     running_correct = 0
     running_total = 0
 
+    if config.train.grad_clip.disable:
+        clip_grad_fn_ = lambda x: None
+    elif config.train.grad_clip.type == "norm":
+        clip_grad_fn_ = lambda x: clip_grad_norm_(
+            x, config.train.grad_clip.value, foreach=False
+        )
+    elif config.train.grad_clip.type == "value":
+        clip_grad_fn_ = lambda x: clip_grad_value_(
+            x, config.train.grad_clip.value, foreach=False
+        )
+    else:
+        raise NotImplementedError(
+            f"Gradient clipping type {config.train.grad_clip.type} not implemented"
+        )
+
     bar = tqdm(
         train_loader,
         desc=(
@@ -63,23 +79,7 @@ def train_epoch(
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        if not config.train.grad_clip.disable:
-            if config.train.grad_clip.type == "norm":
-                clip_grad_norm_(
-                    model.parameters(),
-                    config.train.grad_clip.value,
-                    foreach=False,
-                )
-            elif config.train.grad_clip.type == "value":
-                clip_grad_value_(
-                    model.parameters(),
-                    config.train.grad_clip.value,
-                    foreach=False,
-                )
-            else:
-                raise NotImplementedError(
-                    f"Gradient clipping type {config.train.grad_clip.type} not implemented"
-                )
+        clip_grad_fn_(model.parameters())
         optimizer.step()
 
         # Update statistics
@@ -180,9 +180,9 @@ def train(config: AttrDict) -> None:
 
     # Initialize the optimizer
     if config.optimizer.fn == "sgd":
-        if config.model.sparse_format == "csr":
+        if config.model.sparse_format in ("coo", "csr"):
             raise ValueError(
-                "sgd is not supported with csr: Use sparse_sgd instead"
+                "sgd is not supported with coo or csr: Use sparse_sgd instead"
             )
         optimizer = torch.optim.SGD(
             model.parameters(),
@@ -192,9 +192,19 @@ def train(config: AttrDict) -> None:
     elif config.optimizer.fn == "adam":
         if config.model.sparse_format in ("coo", "csr"):
             raise ValueError(
-                "adam is not supported with csr: Use sparse_sgd instead"
+                "adam is not supported with coo or csr: Use sparse_sgd instead"
             )
         optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=config.optimizer.lr,
+            betas=(config.optimizer.beta1, config.optimizer.beta2),
+        )
+    elif config.optimizer.fn == "adamw":
+        if config.model.sparse_format in ("coo", "csr"):
+            raise ValueError(
+                "adam is not supported with coo or csr: Use sparse_sgd instead"
+            )
+        optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=config.optimizer.lr,
             betas=(config.optimizer.beta1, config.optimizer.beta2),

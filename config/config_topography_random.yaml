@@ -6,8 +6,8 @@ model:
   num_timesteps: 100
   bias: True
   num_classes: 10
-  mm_function: native
-  sparse_format: coo
+  mm_function: torch_sparse
+  sparse_format: torch_sparse
   batch_first: True
   adjacency_matrix_path: null
   self_recurrence: True
@@ -16,19 +16,21 @@ model:
   activation: relu
 # Training parameters
 data:
-  dataset: mnist_v1
+  dataset: cifar10_v1
   root: data
   retina_path: connection/V1_indices.npy
   batch_size: 16
-  num_workers: 0
+  num_workers: 8
 optimizer: 
-  fn: sgd
+  fn: adamw
   lr: 0.001
   momentum: 0.9
+  beta1: 0.9
+  beta2: 0.999
 criterion: cross_entropy
-wandb: False
+wandb: True
 visualize:
-  disable: False
+  disable: True
   save_path: visualizations/test.gif
   fps: 4
   frames: [0, 20]
@@ -37,7 +39,7 @@ train:
   log_freq: 50
   model_dir: models
   grad_clip: 
-    disable: True
+    disable: False
     type: value
     value: 1.0
-    fn: custom
+    fn: native

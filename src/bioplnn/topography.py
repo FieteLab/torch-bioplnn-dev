@@ -55,7 +55,7 @@ class TopographicalCorticalCell(nn.Module):
         if mm_function == "torch_sparse":
             if sparse_format is not None and sparse_format != "torch_sparse":
                 raise ValueError(
-                    "sparse_format must not be specified if mm_function is 'torch_sparse'"
+                    "sparse_format must be 'torch_sparse' or None if mm_function is 'torch_sparse'"
                 )
             self.sparse_format = "torch_sparse"
             self.mm_function = torch_sparse.spmm
@@ -372,7 +372,7 @@ class TopographicalRNN(nn.Module):
         """
 
         # Average out channel dimension if it exists
-        if len(x.shape) > 2:
+        if x.dim() > 2:
             x = x.flatten(2)
             x = x.mean(dim=1)
 

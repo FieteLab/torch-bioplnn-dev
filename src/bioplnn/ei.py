@@ -71,10 +71,11 @@ class Conv2dEIRNNCell(nn.Module):
         self.h_pyr_dim = h_pyr_dim
         self.fb_dim = fb_dim
         self.use_fb = fb_dim > 0
+        h_inter_dims = h_inter_dims if h_inter_dims is not None else []
 
-        if len(h_inter_dims) < 1 or len(h_inter_dims) > 4:
+        if len(h_inter_dims) < 0 or len(h_inter_dims) > 4:
             raise ValueError(
-                "The length of h_inter_dims must be between 1 and 4, inclusive"
+                "h_inter_dims must be a list of length 0 to 4, or None."
                 f"Got {len(h_inter_dims)}."
             )
         if len(h_inter_dims) == 4 and not self.use_fb:
@@ -83,7 +84,7 @@ class Conv2dEIRNNCell(nn.Module):
             )
             h_inter_dims = h_inter_dims[:3]
         self.h_inter_dims = h_inter_dims
-        self.h_inter_dims_sum = sum(h_inter_dims)
+        self.h_inter_dims_sum = sum(h_inter_dims) if h_inter_dims is not None else 0
 
         self.pool_stride = pool_stride
         self.activation = get_activation_class(activation)()
@@ -98,13 +99,14 @@ class Conv2dEIRNNCell(nn.Module):
         self.tau_pyr = nn.Parameter(
             torch.randn((1, h_pyr_dim, *input_size), requires_grad=True)
         )
-        self.tau_inter = nn.Parameter(
-            torch.randn(
-                (1, self.h_inter_dims_sum, *self.inter_size),
-                requires_grad=True,
+        if h_inter_dims:
+            self.tau_inter = nn.Parameter(
+                torch.randn(
+                    (1, self.h_inter_dims_sum, *self.inter_size),
+                    requires_grad=True,
+                )
+                + 0.5
             )
-            + 0.5
-        )
 
         # Initialize excitatory convolutional layers
         self.conv_exc_pyr = Conv2dPositive(
@@ -115,16 +117,17 @@ class Conv2dEIRNNCell(nn.Module):
             bias=bias,
         )
 
-        self.conv_exc_inter = Conv2dPositive(
-            in_channels=(
-                h_pyr_dim if len(h_inter_dims) >= 3 else h_pyr_dim + input_dim
-            ),
-            out_channels=self.h_inter_dims_sum,
-            kernel_size=exc_kernel_size,
-            stride=2,
-            padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
-            bias=bias,
-        )
+        if h_inter_dims:
+            self.conv_exc_inter = Conv2dPositive(
+                in_channels=(
+                    h_pyr_dim if len(h_inter_dims) >= 3 else h_pyr_dim + input_dim
+                ),
+                out_channels=self.h_inter_dims_sum,
+                kernel_size=exc_kernel_size,
+                stride=2,
+                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                bias=bias,
+            )
 
         if len(h_inter_dims) >= 3:
             self.conv_exc_input_inter = Conv2dPositive(
@@ -147,47 +150,51 @@ class Conv2dEIRNNCell(nn.Module):
                 ),
                 bias=bias,
             )
-            self.conv_exc_inter_fb = Conv2dPositive(
-                in_channels=fb_dim,
-                out_channels=(
-                    h_inter_dims[3] if len(h_inter_dims) == 4 else self.h_inter_dims_sum
-                ),
-                kernel_size=exc_kernel_size,
-                stride=2,
-                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
-                bias=bias,
-            )
+            if h_inter_dims:
+                self.conv_exc_inter_fb = Conv2dPositive(
+                    in_channels=fb_dim,
+                    out_channels=(
+                        h_inter_dims[3]
+                        if len(h_inter_dims) == 4
+                        else self.h_inter_dims_sum
+                    ),
+                    kernel_size=exc_kernel_size,
+                    stride=2,
+                    padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                    bias=bias,
+                )
 
         # Initialize inhibitory convolutional layers
-        self.convs_inh = nn.ModuleList()
-        self.inh_out_dims = [
-            h_pyr_dim,
-            self.h_inter_dims_sum,
-            h_pyr_dim,
-            h_pyr_dim,
-        ]
-        for i, h_inter_dim in enumerate(h_inter_dims):
-            conv = ConvTranspose2dPositive(
-                in_channels=h_inter_dim,
-                out_channels=self.inh_out_dims[i],
-                kernel_size=inh_kernel_size,
-                stride=1 if i == 1 else 2,
-                padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
-                bias=bias,
-            )
-            if i in (2, 3) and len(h_inter_dims) == 4:
-                conv2 = Conv2dPositive(
+        if h_inter_dims:
+            self.convs_inh = nn.ModuleList()
+            self.inh_out_dims = [
+                h_pyr_dim,
+                self.h_inter_dims_sum,
+                h_pyr_dim,
+                h_pyr_dim,
+            ]
+            for i, h_inter_dim in enumerate(h_inter_dims):
+                conv = ConvTranspose2dPositive(
                     in_channels=h_inter_dim,
-                    out_channels=(h_inter_dims[3 if i == 2 else 2]),
+                    out_channels=self.inh_out_dims[i],
                     kernel_size=inh_kernel_size,
+                    stride=1 if i == 1 else 2,
                     padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
                     bias=bias,
                 )
-                conv_mod = nn.Module()
-                conv_mod.conv1 = conv
-                conv_mod.conv2 = conv2
-                conv = conv_mod
-            self.convs_inh.append(conv)
+                if i in (2, 3) and len(h_inter_dims) == 4:
+                    conv2 = Conv2dPositive(
+                        in_channels=h_inter_dim,
+                        out_channels=(h_inter_dims[3 if i == 2 else 2]),
+                        kernel_size=inh_kernel_size,
+                        padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
+                        bias=bias,
+                    )
+                    conv_mod = nn.Module()
+                    conv_mod.conv1 = conv
+                    conv_mod.conv2 = conv2
+                    conv = conv_mod
+                self.convs_inh.append(conv)
 
         # Initialize output pooling layer
         self.out_pool = nn.AvgPool2d(
@@ -209,11 +216,15 @@ class Conv2dEIRNNCell(nn.Module):
         """
         return (
             torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device),
-            torch.zeros(
-                batch_size,
-                self.h_inter_dims_sum,
-                *self.inter_size,
-                device=device,
+            (
+                torch.zeros(
+                    batch_size,
+                    self.h_inter_dims_sum,
+                    *self.inter_size,
+                    device=device,
+                )
+                if self.h_inter_dims
+                else None
             ),
         )
 
@@ -256,72 +267,80 @@ class Conv2dEIRNNCell(nn.Module):
         if len(self.h_inter_dims) >= 3:
             exc_inter = self.conv_exc_inter(h_pyr)
             exc_input_inter = self.conv_exc_input_inter(input)
-        else:
+        elif self.h_inter_dims:
             exc_inter = self.conv_exc_inter(exc_cat)
 
         if self.use_fb:
             if fb is None:
                 raise ValueError("If use_fb is True, fb_exc must be provided.")
             exc_pyr_apical = self.conv_exc_pyr_fb(fb)
-            exc_fb_inter = self.conv_exc_inter_fb(fb)
+            if self.h_inter_dims:
+                exc_fb_inter = self.conv_exc_inter_fb(fb)
         else:
             exc_pyr_apical = 0
             exc_fb_inter = 0
 
         # Compute the inhibitions
-        h_inters = torch.split(h_inter, self.h_inter_dims, dim=1)
         inhs = [0] * 4
-        inh_inter_2 = inh_inter_3 = 0
-        for i in range(len(self.h_inter_dims)):
-            conv = self.convs_inh[i]
-            if i in (2, 3) and len(self.h_inter_dims) == 4:
-                conv, conv2 = conv.conv1, conv.conv2
-                inh_inter_2_or_3 = conv2(h_inters[i])
-                if i == 2:
-                    inh_inter_3 = inh_inter_2_or_3
-                else:
-                    inh_inter_2 = inh_inter_2_or_3
-            inhs[i] = conv(
-                h_inters[i],
-                output_size=(
-                    batch_size,
-                    self.inh_out_dims[i],
-                    self.inter_size[0] if i == 1 else self.input_size[0],
-                    self.inter_size[1] if i == 1 else self.input_size[1],
-                ),
-            )
+        if self.h_inter_dims:
+            h_inters = torch.split(h_inter, self.h_inter_dims, dim=1)
+            inh_inter_2 = inh_inter_3 = 0
+            for i in range(len(self.h_inter_dims)):
+                conv = self.convs_inh[i]
+                if i in (2, 3) and len(self.h_inter_dims) == 4:
+                    conv, conv2 = conv.conv1, conv.conv2
+                    inh_inter_2_or_3 = conv2(h_inters[i])
+                    if i == 2:
+                        inh_inter_3 = inh_inter_2_or_3
+                    else:
+                        inh_inter_2 = inh_inter_2_or_3
+                inhs[i] = conv(
+                    h_inters[i],
+                    output_size=(
+                        batch_size,
+                        self.inh_out_dims[i],
+                        self.inter_size[0] if i == 1 else self.input_size[0],
+                        self.inter_size[1] if i == 1 else self.input_size[1],
+                    ),
+                )
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
-
         pyr_basal = torch.relu(exc_pyr_basal - inh_pyr_basal)
         try:  # In case exc_pyr_apical and inh_pyr_apical are both 0 ints
             pyr_apical = torch.relu(exc_pyr_apical - inh_pyr_apical)
         except TypeError:
             pyr_apical = 0
-        cnm_pyr = torch.relu(self.activation(pyr_apical + pyr_basal) - inh_pyr_soma)
+        cnm_pyr = self.activation(
+            torch.relu(
+                self.activation(pyr_apical) + self.activation(pyr_basal) - inh_pyr_soma
+            )
+        )
 
-        cnm_inter = exc_inter - inh_inter
-        if len(self.h_inter_dims) < 4:
-            cnm_inter += exc_fb_inter
-        else:
-            # Add excitations and inhibitions to interneuron 3
-            start = sum(self.h_inter_dims[:3])
-            cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
-        if len(self.h_inter_dims) >= 3:
-            # Add excitations and inhibitions to interneuron 2
-            start = sum(self.h_inter_dims[:2])
-            end = start + self.h_inter_dims[2]
-            cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
-
-        cnm_inter = self.activation(torch.relu(cnm_inter))
+        if self.h_inter_dims:
+            cnm_inter = exc_inter - inh_inter
+            if len(self.h_inter_dims) < 4:
+                cnm_inter += exc_fb_inter
+            else:
+                # Add excitations and inhibitions to interneuron 3
+                start = sum(self.h_inter_dims[:3])
+                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
+            if len(self.h_inter_dims) >= 3:
+                # Add excitations and inhibitions to interneuron 2
+                start = sum(self.h_inter_dims[:2])
+                end = start + self.h_inter_dims[2]
+                cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
+            cnm_inter = self.activation(torch.relu(cnm_inter))
 
         # Euler update for the cell state
         tau_pyr = torch.sigmoid(self.tau_pyr)
         h_next_pyr = (1 - tau_pyr) * h_pyr + tau_pyr * cnm_pyr
 
-        tau_inter = torch.sigmoid(self.tau_inter)
-        h_next_inter = (1 - tau_inter) * h_inter + tau_inter * cnm_inter
+        if self.h_inter_dims:
+            tau_inter = torch.sigmoid(self.tau_inter)
+            h_next_inter = (1 - tau_inter) * h_inter + tau_inter * cnm_inter
+        else:
+            h_next_inter = None
 
         # Pool the output
         out = self.out_pool(h_next_pyr)

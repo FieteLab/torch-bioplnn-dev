@@ -14,6 +14,15 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
+dependencies = [
+  "numpy",
+  "tqdm",
+  "torch",
+  "torchvision",
+  "torch-scatter",
+  "torch-sparse",
+  "wandb",
+]
 
 [project.urls]
 Homepage = "https://github.com/hpvok13/bioplnn"

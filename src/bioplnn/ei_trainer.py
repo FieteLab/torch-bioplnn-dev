@@ -57,7 +57,9 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
     )
     for i, (images, labels) in enumerate(bar):
         images = images.to(device)
@@ -193,14 +195,24 @@ def train(config: AttrDict) -> None:
             lr=config.optimizer.lr,
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
+    elif config.optimizer.fn == "adamw":
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=config.optimizer.lr,
+            betas=(config.optimizer.beta1, config.optimizer.beta2),
+        )
     else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+        raise NotImplementedError(
+            f"Optimizer {config.optimizer.fn} not implemented"
+        )
 
     # Initialize the loss function
     if config.criterion == "cross_entropy":
         criterion = torch.nn.CrossEntropyLoss()
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(
+            f"Criterion {config.criterion} not implemented"
+        )
 
     # Get the data loaders
     train_loader, test_loader = get_dataloaders(
@@ -248,7 +260,9 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
+        link_path = os.path.abspath(
+            os.path.join(config.train.model_dir, "model.pt")
+        )
         torch.save(model, file_path)
         try:
             os.remove(link_path)
