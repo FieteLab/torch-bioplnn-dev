@@ -1,6 +1,7 @@
 .vscode/
+.empty/
 __pycache__/
 data/
 wandb/
 *.out
-models/
+checkpoints/

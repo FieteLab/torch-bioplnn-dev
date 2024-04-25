@@ -5,10 +5,10 @@
 #SBATCH -N 1
 #SBATCH -c 8
 #SBATCH --constraint=rocky8
-#SBATCH --mem 80G
+#SBATCH --mem 20G
 #SBATCH -o trainer.out
 
 source ~/.bashrc
 conda activate pytorch
 
-python -u src/bioplnn/topography_trainer.py --config config/config_topography_random.yaml
+python -u src/bioplnn/trainers/ei.py --config config/config_ei.yaml

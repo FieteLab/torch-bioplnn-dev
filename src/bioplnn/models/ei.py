@@ -306,16 +306,14 @@ class Conv2dEIRNNCell(nn.Module):
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
-        pyr_basal = torch.relu(exc_pyr_basal - inh_pyr_basal)
-        try:  # In case exc_pyr_apical and inh_pyr_apical are both 0 ints
-            pyr_apical = torch.relu(exc_pyr_apical - inh_pyr_apical)
-        except TypeError:
+        pyr_basal = self.activation(torch.relu(exc_pyr_basal - inh_pyr_basal))
+        if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
+            exc_pyr_apical, torch.Tensor
+        ):
+            pyr_apical = self.activation(torch.relu(exc_pyr_apical - inh_pyr_apical))
+        else:
             pyr_apical = 0
-        cnm_pyr = self.activation(
-            torch.relu(
-                self.activation(pyr_apical) + self.activation(pyr_basal) - inh_pyr_soma
-            )
-        )
+        cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal - inh_pyr_soma))
 
         if self.h_inter_dims:
             cnm_inter = exc_inter - inh_inter
@@ -522,7 +520,13 @@ class Conv2dEIRNN(nn.Module):
             )
         return param
 
-    def forward(self, cue: Optional[torch.Tensor], mixture: torch.Tensor):
+    def forward(
+        self,
+        cue: Optional[torch.Tensor],
+        mixture: torch.Tensor,
+        return_layer_outputs=False,
+        return_hidden=False,
+    ):
         """
         Performs forward pass of the Conv2dEIRNN.
 
@@ -571,12 +575,11 @@ class Conv2dEIRNN(nn.Module):
                 fbs = self._init_fb(batch_size, device=device)
 
         out = self.out_layer(outs[-1])
+
+        if return_layer_outputs and return_hidden:
+            return out, outs, (h_pyrs, h_inters)
+        if return_layer_outputs:
+            return out, outs
+        if return_hidden:
+            return out, (h_pyrs, h_inters)
         return out
-
-
-if __name__ == "__main__":
-    import os
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_path, "ei_trainer.py")) as file:
-        exec(file.read())

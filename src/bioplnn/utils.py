@@ -83,8 +83,7 @@ def count_parameters(model):
     for param in model.parameters():
         num_params = (
             param._nnz()
-            if param.layout
-            in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
+            if param.layout in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
             else param.numel()
         )
         total_params += num_params
@@ -127,9 +126,7 @@ def image2v1(
     image_x, image_y = image.shape[1:]  # (C, H, W)
     img_ind = np.zeros((2, image_x, image_y))
     img_ind[0, :, :] = (
-        np.tile(0 + np.arange(image_x), (image_y, 1)).T
-        / image_x
-        * image_top_corner[0]
+        np.tile(0 + np.arange(image_x), (image_y, 1)).T / image_x * image_top_corner[0]
     )
     img_ind[1, :, :] = (
         np.tile(np.arange(image_y) - image_y // 2, (image_x, 1))
@@ -140,9 +137,7 @@ def image2v1(
 
     flat_img_ind = img_ind.reshape((2, image_x * image_y))
 
-    normed_indices_retina = normalize_for_mp(
-        retina_indices, N_x, N_y, retina_radius
-    )
+    normed_indices_retina = normalize_for_mp(retina_indices, N_x, N_y, retina_radius)
     r_indices, theta_indices = r_theta_mp(normed_indices_retina)
 
     v_field_x = r_indices * np.cos(theta_indices)
@@ -171,3 +166,11 @@ def image2v1(
     img_on_vfield = torch.from_numpy(img_on_vfield).to(device).float()
     img_on_vfield = torch.nan_to_num(img_on_vfield)
     return img_on_vfield
+
+
+def compact(l):
+    return list(filter(None, l))
+
+
+def rescale(x):
+    return x * 2 - 1

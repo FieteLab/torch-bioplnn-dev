@@ -1,19 +1,24 @@
 # Data and Model parameters
 model:
-  input_size: [28, 28]
-  input_dim: 1
-  h_pyr_dim: 4
-  h_inter_dims: [4, 4, 4, 4]
-  fb_dim: 4
+  input_size: [64, 64]
+  input_dim: 3
+  h_pyr_dim: [16, 32, 64, 64]
+  h_inter_dims: 
+  - [16]
+  - [32]
+  - [64]
+  - [64]
+  fb_dim: [16, 32, 64, 64]
   exc_kernel_size: [5, 5]
   inh_kernel_size: [5, 5]
-  num_layers: 3
-  num_steps: 20
+  num_layers: 4
+  num_steps: 10
   num_classes: 10
   fb_adjacency: 
-  - [0, 0, 0]
-  - [1, 0, 0]
-  - [1, 1, 0]
+  - [0, 0, 0, 0]
+  - [1, 0, 0, 0]
+  - [0, 1, 0, 0]
+  - [0, 0, 1, 0]
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
@@ -21,26 +26,32 @@ model:
   fc_dim: 256
 # Training parameters
 data:
-  dataset: mnist
-  root: data
-  batch_size: 32
+  root: data/CLEVR_v1.0
+  cues_path: data/CLEVR_v1.0/cues
+  batch_size: 256
+  val_batch_size: 32
+  num_train_images: Null
+  num_val_images: Null
+  holdout: []
+  mode: every
   num_workers: 4
 optimizer: 
-  fn: adam
+  fn: adamw
   lr: 0.001
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
-criterion: cross_entropy
+criterion: ce
 compile:
   disable: True
   fullgraph: True
-  dynamic: null
+  dynamic: Null
   backend: inductor
-  mode: "max-autotune"
+  mode: reduce-overhead
 train:
+  matmul_precision: high
   epochs: 30
-  log_freq: 50
+  log_freq: 5
   model_dir: models
   grad_clip:
     disable: True

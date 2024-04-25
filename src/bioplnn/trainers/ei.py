@@ -6,9 +6,10 @@ import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-from bioplnn.dataset import get_dataloaders
-from bioplnn.ei import Conv2dEIRNN
+from bioplnn.datasets.ei import get_dataloaders
+from bioplnn.models.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict
+from bioplnn.loss import EDLLoss
 
 
 def train_iter(
@@ -57,16 +58,15 @@ def train_iter(
 
     bar = tqdm(
         train_loader,
-        desc=(
-            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
-        ),
+        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
     )
-    for i, (images, labels) in enumerate(bar):
-        images = images.to(device)
+    for i, (cue, mixture, labels) in enumerate(bar):
+        cue = cue.to(device)
+        mixture = mixture.to(device)
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(None, images)
+        outputs = model(cue, mixture)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
@@ -137,12 +137,13 @@ def eval_iter(
     test_total = 0
 
     with torch.no_grad():
-        for images, labels in test_loader:
-            images = images.to(device)
+        for cue, mixture, labels in test_loader:
+            cue = cue.to(device)
+            mixture = mixture.to(device)
             labels = labels.to(device)
 
             # Forward pass
-            outputs = model(None, images)
+            outputs = model(cue, mixture)
             loss = criterion(outputs, labels)
 
             # Update statistics
@@ -168,6 +169,7 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    torch.set_float32_matmul_precision(config.train.matmul_precision)
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Conv2dEIRNN(**config.model).to(device)
@@ -202,23 +204,28 @@ def train(config: AttrDict) -> None:
             betas=(config.optimizer.beta1, config.optimizer.beta2),
         )
     else:
-        raise NotImplementedError(
-            f"Optimizer {config.optimizer.fn} not implemented"
-        )
+        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
 
     # Initialize the loss function
-    if config.criterion == "cross_entropy":
+    if config.criterion == "ce":
         criterion = torch.nn.CrossEntropyLoss()
+    elif config.criterion == "edl":
+        criterion = EDLLoss(num_classes=config.model.num_classes)
     else:
-        raise NotImplementedError(
-            f"Criterion {config.criterion} not implemented"
-        )
+        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
     train_loader, test_loader = get_dataloaders(
-        dataset=config.data.dataset,
-        root=config.data.root,
-        batch_size=config.data.batch_size,
+        data_root=config.data.root,
+        cues_path=config.data.cues_path,
+        train_batch_size=config.data.batch_size,
+        val_batch_size=config.data.val_batch_size,
+        max_n_objects=config.model.num_classes - 1,
+        resolution=config.model.input_size,
+        num_train_images=config.data.num_train_images,
+        num_val_images=config.data.num_val_images,
+        holdout=config.data.holdout,
+        mode=config.data.mode,
         num_workers=config.data.num_workers,
     )
 
@@ -260,9 +267,7 @@ def train(config: AttrDict) -> None:
         file_path = os.path.abspath(
             os.path.join(config.train.model_dir, f"model_{epoch}.pt")
         )
-        link_path = os.path.abspath(
-            os.path.join(config.train.model_dir, "model.pt")
-        )
+        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
         torch.save(model, file_path)
         try:
             os.remove(link_path)

@@ -1,7 +1,3 @@
-import glob
-import os
-import re
-
 import numpy as np
 import torch
 import torchvision
@@ -17,9 +13,7 @@ class V1Dataset:
         Read cortex information.
         """
         self.retina_indices = np.load(retina_path)
-        self.flat_indices = torch.tensor(
-            flatten_indices(self.retina_indices, Ny)
-        )
+        self.flat_indices = torch.tensor(flatten_indices(self.retina_indices, Ny))
         self.Nx = Nx
         self.Ny = Ny
         self.retina_radius = retina_radius
