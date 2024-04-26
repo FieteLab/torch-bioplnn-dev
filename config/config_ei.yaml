@@ -11,6 +11,8 @@ model:
   fb_dim: [16, 32, 64, 64]
   exc_kernel_size: [5, 5]
   inh_kernel_size: [5, 5]
+  num_compartments: 1
+  immediate_inhibition: True
   num_layers: 4
   num_steps: 10
   num_classes: 10
@@ -52,9 +54,9 @@ train:
   matmul_precision: high
   epochs: 30
   log_freq: 5
-  model_dir: models
+  checkpoint_dir: checkpoints/ei
   grad_clip:
     disable: True
     type: norm
     value: 1.0
-wandb: True
+wandb: False

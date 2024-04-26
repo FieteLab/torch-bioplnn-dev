@@ -117,7 +117,7 @@ def train_epoch(
 def eval_epoch(
     model: TopographicalRNN,
     criterion: torch.nn.Module,
-    test_loader: torch.utils.data.DataLoader,
+    val_loader: torch.utils.data.DataLoader,
     wandb_log: Callable[[dict[str, float, int]], None],
     epoch: int,
     device: torch.device,
@@ -128,7 +128,7 @@ def eval_epoch(
     Args:
         model (TopographicalRNN): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
-        test_loader (torch.utils.data.DataLoader): The test data loader.
+        val_loader (torch.utils.data.DataLoader): The test data loader.
         wandb_log (function): Function to log evaluation statistics to Weights & Biases.
         epoch (int): The current epoch number.
         device (torch.device): The device to perform computations on.
@@ -142,7 +142,7 @@ def eval_epoch(
     test_total = 0
 
     with torch.no_grad():
-        for images, labels in test_loader:
+        for images, labels in val_loader:
             images = images.to(device)
             labels = labels.to(device)
 
@@ -158,7 +158,7 @@ def eval_epoch(
             test_total += len(labels)
 
     # Calculate average test loss and accuracy
-    test_loss /= len(test_loader)
+    test_loss /= len(val_loader)
     test_acc = test_correct / test_total
 
     wandb_log(dict(test_loss=test_loss, test_acc=test_acc, epoch=epoch))
@@ -173,6 +173,8 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    os.makedirs(config.train.checkpoint_dir, exist_ok=True)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = TopographicalRNN(**config.model).to(device)
 
@@ -225,7 +227,7 @@ def train(config: AttrDict) -> None:
         raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
-    train_loader, test_loader = get_dataloaders(
+    train_loader, val_loader = get_dataloaders(
         dataset=config.data.dataset,
         root=config.data.root,
         retina_path=config.data.retina_path,
@@ -255,11 +257,11 @@ def train(config: AttrDict) -> None:
 
         # Evaluate the model on the test set
         test_loss, test_acc = eval_epoch(
-            model, criterion, test_loader, wandb_log, epoch, device
+            model, criterion, val_loader, wandb_log, epoch, device
         )
 
         if not config.visualize.disable:
-            images, _ = next(iter(test_loader))
+            images, _ = next(iter(val_loader))
             images = images.to(device)
             save_path = None
             if config.visualize.save_path is not None:
@@ -285,10 +287,17 @@ def train(config: AttrDict) -> None:
 
         # Save Model
         file_path = os.path.abspath(
-            os.path.join(config.train.model_dir, f"model_{epoch}.pt")
+            os.path.join(config.train.checkpoint_dir, f"checkpoint_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(config.train.model_dir, "model.pt"))
-        torch.save(model, file_path)
+        link_path = os.path.abspath(
+            os.path.join(config.train.checkpoint_dir, "checkpoint.pt")
+        )
+        checkpoint = {
+            "epoch": epoch,
+            "model_state_dict": getattr(model, "_orig_mod", model).state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        torch.save(checkpoint, file_path)
         try:
             os.remove(link_path)
         except FileNotFoundError:

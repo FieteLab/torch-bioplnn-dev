@@ -40,6 +40,8 @@ class Conv2dEIRNNCell(nn.Module):
         fb_dim: int = 0,
         exc_kernel_size: tuple[int, int] = (5, 5),
         inh_kernel_size: tuple[int, int] = (5, 5),
+        num_compartments: int = 3,
+        immediate_inhibition: bool = False,
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
@@ -69,9 +71,11 @@ class Conv2dEIRNNCell(nn.Module):
         self.inter_size = (ceil(input_size[0] / 2), ceil(input_size[1] / 2))
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
+        h_inter_dims = h_inter_dims if h_inter_dims is not None else []
         self.fb_dim = fb_dim
         self.use_fb = fb_dim > 0
-        h_inter_dims = h_inter_dims if h_inter_dims is not None else []
+        self.immediate_inhibition = immediate_inhibition
+        self.num_compartments = num_compartments
 
         if len(h_inter_dims) < 0 or len(h_inter_dims) > 4:
             raise ValueError(
@@ -262,7 +266,10 @@ class Conv2dEIRNNCell(nn.Module):
         """
         # Compute the excitations
         batch_size = input.shape[0]
-        exc_cat = torch.cat([input, h_pyr], dim=1)
+        exc_cat = [input, h_pyr]
+        if self.use_fb and self.num_compartments == 1:
+            exc_cat.append(fb)
+        exc_cat = torch.cat(exc_cat, dim=1)
         exc_pyr_basal = self.conv_exc_pyr(exc_cat)
         if len(self.h_inter_dims) >= 3:
             exc_inter = self.conv_exc_inter(h_pyr)
@@ -270,7 +277,7 @@ class Conv2dEIRNNCell(nn.Module):
         elif self.h_inter_dims:
             exc_inter = self.conv_exc_inter(exc_cat)
 
-        if self.use_fb:
+        if self.use_fb and self.num_compartments == 3:
             if fb is None:
                 raise ValueError("If use_fb is True, fb_exc must be provided.")
             exc_pyr_apical = self.conv_exc_pyr_fb(fb)
@@ -283,19 +290,23 @@ class Conv2dEIRNNCell(nn.Module):
         # Compute the inhibitions
         inhs = [0] * 4
         if self.h_inter_dims:
-            h_inters = torch.split(h_inter, self.h_inter_dims, dim=1)
+            exc_inters = torch.split(
+                exc_inter if self.immediate_inhibition else h_inter,
+                self.h_inter_dims,
+                dim=1,
+            )
             inh_inter_2 = inh_inter_3 = 0
             for i in range(len(self.h_inter_dims)):
                 conv = self.convs_inh[i]
                 if i in (2, 3) and len(self.h_inter_dims) == 4:
                     conv, conv2 = conv.conv1, conv.conv2
-                    inh_inter_2_or_3 = conv2(h_inters[i])
+                    inh_inter_2_or_3 = conv2(exc_inters[i])
                     if i == 2:
                         inh_inter_3 = inh_inter_2_or_3
                     else:
                         inh_inter_2 = inh_inter_2_or_3
                 inhs[i] = conv(
-                    h_inters[i],
+                    exc_inters[i],
                     output_size=(
                         batch_size,
                         self.inh_out_dims[i],
@@ -306,14 +317,25 @@ class Conv2dEIRNNCell(nn.Module):
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
-        pyr_basal = self.activation(torch.relu(exc_pyr_basal - inh_pyr_basal))
-        if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
-            exc_pyr_apical, torch.Tensor
-        ):
-            pyr_apical = self.activation(torch.relu(exc_pyr_apical - inh_pyr_apical))
+        if self.num_compartments == 1:
+            cnm_pyr = self.activation(
+                torch.relu(
+                    exc_pyr_basal - inh_pyr_soma - inh_pyr_basal - inh_pyr_apical
+                )
+            )
+        elif self.num_compartments == 3:
+            pyr_basal = self.activation(torch.relu(exc_pyr_basal - inh_pyr_basal))
+            if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
+                exc_pyr_apical, torch.Tensor
+            ):
+                pyr_apical = self.activation(
+                    torch.relu(exc_pyr_apical - inh_pyr_apical)
+                )
+            else:
+                pyr_apical = 0
+            cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal - inh_pyr_soma))
         else:
-            pyr_apical = 0
-        cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal - inh_pyr_soma))
+            raise ValueError("num_compartments must be 1 or 3.")
 
         if self.h_inter_dims:
             cnm_inter = exc_inter - inh_inter
@@ -356,6 +378,8 @@ class Conv2dEIRNN(nn.Module):
         fb_dim: int | list[int],
         exc_kernel_size: list[int, int] | list[list[int, int]],
         inh_kernel_size: list[int, int] | list[list[int, int]],
+        num_compartments: int,
+        immediate_inhibition: bool,
         num_layers: int,
         num_steps: int,
         num_classes: Optional[int] = None,
@@ -466,6 +490,8 @@ class Conv2dEIRNN(nn.Module):
                     fb_dim=self.fb_dims[i] if self.use_fb[i] else 0,
                     exc_kernel_size=self.exc_kernel_sizes[i],
                     inh_kernel_size=self.inh_kernel_sizes[i],
+                    num_compartments=num_compartments,
+                    immediate_inhibition=immediate_inhibition,
                     pool_kernel_size=self.pool_kernel_sizes[i],
                     pool_stride=self.pool_strides[i],
                     bias=self.biases[i],
