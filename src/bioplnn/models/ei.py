@@ -114,36 +114,16 @@ class Conv2dEIRNNCell(nn.Module):
 
         # Initialize excitatory convolutional layers
         self.conv_exc_pyr = Conv2dPositive(
-            in_channels=input_dim + h_pyr_dim,
+            in_channels=input_dim
+            + h_pyr_dim
+            + (fb_dim if self.use_fb and self.num_compartments == 1 else 0),
             out_channels=h_pyr_dim,
             kernel_size=exc_kernel_size,
             padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
             bias=bias,
         )
 
-        if h_inter_dims:
-            self.conv_exc_inter = Conv2dPositive(
-                in_channels=(
-                    h_pyr_dim if len(h_inter_dims) >= 3 else h_pyr_dim + input_dim
-                ),
-                out_channels=self.h_inter_dims_sum,
-                kernel_size=exc_kernel_size,
-                stride=2,
-                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
-                bias=bias,
-            )
-
-        if len(h_inter_dims) >= 3:
-            self.conv_exc_input_inter = Conv2dPositive(
-                in_channels=input_dim,
-                out_channels=h_inter_dims[2],
-                kernel_size=exc_kernel_size,
-                stride=2,
-                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
-                bias=bias,
-            )
-
-        if self.use_fb:
+        if self.use_fb and num_compartments == 3:
             self.conv_exc_pyr_fb = Conv2dPositive(
                 in_channels=fb_dim,
                 out_channels=h_pyr_dim,
@@ -154,19 +134,46 @@ class Conv2dEIRNNCell(nn.Module):
                 ),
                 bias=bias,
             )
-            if h_inter_dims:
-                self.conv_exc_inter_fb = Conv2dPositive(
-                    in_channels=fb_dim,
-                    out_channels=(
-                        h_inter_dims[3]
-                        if len(h_inter_dims) == 4
-                        else self.h_inter_dims_sum
-                    ),
+
+        if h_inter_dims:
+            exc_inter_in_channels = h_pyr_dim
+            if len(self.h_inter_dims) >= 3:
+                self.conv_exc_input_inter = Conv2dPositive(
+                    in_channels=input_dim,
+                    out_channels=h_inter_dims[2],
                     kernel_size=exc_kernel_size,
                     stride=2,
                     padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
                     bias=bias,
                 )
+            else:
+                exc_inter_in_channels += input_dim
+
+            if self.use_fb:
+                if len(h_inter_dims) == 4:
+                    self.conv_exc_inter_fb = Conv2dPositive(
+                        in_channels=fb_dim,
+                        out_channels=(
+                            h_inter_dims[3]
+                            if len(h_inter_dims) == 4
+                            else self.h_inter_dims_sum
+                        ),
+                        kernel_size=exc_kernel_size,
+                        stride=2,
+                        padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                        bias=bias,
+                    )
+                else:
+                    exc_inter_in_channels += fb_dim
+
+            self.conv_exc_inter = Conv2dPositive(
+                in_channels=exc_inter_in_channels,
+                out_channels=self.h_inter_dims_sum,
+                kernel_size=exc_kernel_size,
+                stride=2,
+                padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
+                bias=bias,
+            )
 
         # Initialize inhibitory convolutional layers
         if h_inter_dims:
@@ -264,28 +271,34 @@ class Conv2dEIRNNCell(nn.Module):
             torch.Tensor: Next hidden state of shape (b, c_hidden*2, h, w).
             torch.Tensor: Output tensor after pooling of shape (b, c_hidden*2, h', w').
         """
-        # Compute the excitations
+        if self.use_fb and fb is None:
+            raise ValueError("If use_fb is True, fb_exc must be provided.")
         batch_size = input.shape[0]
-        exc_cat = [input, h_pyr]
-        if self.use_fb and self.num_compartments == 1:
-            exc_cat.append(fb)
-        exc_cat = torch.cat(exc_cat, dim=1)
-        exc_pyr_basal = self.conv_exc_pyr(exc_cat)
-        if len(self.h_inter_dims) >= 3:
-            exc_inter = self.conv_exc_inter(h_pyr)
-            exc_input_inter = self.conv_exc_input_inter(input)
-        elif self.h_inter_dims:
-            exc_inter = self.conv_exc_inter(exc_cat)
 
-        if self.use_fb and self.num_compartments == 3:
-            if fb is None:
-                raise ValueError("If use_fb is True, fb_exc must be provided.")
-            exc_pyr_apical = self.conv_exc_pyr_fb(fb)
-            if self.h_inter_dims:
-                exc_fb_inter = self.conv_exc_inter_fb(fb)
-        else:
-            exc_pyr_apical = 0
+        # Compute the excitations for pyramidal cells
+        exc_cat = [input, h_pyr]
+        exc_pyr_apical = 0
+        if self.use_fb:
+            if self.num_compartments == 3:
+                exc_pyr_apical = self.conv_exc_pyr_fb(fb)
+            else:
+                exc_cat.append(fb)
+        exc_pyr_basal = self.conv_exc_pyr(torch.cat(exc_cat, dim=1))
+
+        # Compute the excitations for interneurons
+        if self.h_inter_dims:
+            exc_cat = [h_pyr]
+            if len(self.h_inter_dims) >= 3:
+                exc_input_inter = self.conv_exc_input_inter(input)
+            else:
+                exc_cat.append(input)
             exc_fb_inter = 0
+            if self.use_fb:
+                if len(self.h_inter_dims) == 4:
+                    exc_fb_inter = self.conv_exc_inter_fb(fb)
+                else:
+                    exc_cat.append(fb)
+            exc_inter = self.conv_exc_inter(torch.cat(exc_cat, dim=1))
 
         # Compute the inhibitions
         inhs = [0] * 4
@@ -320,7 +333,11 @@ class Conv2dEIRNNCell(nn.Module):
         if self.num_compartments == 1:
             cnm_pyr = self.activation(
                 torch.relu(
-                    exc_pyr_basal - inh_pyr_soma - inh_pyr_basal - inh_pyr_apical
+                    exc_pyr_basal
+                    + exc_pyr_apical
+                    - inh_pyr_soma
+                    - inh_pyr_basal
+                    - inh_pyr_apical
                 )
             )
         elif self.num_compartments == 3:
@@ -339,17 +356,18 @@ class Conv2dEIRNNCell(nn.Module):
 
         if self.h_inter_dims:
             cnm_inter = exc_inter - inh_inter
-            if len(self.h_inter_dims) < 4:
-                cnm_inter += exc_fb_inter
-            else:
-                # Add excitations and inhibitions to interneuron 3
-                start = sum(self.h_inter_dims[:3])
-                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
             if len(self.h_inter_dims) >= 3:
                 # Add excitations and inhibitions to interneuron 2
                 start = sum(self.h_inter_dims[:2])
                 end = start + self.h_inter_dims[2]
                 cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
+            if len(self.h_inter_dims) == 4:
+                # Add excitations and inhibitions to interneuron 3
+                start = sum(self.h_inter_dims[:3])
+                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
+            else:
+                cnm_inter += exc_fb_inter
+
             cnm_inter = self.activation(torch.relu(cnm_inter))
 
         # Euler update for the cell state
