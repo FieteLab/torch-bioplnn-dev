@@ -16,6 +16,7 @@ model:
   num_layers: 4
   num_steps: 10
   num_classes: 10
+  attn_type: lrp
   fb_adjacency: 
   - [0, 0, 0, 0]
   - [1, 0, 0, 0]

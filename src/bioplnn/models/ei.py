@@ -8,6 +8,56 @@ import torch.nn as nn
 from bioplnn.utils import get_activation_class
 
 
+class SimpleAttentionalGain(nn.Module):
+    def __init__(self, spatial_size: tuple[int, int]):
+        super(SimpleAttentionalGain, self).__init__()
+
+        # outsize is N X C X SD X SD
+        self.spatial_average = nn.AdaptiveAvgPool2d(spatial_size)
+
+        self.bias = nn.Parameter(torch.zeros(1))  # init gain scaling to zero
+        self.slope = nn.Parameter(torch.ones(1))  # init slope to one
+        self.threshold = nn.Parameter(torch.zeros(1))  # init threshold to zero
+
+    def forward(self, cue, mixture):
+        ## Process cue
+        cue = self.spatial_average(cue)
+
+        # apply threshold shift
+        cue = cue - self.threshold
+
+        # apply slope
+        cue = cue * self.slope
+
+        # apply sigmoid & bias
+        cue = self.bias + (1 - self.bias) * torch.sigmoid(cue)
+
+        # Apply to mixture (element mult)
+        mixture = torch.mul(mixture, cue)
+
+        return mixture
+
+
+class LowRankPerturbation(nn.Module):
+    def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
+        super().__init__()
+        # B x C x H  W
+        self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+        self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+
+    def forward(self, cue, mixture):
+        rank_one_vector = torch.matmul(cue, self.W) + self.bias
+
+        # compute the rank one matrix
+        rank_one_perturbation = torch.matmul(
+            rank_one_vector, rank_one_vector.transpose(-2, -1)
+        )
+
+        perturbed_mixture = mixture + rank_one_perturbation
+
+        return perturbed_mixture
+
+
 class Conv2dPositive(nn.Conv2d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -401,6 +451,7 @@ class Conv2dEIRNN(nn.Module):
         num_layers: int,
         num_steps: int,
         num_classes: Optional[int] = None,
+        attn_type: str = "gain_modulation",
         fb_adjacency: Optional[torch.Tensor] = None,
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
@@ -451,7 +502,7 @@ class Conv2dEIRNN(nn.Module):
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
         self.input_sizes = [input_size]
-        for i in range(num_layers - 1):
+        for i in range(num_layers):
             self.input_sizes.append(
                 (
                     ceil(self.input_sizes[i][0] / self.pool_strides[i][0]),
@@ -498,6 +549,7 @@ class Conv2dEIRNN(nn.Module):
                     )
 
         self.layers = nn.ModuleList()
+        self.attns = nn.ModuleList()
         for i in range(num_layers):
             self.layers.append(
                 Conv2dEIRNNCell(
@@ -516,6 +568,16 @@ class Conv2dEIRNN(nn.Module):
                     activation=activation,
                 )
             )
+            if attn_type == "gm":
+                self.attns.append(SimpleAttentionalGain(self.input_sizes[i + 1]))
+            elif attn_type == "lrp":
+                self.attns.append(
+                    LowRankPerturbation(self.h_pyr_dims[i], self.input_sizes[i + 1])
+                )
+            else:
+                raise ValueError(
+                    "attn_type must be 'gm' for gain modulation or 'lrp' for low-rank perturbation."
+                )
 
         self.out_layer = (
             nn.Sequential(
@@ -603,9 +665,10 @@ class Conv2dEIRNN(nn.Module):
                         "The input must be a 4D tensor or a 5D tensor with sequence length."
                     )
                 upper = min(t, len(self.layers) - 1)
-                lower = 0
+                # upper = len(self.layers) - 1
+                lower = -1
                 # lower = max(len(self.layers) - self.num_steps + t, 0)
-                for i in range(upper, lower - 1, -1):
+                for i in range(upper, lower, -1):
                     layer = self.layers[i]
                     (h_pyrs[i], h_inters[i], outs[i]) = layer(
                         input=input if i == 0 else outs[i - 1],
@@ -613,10 +676,17 @@ class Conv2dEIRNN(nn.Module):
                         h_inter=h_inters[i],
                         fb=fbs_prev[i] if self.use_fb[i] else None,
                     )
+
+                    # Apply attention to mixture
+                    if stimulation is mixture:
+                        outs[i] = self.attns[i](outs_cue[i], outs[i])
+
+                    # Apply feedback
                     for j in self.fb_adjacency[i]:
                         fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i])
                 fbs_prev = fbs
                 fbs = self._init_fb(batch_size, device=device)
+            outs_cue = outs
 
         out = self.out_layer(outs[-1])
 
