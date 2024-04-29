@@ -10,9 +10,15 @@ from bioplnn.utils import get_activation_class
 
 class SimpleAttentionalGain(nn.Module):
     def __init__(self, spatial_size: tuple[int, int]):
-        super(SimpleAttentionalGain, self).__init__()
+        """
+        Initializes the SimpleAttentionalGain module.
 
-        # outsize is N X C X SD X SD
+        Args:
+            spatial_size (tuple[int, int]): The spatial size of the input tensors (H, W).
+
+        """
+        super().__init__()
+
         self.spatial_average = nn.AdaptiveAvgPool2d(spatial_size)
 
         self.bias = nn.Parameter(torch.zeros(1))  # init gain scaling to zero
@@ -20,42 +26,61 @@ class SimpleAttentionalGain(nn.Module):
         self.threshold = nn.Parameter(torch.zeros(1))  # init threshold to zero
 
     def forward(self, cue, mixture):
-        ## Process cue
+        """
+        Forward pass of the EI model.
+
+        Args:
+            cue (torch.Tensor): The cue input.
+            mixture (torch.Tensor): The mixture input.
+
+        Returns:
+            torch.Tensor: The output after applying gain modulation to the mixture input.
+        """
+        # Process cue
         cue = self.spatial_average(cue)
-
-        # apply threshold shift
+        # Apply threshold shift
         cue = cue - self.threshold
-
-        # apply slope
+        # Apply slope
         cue = cue * self.slope
-
-        # apply sigmoid & bias
+        # Apply sigmoid & bias
         cue = self.bias + (1 - self.bias) * torch.sigmoid(cue)
-
         # Apply to mixture (element mult)
-        mixture = torch.mul(mixture, cue)
-
-        return mixture
+        return torch.mul(mixture, cue)
 
 
 class LowRankPerturbation(nn.Module):
     def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
+        """
+        Initializes the EI model.
+
+        Args:
+            in_channels (int): The number of input channels.
+            spatial_size (tuple[int, int]): The spatial size of the input.
+
+        """
         super().__init__()
-        # B x C x H  W
+        # Initialize the weight and bias matrices
         self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
         self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
 
-    def forward(self, cue, mixture):
-        rank_one_vector = torch.matmul(cue, self.W) + self.bias
+    def forward(self, input: torch.Tensor):
+        """
+        Forward pass of the model.
 
-        # compute the rank one matrix
+        Args:
+            cue (torch.Tensor): The cue tensor.
+            mixture (torch.Tensor): The mixture tensor.
+
+        Returns:
+            torch.Tensor: The output tensor after adding the rank one perturbation to the mixture.
+        """
+        # Compute the rank one matrix
+        rank_one_vector = torch.matmul(input, self.W) + self.bias
         rank_one_perturbation = torch.matmul(
             rank_one_vector, rank_one_vector.transpose(-2, -1)
         )
-
-        perturbed_mixture = mixture + rank_one_perturbation
-
-        return perturbed_mixture
+        # Add the rank one perturbation to the mixture
+        return input + rank_one_perturbation
 
 
 class Conv2dPositive(nn.Conv2d):
@@ -103,18 +128,17 @@ class Conv2dEIRNNCell(nn.Module):
         Args:
             input_size (tuple[int, int]): Height and width of input tensor as (height, width).
             input_dim (int): Number of channels of input tensor.
-            prev_pyr_dim (int): Number of channels of previous excitatory tensor.
-            prev_inh_dim (int): Number of channels of previous inhibitory tensor.
-            cur_pyr_dim (int): Number of channels of current excitatory tensor.
-            cur_inh_dim (int): Number of channels of current inhibitory tensor.
-            fb_pyr_dim (int): Number of channels of fb excitatory tensor.
-            fb_inh_dim (int): Number of channels of fb inhibitory tensor.
-            exc_kernel_size (tuple[int, int]): Size of the kernel for excitatory convolution.
-            inhib_kernel_sizes (list[tuple[int, int]]): Sizes of the kernels for inhibitory convolutions.
-            bias (bool, optional): Whether or not to add the bias. Default is True.
-            euler (bool, optional): Whether to use Euler updates for the cell state. Default is True.
-            dt (int, optional): Time step for Euler updates. Default is 1.
-            activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "tanh".
+            h_pyr_dim (int, optional): Number of channels of the excitatory pyramidal tensor. Default is 4.
+            h_inter_dims (tuple[int], optional): Number of channels of the interneuron tensors. Default is (4).
+            fb_dim (int, optional): Number of channels of the feedback excitatory tensor. Default is 0.
+            exc_kernel_size (tuple[int, int], optional): Size of the kernel for excitatory convolution. Default is (5, 5).
+            inh_kernel_size (tuple[int, int], optional): Size of the kernel for inhibitory convolution. Default is (5, 5).
+            num_compartments (int, optional): Number of compartments. Default is 3.
+            immediate_inhibition (bool, optional): Whether to use immediate inhibition. Default is False.
+            pool_kernel_size (tuple[int, int], optional): Size of the kernel for pooling. Default is (5, 5).
+            pool_stride (tuple[int, int], optional): Stride for pooling. Default is (2, 2).
+            bias (bool, optional): Whether to add bias. Default is True.
+            activation (str, optional): Activation function to use. Only 'tanh' and 'relu' activations are supported. Default is "relu".
         """
         super().__init__()
         self.input_size = input_size
@@ -122,16 +146,15 @@ class Conv2dEIRNNCell(nn.Module):
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
         h_inter_dims = h_inter_dims if h_inter_dims is not None else []
-        self.fb_dim = fb_dim
-        self.use_fb = fb_dim > 0
-        self.immediate_inhibition = immediate_inhibition
-        self.num_compartments = num_compartments
-
         if len(h_inter_dims) < 0 or len(h_inter_dims) > 4:
             raise ValueError(
                 "h_inter_dims must be a list of length 0 to 4, or None."
                 f"Got {len(h_inter_dims)}."
             )
+        self.fb_dim = fb_dim
+        self.use_fb = fb_dim > 0
+        self.immediate_inhibition = immediate_inhibition
+        self.num_compartments = num_compartments
         if len(h_inter_dims) == 4 and not self.use_fb:
             warn(
                 "The number of interneurons is 4 but fb_dim is 0. Interneuron 3 will not be used"
@@ -139,14 +162,12 @@ class Conv2dEIRNNCell(nn.Module):
             h_inter_dims = h_inter_dims[:3]
         self.h_inter_dims = h_inter_dims
         self.h_inter_dims_sum = sum(h_inter_dims) if h_inter_dims is not None else 0
-
         self.pool_stride = pool_stride
         self.activation = get_activation_class(activation)()
-        self.out_shape = (
-            1,
-            h_pyr_dim,
-            ceil(input_size[0] / 2),
-            ceil(input_size[1] / 2),
+        self.out_dim = h_pyr_dim
+        self.out_size = (
+            ceil(input_size[0] / pool_stride[0]),
+            ceil(input_size[1] / pool_stride[1]),
         )
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
@@ -451,7 +472,13 @@ class Conv2dEIRNN(nn.Module):
         num_layers: int,
         num_steps: int,
         num_classes: Optional[int] = None,
-        attn_type: str = "gain_modulation",
+        lrp: bool = True,
+        lrp_input: str = "hidden",
+        lrp_apply_timestep: str | int = "all",
+        agm: bool = True,
+        agm_input: str = "layer_output",
+        agm_apply_timestep: str | int = "all",
+        flush_hidden: bool = True,
         fb_adjacency: Optional[torch.Tensor] = None,
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
@@ -493,6 +520,27 @@ class Conv2dEIRNN(nn.Module):
             inh_kernel_size, num_layers, depth=1
         )
         self.num_steps = num_steps
+        self.lrp = lrp
+        self.lrp_input = lrp_input
+        self.lrp_apply_timestep = lrp_apply_timestep
+        self.agm = agm
+        self.agm_input = agm_input
+        self.agm_apply_timestep = agm_apply_timestep
+        if lrp:
+            if lrp_input not in ("hidden", "layer_output"):
+                raise ValueError("lrp_input must be 'hidden' or 'layer_output'.")
+            if lrp_apply_timestep != "all" and 0 < lrp_apply_timestep < num_steps:
+                raise ValueError(
+                    "lrp_apply_timestep must be 'all' or an integer between 0 and num_steps."
+                )
+        if self.agm:
+            if self.agm_input not in ("hidden", "layer_output"):
+                raise ValueError("agm_input must be 'hidden' or 'layer_output'.")
+            if agm_apply_timestep != "all" and 0 <= agm_apply_timestep < num_steps:
+                raise ValueError(
+                    "agm_apply_timestep must be 'all' or an integer between 0 and num_steps."
+                )
+        self.flush_hidden = flush_hidden
         self.pool_kernel_sizes = self._extend_for_multilayer(
             pool_kernel_size, num_layers, depth=1
         )
@@ -549,7 +597,10 @@ class Conv2dEIRNN(nn.Module):
                     )
 
         self.layers = nn.ModuleList()
-        self.attns = nn.ModuleList()
+        self.lrps = nn.ModuleList()
+        self.lrps_inter = nn.ModuleList()
+        self.agms = nn.ModuleList()
+        self.agms_inter = nn.ModuleList()
         for i in range(num_layers):
             self.layers.append(
                 Conv2dEIRNNCell(
@@ -568,22 +619,38 @@ class Conv2dEIRNN(nn.Module):
                     activation=activation,
                 )
             )
-            if attn_type == "gm":
-                self.attns.append(SimpleAttentionalGain(self.input_sizes[i + 1]))
-            elif attn_type == "lrp":
-                self.attns.append(
-                    LowRankPerturbation(self.h_pyr_dims[i], self.input_sizes[i + 1])
-                )
-            else:
-                raise ValueError(
-                    "attn_type must be 'gm' for gain modulation or 'lrp' for low-rank perturbation."
-                )
+            if lrp:
+                if self.lrp_input == "hidden":
+                    self.lrps.append(
+                        LowRankPerturbation(
+                            self.layers[i].h_pyr_dim, self.layers[i].input_size
+                        )
+                    )
+                    self.lrps_inter.append(
+                        LowRankPerturbation(
+                            self.layers[i].h_inter_dims_sum, self.layers[i].inter_size
+                        )
+                    )
+                else:
+                    self.lrps.append(
+                        LowRankPerturbation(
+                            self.layers[i].out_dim, self.layers[i].out_size
+                        )
+                    )
+            if agm:
+                if self.agm_input == "hidden":
+                    self.agms.append(SimpleAttentionalGain(self.layers[i].input_size))
+                    self.agms_inter.append(
+                        SimpleAttentionalGain(self.layers[i].inter_size)
+                    )
+                else:
+                    self.agms.append(SimpleAttentionalGain(self.layers[i].out_size))
 
         self.out_layer = (
             nn.Sequential(
                 nn.Flatten(1),
                 nn.Linear(
-                    prod(self.layers[-1].out_shape[1:]),
+                    self.layers[-1].out_dim * prod(self.layers[-1].out_size),
                     fc_dim,
                 ),
                 activation_class(),
@@ -654,6 +721,10 @@ class Conv2dEIRNN(nn.Module):
         for stimulation in (cue, mixture):
             if stimulation is None:
                 continue
+            if stimulation is mixture and self.flush_hidden:
+                h_pyrs, h_inters = self._init_hidden(batch_size, device=device)
+                fbs_prev = self._init_fb(batch_size, device=device)
+                fbs = self._init_fb(batch_size, device=device)
             outs = [None] * len(self.layers)
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:
@@ -677,9 +748,28 @@ class Conv2dEIRNN(nn.Module):
                         fb=fbs_prev[i] if self.use_fb[i] else None,
                     )
 
-                    # Apply attention to mixture
+                    # Apply lrp and agm to mixture
                     if stimulation is mixture:
-                        outs[i] = self.attns[i](outs_cue[i], outs[i])
+                        if self.agm and (
+                            self.agm_apply_timestep == "all"
+                            or self.agm_apply_timestep == t
+                        ):
+                            if self.agm_input == "hidden":
+                                h_pyrs[i] = self.agms[i](h_pyrs_cue[i], h_pyrs[i])
+                                h_inters[i] = self.agms_inter[i](
+                                    h_inters_cue[i], h_inters[i]
+                                )
+                            else:
+                                outs[i] = self.agms[i](outs_cue[i], outs[i])
+                        if self.lrp and (
+                            self.agm_apply_timestep == "all"
+                            or self.agm_apply_timestep == t
+                        ):
+                            if self.lrp_input == "hidden":
+                                h_pyrs[i] = self.lrps[i](h_pyrs[i])
+                                h_inters[i] = self.lrps_inter[i](h_inters[i])
+                            else:
+                                outs[i] = self.lrps[i](outs[i])
 
                     # Apply feedback
                     for j in self.fb_adjacency[i]:
@@ -687,6 +777,8 @@ class Conv2dEIRNN(nn.Module):
                 fbs_prev = fbs
                 fbs = self._init_fb(batch_size, device=device)
             outs_cue = outs
+            h_pyrs_cue = h_pyrs
+            h_inters_cue = h_inters
 
         out = self.out_layer(outs[-1])
 

@@ -31,12 +31,12 @@ def train_iter(
         optimizer (torch.optim.Optimizer): The optimizer used for training.
         criterion (torch.nn.Module): The loss function.
         train_loader (torch.utils.data.DataLoader): The training data loader.
-        wandb_log (function): Function to log training statistics to Weights & Biases.
+        wandb_log (Callable[[dict[str, float, int]], None]): Function to log training statistics to Weights & Biases.
         epoch (int): The current epoch number.
         device (torch.device): The device to perform computations on.
 
     Returns:
-        tuple: A tuple containing the training loss and accuracy.
+        tuple[float, float]: A tuple containing the training loss and accuracy.
     """
     if config.train.grad_clip.disable:
         clip_grad_ = lambda x, y: None
@@ -169,13 +169,13 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
-    os.makedirs(config.train.checkpoint_dir, exist_ok=True)
-
+    # Set the matmul precision
     torch.set_float32_matmul_precision(config.train.matmul_precision)
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Conv2dEIRNN(**config.model).to(device)
-
+    # Create the checkpoint directory
+    os.makedirs(config.train.checkpoint_dir, exist_ok=True)
     # Compile the model if requested
     model = torch.compile(
         model,
@@ -251,7 +251,7 @@ def train(config: AttrDict) -> None:
             device,
         )
 
-        # Evaluate the model on the test set
+        # Evaluate the model on the validation set
         test_loss, test_acc = eval_iter(
             model, criterion, val_loader, wandb_log, epoch, device
         )
@@ -265,7 +265,7 @@ def train(config: AttrDict) -> None:
             f"Test Accuracy: {test_acc:.2%}"
         )
 
-        # Save Model
+        # Save the model
         file_path = os.path.abspath(
             os.path.join(config.train.checkpoint_dir, f"checkpoint_{epoch}.pt")
         )

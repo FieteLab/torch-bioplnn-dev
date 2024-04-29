@@ -16,7 +16,13 @@ model:
   num_layers: 4
   num_steps: 10
   num_classes: 10
-  attn_type: lrp
+  lrp: True
+  lrp_input: hidden
+  lrp_apply_timestep: all
+  agm: True
+  agm_input: layer_output
+  agm_apply_timestep: all
+  flush_hidden: True
   fb_adjacency: 
   - [0, 0, 0, 0]
   - [1, 0, 0, 0]
