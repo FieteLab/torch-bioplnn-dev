@@ -18,11 +18,15 @@ model:
   num_classes: 10
   lrp: True
   lrp_input: hidden
-  lrp_apply_timestep: all
+  lrp_apply_timestep: 0
+  lrp_init_scale: 0.01
   agm: True
   agm_input: layer_output
   agm_apply_timestep: all
-  flush_hidden: True
+  flush_hidden: False
+  hidden_init_mode: zeros
+  fb_init_mode: zeros
+  out_init_mode: zeros
   fb_adjacency: 
   - [0, 0, 0, 0]
   - [1, 0, 0, 0]
@@ -43,7 +47,7 @@ data:
   num_val_images: Null
   holdout: []
   mode: every
-  num_workers: 4
+  num_workers: 8
 optimizer: 
   fn: adamw
   lr: 0.001
@@ -66,4 +70,4 @@ train:
     disable: True
     type: norm
     value: 1.0
-wandb: False
+wandb: True

@@ -49,7 +49,9 @@ class SimpleAttentionalGain(nn.Module):
 
 
 class LowRankPerturbation(nn.Module):
-    def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
+    def __init__(
+        self, in_channels: int, spatial_size: tuple[int, int], init_scale=1e-2
+    ):
         """
         Initializes the EI model.
 
@@ -60,8 +62,12 @@ class LowRankPerturbation(nn.Module):
         """
         super().__init__()
         # Initialize the weight and bias matrices
-        self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
-        self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+        self.W = nn.Parameter(
+            torch.randn(1, in_channels, spatial_size[0], 1) * init_scale
+        )
+        self.bias = nn.Parameter(
+            torch.randn(1, in_channels, spatial_size[0], 1) * init_scale
+        )
 
     def forward(self, input: torch.Tensor):
         """
@@ -161,7 +167,7 @@ class Conv2dEIRNNCell(nn.Module):
             )
             h_inter_dims = h_inter_dims[:3]
         self.h_inter_dims = h_inter_dims
-        self.h_inter_dims_sum = sum(h_inter_dims) if h_inter_dims is not None else 0
+        self.h_inter_dims_sum = sum(h_inter_dims)
         self.pool_stride = pool_stride
         self.activation = get_activation_class(activation)()
         self.out_dim = h_pyr_dim
@@ -224,11 +230,7 @@ class Conv2dEIRNNCell(nn.Module):
                 if len(h_inter_dims) == 4:
                     self.conv_exc_inter_fb = Conv2dPositive(
                         in_channels=fb_dim,
-                        out_channels=(
-                            h_inter_dims[3]
-                            if len(h_inter_dims) == 4
-                            else self.h_inter_dims_sum
-                        ),
+                        out_channels=h_inter_dims[3],
                         kernel_size=exc_kernel_size,
                         stride=2,
                         padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
@@ -285,21 +287,30 @@ class Conv2dEIRNNCell(nn.Module):
             padding=(pool_kernel_size[0] // 2, pool_kernel_size[1] // 2),
         )
 
-    def init_hidden(self, batch_size, device=None):
+    def init_hidden(self, batch_size, init_mode="zeros", device=None):
         """
         Initializes the hidden state tensor for the cRNN_EI model.
 
         Args:
             batch_size (int): The size of the input batch.
+            device (torch.device, optional): The device to initialize the tensor on. Default is None.
+            init_mode (str, optional): The initialization mode. Can be "zeros" or "normal". Default is "zeros".
 
         Returns:
             torch.Tensor: The initialized excitatory hidden state tensor.
             torch.Tensor: The initialized inhibitory hidden state tensor.
         """
+
+        if init_mode == "zeros":
+            func = torch.zeros
+        elif init_mode == "normal":
+            func = torch.randn
+        else:
+            raise ValueError("Invalid init_mode. Must be 'zeros' or 'normal'.")
         return (
-            torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device),
+            func(batch_size, self.h_pyr_dim, *self.input_size, device=device),
             (
-                torch.zeros(
+                func(
                     batch_size,
                     self.h_inter_dims_sum,
                     *self.inter_size,
@@ -310,17 +321,45 @@ class Conv2dEIRNNCell(nn.Module):
             ),
         )
 
-    def init_fb(self, batch_size, device=None):
+    def init_fb(self, batch_size, init_mode="zeros", device=None):
         """
         Initializes the output tensor for the cRNN_EI model.
 
         Args:
             batch_size (int): The size of the input batch.
+            device (torch.device, optional): The device to initialize the tensor on. Default is None.
+            init_mode (str, optional): The initialization mode. Can be "zeros" or "normal". Default is "zeros".
 
         Returns:
             torch.Tensor: The initialized output tensor.
         """
-        return torch.zeros(batch_size, self.h_pyr_dim, *self.input_size, device=device)
+        if init_mode == "zeros":
+            func = torch.zeros
+        elif init_mode == "normal":
+            func = torch.randn
+        else:
+            raise ValueError("Invalid init_mode. Must be 'zeros' or 'normal'.")
+        return func(batch_size, self.fb_dim, *self.input_size, device=device)
+
+    def init_out(self, batch_size, init_mode="zeros", device=None):
+        """
+        Initializes the output tensor for the cRNN_EI model.
+
+        Args:
+            batch_size (int): The size of the input batch.
+            device (torch.device, optional): The device to initialize the tensor on. Default is None.
+            init_mode (str, optional): The initialization mode. Can be "zeros" or "normal". Default is "zeros".
+
+        Returns:
+            torch.Tensor: The initialized output tensor.
+        """
+        if init_mode == "zeros":
+            func = torch.zeros
+        elif init_mode == "normal":
+            func = torch.randn
+        else:
+            raise ValueError("Invalid init_mode. Must be 'zeros' or 'normal'.")
+        return func(batch_size, self.out_dim, *self.out_size, device=device)
 
     def forward(
         self,
@@ -475,10 +514,14 @@ class Conv2dEIRNN(nn.Module):
         lrp: bool = True,
         lrp_input: str = "hidden",
         lrp_apply_timestep: str | int = "all",
+        lrp_init_scale: float = 1e-2,
         agm: bool = True,
         agm_input: str = "layer_output",
         agm_apply_timestep: str | int = "all",
         flush_hidden: bool = True,
+        hidden_init_mode: str = "zeros",
+        fb_init_mode: str = "zeros",
+        out_init_mode: str = "zeros",
         fb_adjacency: Optional[torch.Tensor] = None,
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
@@ -541,6 +584,9 @@ class Conv2dEIRNN(nn.Module):
                     "agm_apply_timestep must be 'all' or an integer between 0 and num_steps."
                 )
         self.flush_hidden = flush_hidden
+        self.hidden_init_mode = hidden_init_mode
+        self.fb_init_mode = fb_init_mode
+        self.out_init_mode = out_init_mode
         self.pool_kernel_sizes = self._extend_for_multilayer(
             pool_kernel_size, num_layers, depth=1
         )
@@ -623,18 +669,24 @@ class Conv2dEIRNN(nn.Module):
                 if self.lrp_input == "hidden":
                     self.lrps.append(
                         LowRankPerturbation(
-                            self.layers[i].h_pyr_dim, self.layers[i].input_size
+                            self.layers[i].h_pyr_dim,
+                            self.layers[i].input_size,
+                            lrp_init_scale,
                         )
                     )
                     self.lrps_inter.append(
                         LowRankPerturbation(
-                            self.layers[i].h_inter_dims_sum, self.layers[i].inter_size
+                            self.layers[i].h_inter_dims_sum,
+                            self.layers[i].inter_size,
+                            lrp_init_scale,
                         )
                     )
                 else:
                     self.lrps.append(
                         LowRankPerturbation(
-                            self.layers[i].out_dim, self.layers[i].out_size
+                            self.layers[i].out_dim,
+                            self.layers[i].out_size,
+                            lrp_init_scale,
                         )
                     )
             if agm:
@@ -661,21 +713,30 @@ class Conv2dEIRNN(nn.Module):
             else nn.Identity()
         )
 
-    def _init_hidden(self, batch_size, device=None):
+    def _init_hidden(self, batch_size, init_mode="zeros", device=None):
         h_pyrs = []
         h_inters = []
         for layer in self.layers:
-            h_pyr, h_inter = layer.init_hidden(batch_size, device=device)
+            h_pyr, h_inter = layer.init_hidden(
+                batch_size, init_mode=init_mode, device=device
+            )
             h_pyrs.append(h_pyr)
             h_inters.append(h_inter)
         return h_pyrs, h_inters
 
-    def _init_fb(self, batch_size, device=None):
+    def _init_fb(self, batch_size, init_mode="zeros", device=None):
         h_fbs = []
         for layer in self.layers:
-            h_fb = layer.init_fb(batch_size, device=device)
+            h_fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
             h_fbs.append(h_fb)
         return h_fbs
+
+    def _init_out(self, batch_size, init_mode="zeros", device=None):
+        outs = []
+        for layer in self.layers:
+            out = layer.init_out(batch_size, init_mode=init_mode, device=device)
+            outs.append(out)
+        return outs
 
     @staticmethod
     def _extend_for_multilayer(param, num_layers, depth=0):
@@ -714,18 +775,23 @@ class Conv2dEIRNN(nn.Module):
         """
         device = mixture.device
         batch_size = mixture.shape[0]
-        h_pyrs, h_inters = self._init_hidden(batch_size, device=device)
-        fbs_prev = self._init_fb(batch_size, device=device)
-        fbs = self._init_fb(batch_size, device=device)
-
         for stimulation in (cue, mixture):
             if stimulation is None:
                 continue
-            if stimulation is mixture and self.flush_hidden:
-                h_pyrs, h_inters = self._init_hidden(batch_size, device=device)
-                fbs_prev = self._init_fb(batch_size, device=device)
-                fbs = self._init_fb(batch_size, device=device)
-            outs = [None] * len(self.layers)
+            if stimulation is cue or cue is None or self.flush_hidden:
+                h_pyrs, h_inters = self._init_hidden(
+                    batch_size, init_mode=self.hidden_init_mode, device=device
+                )
+                fbs_prev = self._init_fb(
+                    batch_size, init_mode=self.fb_init_mode, device=device
+                )
+                fbs = self._init_fb(
+                    batch_size, init_mode=self.fb_init_mode, device=device
+                )
+                outs_prev = self._init_out(
+                    batch_size, init_mode=self.out_init_mode, device=device
+                )
+                outs = [None] * len(self.layers)
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:
                     input = stimulation[:, t, ...]
@@ -735,14 +801,9 @@ class Conv2dEIRNN(nn.Module):
                     raise ValueError(
                         "The input must be a 4D tensor or a 5D tensor with sequence length."
                     )
-                upper = min(t, len(self.layers) - 1)
-                # upper = len(self.layers) - 1
-                lower = -1
-                # lower = max(len(self.layers) - self.num_steps + t, 0)
-                for i in range(upper, lower, -1):
-                    layer = self.layers[i]
+                for i, layer in enumerate(self.layers):
                     (h_pyrs[i], h_inters[i], outs[i]) = layer(
-                        input=input if i == 0 else outs[i - 1],
+                        input=input if i == 0 else outs_prev[i - 1],
                         h_pyr=h_pyrs[i],
                         h_inter=h_inters[i],
                         fb=fbs_prev[i] if self.use_fb[i] else None,
@@ -775,17 +836,22 @@ class Conv2dEIRNN(nn.Module):
                     for j in self.fb_adjacency[i]:
                         fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i])
                 fbs_prev = fbs
-                fbs = self._init_fb(batch_size, device=device)
-            outs_cue = outs
+                fbs = self._init_fb(
+                    batch_size, init_mode=self.fb_init_mode, device=device
+                )
+                outs_prev = outs
+                outs = [None] * len(self.layers)
+
+            outs_cue = outs_prev
             h_pyrs_cue = h_pyrs
             h_inters_cue = h_inters
 
-        out = self.out_layer(outs[-1])
+        out = self.out_layer(outs_prev[-1])
 
         if return_layer_outputs and return_hidden:
-            return out, outs, (h_pyrs, h_inters)
+            return out, outs_prev, (h_pyrs, h_inters)
         if return_layer_outputs:
-            return out, outs
+            return out, outs_prev
         if return_hidden:
             return out, (h_pyrs, h_inters)
         return out
