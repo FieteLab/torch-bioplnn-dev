@@ -1,15 +1,14 @@
 import json
 import os
 from typing import Callable
-from typing import List
 from typing import Optional
-from typing import Tuple
 from PIL import Image, ImageDraw
+import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from torchvision.transforms import transforms
 import numpy as np
-from bioplnn.utils import compact, rescale
+from bioplnn.utils import compact, rescale, seed_worker
 import glob
 
 
@@ -253,14 +252,14 @@ class CLEVRDataset(Dataset):
     """Need to also include meta data to create "cues"
     """
 
-    def get_files(self) -> List[str]:
+    def get_files(self) -> list[str]:
         with open(
             os.path.join(self.data_root, f"scenes/CLEVR_{self.split}_scenes.json")
         ) as f:
             scene = json.load(f)
-        paths: List[Optional[str]] = []
-        meta: List[Optional[dict]] = []
-        meta_shapes: List[Optional[dict]] = []
+        paths: list[Optional[str]] = []
+        meta: list[Optional[dict]] = []
+        meta_shapes: list[Optional[dict]] = []
 
         total_num_images = len(scene["scenes"])
         i = 0
@@ -297,12 +296,13 @@ def get_dataloaders(
     train_batch_size: int,
     val_batch_size: int,
     max_n_objects: int,
-    resolution: Tuple[int, int],
+    resolution: tuple[int, int],
     num_train_images: Optional[int] = None,
     num_val_images: Optional[int] = None,
     holdout: list = [],
     mode: str = "color",
     num_workers: int = 0,
+    seed: Optional[int] = None,
 ):
     clevr_transforms = transforms.Compose(
         [
@@ -336,27 +336,17 @@ def get_dataloaders(
         batch_size=train_batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=seed_worker if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=val_batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=seed_worker if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
     return train_dataloader, val_dataloader
-
-
-class CLEVRTransforms(object):
-    def __init__(self, resolution: Tuple[int, int]):
-        self.transforms = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Lambda(lambda X: 2 * X - 1.0),  # rescale between -1 and 1
-                transforms.Resize(resolution),
-            ]
-        )
-
-    def __call__(self, input, *args, **kwargs):
-        return self.transforms(input)

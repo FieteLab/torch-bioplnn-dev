@@ -9,6 +9,7 @@ model:
   - [64]
   - [64]
   fb_dim: [16, 32, 64, 64]
+  inter_mode: same
   exc_kernel_size: [5, 5]
   inh_kernel_size: [5, 5]
   num_compartments: 1
@@ -23,6 +24,8 @@ model:
   agm: True
   agm_input: layer_output
   agm_apply_timestep: all
+  exc_rectify: Null
+  inh_rectify: neg
   flush_hidden: False
   hidden_init_mode: zeros
   fb_init_mode: zeros
@@ -47,7 +50,7 @@ data:
   num_val_images: Null
   holdout: []
   mode: every
-  num_workers: 8
+  num_workers: 4
 optimizer: 
   fn: adamw
   lr: 0.001
@@ -70,4 +73,6 @@ train:
     disable: True
     type: norm
     value: 1.0
-wandb: True
+wandb: False
+seed: Null
+tqdm: True

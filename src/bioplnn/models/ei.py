@@ -97,6 +97,17 @@ class Conv2dPositive(nn.Conv2d):
         self.weight.data = torch.relu(self.weight.data)
         if self.bias is not None:
             self.bias.data = torch.relu(self.bias.data)
+        return -super().forward(*args, **kwargs)
+
+
+class Conv2dNegative(nn.Conv2d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        self.weight.data = -torch.relu(-self.weight.data)
+        if self.bias is not None:
+            self.bias.data = -torch.relu(-self.bias.data)
         return super().forward(*args, **kwargs)
 
 
@@ -108,6 +119,17 @@ class ConvTranspose2dPositive(nn.ConvTranspose2d):
         self.weight.data = torch.relu(self.weight.data)
         if self.bias is not None:
             self.bias.data = torch.relu(self.bias.data)
+        return -super().forward(*args, **kwargs)
+
+
+class ConvTranspose2dNegative(nn.ConvTranspose2d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        self.weight.data = -torch.relu(-self.weight.data)
+        if self.bias is not None:
+            self.bias.data = -torch.relu(-self.bias.data)
         return super().forward(*args, **kwargs)
 
 
@@ -119,10 +141,13 @@ class Conv2dEIRNNCell(nn.Module):
         h_pyr_dim: int = 4,
         h_inter_dims: tuple[int] = (4),
         fb_dim: int = 0,
+        inter_mode: str = "half",
         exc_kernel_size: tuple[int, int] = (5, 5),
         inh_kernel_size: tuple[int, int] = (5, 5),
         num_compartments: int = 3,
         immediate_inhibition: bool = False,
+        exc_rectify: Optional[str] = None,
+        inh_rectify: Optional[str] = "neg",
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
@@ -148,7 +173,12 @@ class Conv2dEIRNNCell(nn.Module):
         """
         super().__init__()
         self.input_size = input_size
-        self.inter_size = (ceil(input_size[0] / 2), ceil(input_size[1] / 2))
+        if inter_mode == "half":
+            self.inter_size = (ceil(input_size[0] / 2), ceil(input_size[1] / 2))
+        elif inter_mode == "same":
+            self.inter_size = input_size
+        else:
+            raise ValueError("inter_mode must be 'half' or 'same'.")
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
         h_inter_dims = h_inter_dims if h_inter_dims is not None else []
@@ -189,8 +219,22 @@ class Conv2dEIRNNCell(nn.Module):
                 + 0.5
             )
 
+        if exc_rectify == "pos":
+            Conv2dExc = Conv2dPositive
+        elif exc_rectify is None:
+            Conv2dExc = nn.Conv2d
+        else:
+            raise ValueError("pyr_rectify must be 'pos' or None.")
+
+        if inh_rectify == "neg":
+            Conv2dInh = Conv2dNegative
+        elif inh_rectify == "pos":
+            Conv2dInh = Conv2dPositive
+        elif inh_rectify is None:
+            Conv2dInh = nn.Conv2d
+
         # Initialize excitatory convolutional layers
-        self.conv_exc_pyr = Conv2dPositive(
+        self.conv_exc_pyr = Conv2dExc(
             in_channels=input_dim
             + h_pyr_dim
             + (fb_dim if self.use_fb and self.num_compartments == 1 else 0),
@@ -201,7 +245,7 @@ class Conv2dEIRNNCell(nn.Module):
         )
 
         if self.use_fb and num_compartments == 3:
-            self.conv_exc_pyr_fb = Conv2dPositive(
+            self.conv_exc_pyr_fb = Conv2dExc(
                 in_channels=fb_dim,
                 out_channels=h_pyr_dim,
                 kernel_size=exc_kernel_size,
@@ -215,11 +259,11 @@ class Conv2dEIRNNCell(nn.Module):
         if h_inter_dims:
             exc_inter_in_channels = h_pyr_dim
             if len(self.h_inter_dims) >= 3:
-                self.conv_exc_input_inter = Conv2dPositive(
+                self.conv_exc_input_inter = Conv2dExc(
                     in_channels=input_dim,
                     out_channels=h_inter_dims[2],
                     kernel_size=exc_kernel_size,
-                    stride=2,
+                    stride=2 if inter_mode == "half" else 1,
                     padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
                     bias=bias,
                 )
@@ -228,22 +272,22 @@ class Conv2dEIRNNCell(nn.Module):
 
             if self.use_fb:
                 if len(h_inter_dims) == 4:
-                    self.conv_exc_inter_fb = Conv2dPositive(
+                    self.conv_exc_inter_fb = Conv2dExc(
                         in_channels=fb_dim,
                         out_channels=h_inter_dims[3],
                         kernel_size=exc_kernel_size,
-                        stride=2,
+                        stride=2 if inter_mode == "half" else 1,
                         padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
                         bias=bias,
                     )
                 else:
                     exc_inter_in_channels += fb_dim
 
-            self.conv_exc_inter = Conv2dPositive(
+            self.conv_exc_inter = Conv2dExc(
                 in_channels=exc_inter_in_channels,
                 out_channels=self.h_inter_dims_sum,
                 kernel_size=exc_kernel_size,
-                stride=2,
+                stride=2 if inter_mode == "half" else 1,
                 padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
                 bias=bias,
             )
@@ -258,16 +302,22 @@ class Conv2dEIRNNCell(nn.Module):
                 h_pyr_dim,
             ]
             for i, h_inter_dim in enumerate(h_inter_dims):
-                conv = ConvTranspose2dPositive(
+                conv_tmp = Conv2dInh(
                     in_channels=h_inter_dim,
                     out_channels=self.inh_out_dims[i],
                     kernel_size=inh_kernel_size,
-                    stride=1 if i == 1 else 2,
                     padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
                     bias=bias,
                 )
+                if inter_mode == "half":
+                    conv = nn.Sequential(
+                        nn.Upsample(size=input_size, mode="bilinear"),
+                        conv_tmp,
+                    )
+                else:
+                    conv = conv_tmp
                 if i in (2, 3) and len(h_inter_dims) == 4:
-                    conv2 = Conv2dPositive(
+                    conv2 = Conv2dInh(
                         in_channels=h_inter_dim,
                         out_channels=(h_inter_dims[3 if i == 2 else 2]),
                         kernel_size=inh_kernel_size,
@@ -414,7 +464,7 @@ class Conv2dEIRNNCell(nn.Module):
         inhs = [0] * 4
         if self.h_inter_dims:
             exc_inters = torch.split(
-                exc_inter if self.immediate_inhibition else h_inter,
+                self.activation(exc_inter) if self.immediate_inhibition else h_inter,
                 self.h_inter_dims,
                 dim=1,
             )
@@ -428,53 +478,46 @@ class Conv2dEIRNNCell(nn.Module):
                         inh_inter_3 = inh_inter_2_or_3
                     else:
                         inh_inter_2 = inh_inter_2_or_3
-                inhs[i] = conv(
-                    exc_inters[i],
-                    output_size=(
-                        batch_size,
-                        self.inh_out_dims[i],
-                        self.inter_size[0] if i == 1 else self.input_size[0],
-                        self.inter_size[1] if i == 1 else self.input_size[1],
-                    ),
-                )
+                inhs[i] = conv(exc_inters[i])
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
+        # TODO: Figure out if relu is necessary/desirable
         if self.num_compartments == 1:
             cnm_pyr = self.activation(
                 torch.relu(
                     exc_pyr_basal
                     + exc_pyr_apical
-                    - inh_pyr_soma
-                    - inh_pyr_basal
-                    - inh_pyr_apical
+                    + inh_pyr_soma
+                    + inh_pyr_basal
+                    + inh_pyr_apical
                 )
             )
         elif self.num_compartments == 3:
-            pyr_basal = self.activation(torch.relu(exc_pyr_basal - inh_pyr_basal))
+            pyr_basal = self.activation(torch.relu(exc_pyr_basal + inh_pyr_basal))
             if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
                 exc_pyr_apical, torch.Tensor
             ):
                 pyr_apical = self.activation(
-                    torch.relu(exc_pyr_apical - inh_pyr_apical)
+                    torch.relu(exc_pyr_apical + inh_pyr_apical)
                 )
             else:
                 pyr_apical = 0
-            cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal - inh_pyr_soma))
+            cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal + inh_pyr_soma))
         else:
             raise ValueError("num_compartments must be 1 or 3.")
 
         if self.h_inter_dims:
-            cnm_inter = exc_inter - inh_inter
+            cnm_inter = exc_inter + inh_inter
             if len(self.h_inter_dims) >= 3:
                 # Add excitations and inhibitions to interneuron 2
                 start = sum(self.h_inter_dims[:2])
                 end = start + self.h_inter_dims[2]
-                cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
+                cnm_inter[:, start:end, ...] = exc_input_inter + inh_inter_2
             if len(self.h_inter_dims) == 4:
                 # Add excitations and inhibitions to interneuron 3
                 start = sum(self.h_inter_dims[:3])
-                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
+                cnm_inter[:, start:, ...] = exc_fb_inter + inh_inter_3
             else:
                 cnm_inter += exc_fb_inter
 
@@ -510,6 +553,7 @@ class Conv2dEIRNN(nn.Module):
         immediate_inhibition: bool,
         num_layers: int,
         num_steps: int,
+        inter_mode: str = "same",
         num_classes: Optional[int] = None,
         lrp: bool = True,
         lrp_input: str = "hidden",
@@ -518,6 +562,8 @@ class Conv2dEIRNN(nn.Module):
         agm: bool = True,
         agm_input: str = "layer_output",
         agm_apply_timestep: str | int = "all",
+        exc_rectify: Optional[str] = None,
+        inh_rectify: Optional[str] = "neg",
         flush_hidden: bool = True,
         hidden_init_mode: str = "zeros",
         fb_init_mode: str = "zeros",
@@ -655,10 +701,13 @@ class Conv2dEIRNN(nn.Module):
                     h_pyr_dim=self.h_pyr_dims[i],
                     h_inter_dims=self.h_inter_dims[i],
                     fb_dim=self.fb_dims[i] if self.use_fb[i] else 0,
+                    inter_mode=inter_mode,
                     exc_kernel_size=self.exc_kernel_sizes[i],
                     inh_kernel_size=self.inh_kernel_sizes[i],
                     num_compartments=num_compartments,
                     immediate_inhibition=immediate_inhibition,
+                    exc_rectify=exc_rectify,
+                    inh_rectify=inh_rectify,
                     pool_kernel_size=self.pool_kernel_sizes[i],
                     pool_stride=self.pool_strides[i],
                     bias=self.biases[i],

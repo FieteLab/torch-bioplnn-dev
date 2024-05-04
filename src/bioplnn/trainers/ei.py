@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from bioplnn.datasets.ei import get_dataloaders
 from bioplnn.models.ei import Conv2dEIRNN
-from bioplnn.utils import AttrDict
+from bioplnn.utils import AttrDict, seed
 from bioplnn.loss import EDLLoss
 
 
@@ -59,6 +59,7 @@ def train_iter(
     bar = tqdm(
         train_loader,
         desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        disable=not config.tqdm,
     )
     for i, (cue, mixture, labels) in enumerate(bar):
         cue = cue.to(device)
@@ -169,6 +170,9 @@ def train(config: AttrDict) -> None:
     Args:
         config (AttrDict): Configuration parameters.
     """
+    # Set the random seed
+    if config.seed is not None:
+        seed(config.seed)
     # Set the matmul precision
     torch.set_float32_matmul_precision(config.train.matmul_precision)
     # Get device and initialize the model
@@ -229,6 +233,7 @@ def train(config: AttrDict) -> None:
         holdout=config.data.holdout,
         mode=config.data.mode,
         num_workers=config.data.num_workers,
+        seed=config.seed,
     )
 
     # Initialize Weights & Biases
@@ -297,5 +302,6 @@ if __name__ == "__main__":
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
     config = AttrDict(config)
+    print("Loaded Config")
 
     train(config)

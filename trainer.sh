@@ -6,7 +6,7 @@
 #SBATCH -c 8
 #SBATCH --constraint=rocky8
 #SBATCH --mem 20G
-#SBATCH -o trainer.out
+#SBATCH -o trainer_%j.out
 
 source ~/.bashrc
 conda activate pytorch

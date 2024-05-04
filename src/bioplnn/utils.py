@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import scipy
 import scipy.interpolate
@@ -5,6 +6,7 @@ import torch
 from torch import nn
 from torch.profiler import ProfilerActivity, profile, record_function
 from types import SimpleNamespace
+import random
 
 
 class AttrDict(dict):
@@ -22,6 +24,21 @@ class AttrDict(dict):
 #         for k, v in self.__dict__.items():
 #             if isinstance(v, dict):
 #                 self.__dict__[k] = AttrDict2(v)
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+def seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 
 def get_activation_class(activation):
