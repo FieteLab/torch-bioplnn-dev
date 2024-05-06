@@ -184,8 +184,8 @@ class Conv2dEIRNNCell(nn.Module):
         h_inter_dims = h_inter_dims if h_inter_dims is not None else []
         if len(h_inter_dims) < 0 or len(h_inter_dims) > 4:
             raise ValueError(
-                "h_inter_dims must be a list of length 0 to 4, or None."
-                f"Got {len(h_inter_dims)}."
+                "h_inter_dims must be a tuple of length 0 to 4, or None."
+                f"Got length {len(h_inter_dims)}."
             )
         self.fb_dim = fb_dim
         self.use_fb = fb_dim > 0
@@ -207,16 +207,10 @@ class Conv2dEIRNNCell(nn.Module):
         )
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
-        self.tau_pyr = nn.Parameter(
-            torch.randn((1, h_pyr_dim, *input_size), requires_grad=True)
-        )
+        self.tau_pyr = nn.Parameter(torch.randn((1, h_pyr_dim, *input_size)))
         if h_inter_dims:
             self.tau_inter = nn.Parameter(
-                torch.randn(
-                    (1, self.h_inter_dims_sum, *self.inter_size),
-                    requires_grad=True,
-                )
-                + 0.5
+                torch.randn((1, self.h_inter_dims_sum, *self.inter_size))
             )
 
         if exc_rectify == "pos":
@@ -440,29 +434,28 @@ class Conv2dEIRNNCell(nn.Module):
         exc_pyr_apical = 0
         if self.use_fb:
             if self.num_compartments == 3:
-                exc_pyr_apical = self.conv_exc_pyr_fb(fb)
+                exc_pyr_apical = self.activation(self.conv_exc_pyr_fb(fb))
             else:
                 exc_cat.append(fb)
-        exc_pyr_basal = self.conv_exc_pyr(torch.cat(exc_cat, dim=1))
+        exc_pyr_basal = self.activation(self.conv_exc_pyr(torch.cat(exc_cat, dim=1)))
 
-        # Compute the excitations for interneurons
+        inhs = [0] * 4
         if self.h_inter_dims:
+            # Compute the excitations for interneurons
             exc_cat = [h_pyr]
             if len(self.h_inter_dims) >= 3:
-                exc_input_inter = self.conv_exc_input_inter(input)
+                exc_input_inter = self.activation(self.conv_exc_input_inter(input))
             else:
                 exc_cat.append(input)
             exc_fb_inter = 0
             if self.use_fb:
                 if len(self.h_inter_dims) == 4:
-                    exc_fb_inter = self.conv_exc_inter_fb(fb)
+                    exc_fb_inter = self.activation(self.conv_exc_inter_fb(fb))
                 else:
                     exc_cat.append(fb)
-            exc_inter = self.conv_exc_inter(torch.cat(exc_cat, dim=1))
+            exc_inter = self.activation(self.conv_exc_inter(torch.cat(exc_cat, dim=1)))
 
-        # Compute the inhibitions
-        inhs = [0] * 4
-        if self.h_inter_dims:
+            # Compute the inhibitions
             exc_inters = torch.split(
                 self.activation(exc_inter) if self.immediate_inhibition else h_inter,
                 self.h_inter_dims,
@@ -473,25 +466,23 @@ class Conv2dEIRNNCell(nn.Module):
                 conv = self.convs_inh[i]
                 if i in (2, 3) and len(self.h_inter_dims) == 4:
                     conv, conv2 = conv.conv1, conv.conv2
-                    inh_inter_2_or_3 = conv2(exc_inters[i])
+                    inh_inter_2_or_3 = self.activation(conv2(exc_inters[i]))
                     if i == 2:
                         inh_inter_3 = inh_inter_2_or_3
                     else:
                         inh_inter_2 = inh_inter_2_or_3
-                inhs[i] = conv(exc_inters[i])
+                inhs[i] = self.activation(conv(exc_inters[i]))
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
         # TODO: Figure out if relu is necessary/desirable
         if self.num_compartments == 1:
-            cnm_pyr = self.activation(
-                torch.relu(
-                    exc_pyr_basal
-                    + exc_pyr_apical
-                    + inh_pyr_soma
-                    + inh_pyr_basal
-                    + inh_pyr_apical
-                )
+            cnm_pyr = (
+                exc_pyr_basal
+                + exc_pyr_apical
+                + inh_pyr_soma
+                + inh_pyr_basal
+                + inh_pyr_apical
             )
         elif self.num_compartments == 3:
             pyr_basal = self.activation(torch.relu(exc_pyr_basal + inh_pyr_basal))
@@ -521,7 +512,7 @@ class Conv2dEIRNNCell(nn.Module):
             else:
                 cnm_inter += exc_fb_inter
 
-            cnm_inter = self.activation(torch.relu(cnm_inter))
+            # cnm_inter = self.activation(torch.relu(cnm_inter))
 
         # Euler update for the cell state
         tau_pyr = torch.sigmoid(self.tau_pyr)
@@ -642,7 +633,7 @@ class Conv2dEIRNN(nn.Module):
         self.biases = self._extend_for_multilayer(bias, num_layers)
 
         self.input_sizes = [input_size]
-        for i in range(num_layers):
+        for i in range(num_layers - 1):
             self.input_sizes.append(
                 (
                     ceil(self.input_sizes[i][0] / self.pool_strides[i][0]),
@@ -654,6 +645,7 @@ class Conv2dEIRNN(nn.Module):
         self.activation = activation_class()
 
         self.use_fb = [False] * num_layers
+        self.fb_adjacency = fb_adjacency
         if fb_adjacency is not None:
             try:
                 fb_adjacency = torch.load(fb_adjacency)
@@ -670,6 +662,10 @@ class Conv2dEIRNN(nn.Module):
             if fb_adjacency.count_nonzero() == 0:
                 raise ValueError("fb_adjacency must be a non-zero tensor if provided.")
 
+            if exc_rectify == "pos":
+                Conv2dFb = Conv2dPositive
+            elif exc_rectify is None:
+                Conv2dFb = nn.Conv2d
             self.fb_adjacency = []
             self.fb_convs = nn.ModuleDict()
             for i, row in enumerate(fb_adjacency):
@@ -678,7 +674,7 @@ class Conv2dEIRNN(nn.Module):
                 for j in row:
                     self.use_fb[j] = True
                     upsample = nn.Upsample(size=self.input_sizes[j], mode="bilinear")
-                    conv_exc = Conv2dPositive(
+                    conv_exc = Conv2dFb(
                         in_channels=self.h_pyr_dims[i],
                         out_channels=self.fb_dims[j],
                         kernel_size=1,
@@ -754,7 +750,7 @@ class Conv2dEIRNN(nn.Module):
                     self.layers[-1].out_dim * prod(self.layers[-1].out_size),
                     fc_dim,
                 ),
-                activation_class(),
+                nn.ReLU(),
                 nn.Dropout(),
                 nn.Linear(fc_dim, num_classes),
             )
@@ -792,7 +788,7 @@ class Conv2dEIRNN(nn.Module):
         inner = param
         for _ in range(depth):
             if not isinstance(inner, (list, tuple)):
-                raise ValueError("depth exceeds the depth of param.")
+                break
             inner = inner[0]
 
         if not isinstance(inner, (list, tuple)):
@@ -831,16 +827,14 @@ class Conv2dEIRNN(nn.Module):
                 h_pyrs, h_inters = self._init_hidden(
                     batch_size, init_mode=self.hidden_init_mode, device=device
                 )
-                fbs_prev = self._init_fb(
-                    batch_size, init_mode=self.fb_init_mode, device=device
-                )
-                fbs = self._init_fb(
-                    batch_size, init_mode=self.fb_init_mode, device=device
-                )
-                outs_prev = self._init_out(
-                    batch_size, init_mode=self.out_init_mode, device=device
-                )
-                outs = [None] * len(self.layers)
+            fbs_prev = self._init_fb(
+                batch_size, init_mode=self.fb_init_mode, device=device
+            )
+            fbs = self._init_fb(batch_size, init_mode=self.fb_init_mode, device=device)
+            outs_prev = self._init_out(
+                batch_size, init_mode=self.out_init_mode, device=device
+            )
+            outs = [None] * len(self.layers)
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:
                     input = stimulation[:, t, ...]
@@ -882,8 +876,9 @@ class Conv2dEIRNN(nn.Module):
                                 outs[i] = self.lrps[i](outs[i])
 
                     # Apply feedback
-                    for j in self.fb_adjacency[i]:
-                        fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i])
+                    if self.fb_adjacency is not None:
+                        for j in self.fb_adjacency[i]:
+                            fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i])
                 fbs_prev = fbs
                 fbs = self._init_fb(
                     batch_size, init_mode=self.fb_init_mode, device=device

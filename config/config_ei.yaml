@@ -3,21 +3,29 @@ model:
   input_size: [64, 64]
   input_dim: 3
   h_pyr_dim: [16, 32, 64, 64]
-  h_inter_dims: 
+  h_inter_dims: # Null
+  - [4]
+  - [8]
   - [16]
-  - [32]
-  - [64]
-  - [64]
+  - [16]
   fb_dim: [16, 32, 64, 64]
   inter_mode: same
-  exc_kernel_size: [5, 5]
-  inh_kernel_size: [5, 5]
+  exc_kernel_size: 
+  - [5, 5]
+  - [5, 5]
+  - [3, 3]
+  - [3, 3]
+  inh_kernel_size: 
+  - [5, 5]
+  - [5, 5]
+  - [3, 3]
+  - [3, 3]
   num_compartments: 1
   immediate_inhibition: True
   num_layers: 4
   num_steps: 10
   num_classes: 10
-  lrp: True
+  lrp: False
   lrp_input: hidden
   lrp_apply_timestep: 0
   lrp_init_scale: 0.01
@@ -30,7 +38,7 @@ model:
   hidden_init_mode: zeros
   fb_init_mode: zeros
   out_init_mode: zeros
-  fb_adjacency: 
+  fb_adjacency: # Null
   - [0, 0, 0, 0]
   - [1, 0, 0, 0]
   - [0, 1, 0, 0]
@@ -45,18 +53,21 @@ data:
   root: data/CLEVR_v1.0
   cues_path: data/CLEVR_v1.0/cues
   batch_size: 256
-  val_batch_size: 32
+  val_batch_size: 64
   num_train_images: Null
   num_val_images: Null
   holdout: []
   mode: every
-  num_workers: 4
+  num_workers: 8
 optimizer: 
   fn: adamw
   lr: 0.001
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
+scheduler:
+  fn: one_cycle
+  pct_start: 0.3
 criterion: ce
 compile:
   disable: True
@@ -66,13 +77,13 @@ compile:
   mode: reduce-overhead
 train:
   matmul_precision: high
-  epochs: 30
+  epochs: 100
   log_freq: 5
   checkpoint_dir: checkpoints/ei
   grad_clip:
     disable: True
     type: norm
     value: 1.0
-wandb: False
 seed: Null
 tqdm: True
+wandb: True

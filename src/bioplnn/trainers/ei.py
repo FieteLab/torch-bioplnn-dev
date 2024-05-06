@@ -1,21 +1,23 @@
 import os
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
-import wandb
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
+from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
+import wandb
 from bioplnn.datasets.ei import get_dataloaders
+from bioplnn.loss import EDLLoss
 from bioplnn.models.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict, seed
-from bioplnn.loss import EDLLoss
 
 
 def train_iter(
     config: AttrDict,
     model: Conv2dEIRNN,
     optimizer: torch.optim.Optimizer,
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
     wandb_log: Callable[[dict[str, float, int]], None],
@@ -75,6 +77,8 @@ def train_iter(
         loss.backward()
         clip_grad_(model.parameters(), config.train.grad_clip.value)
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
 
         # Update statistics
         train_loss += loss.item()
@@ -163,13 +167,14 @@ def eval_iter(
     return test_loss, test_acc
 
 
-def train(config: AttrDict) -> None:
+def train(config: dict) -> None:
     """
     Train the model using the provided configuration.
 
     Args:
-        config (AttrDict): Configuration parameters.
+        config (dict): Configuration parameters.
     """
+    config = AttrDict(config)
     # Set the random seed
     if config.seed is not None:
         seed(config.seed)
@@ -236,6 +241,18 @@ def train(config: AttrDict) -> None:
         seed=config.seed,
     )
 
+    # Initialize the learning rate scheduler
+    if config.scheduler.fn is None:
+        scheduler = None
+    if config.scheduler.fn == "one_cycle":
+        scheduler = OneCycleLR(
+            optimizer,
+            max_lr=config.optimizer.lr,
+            total_steps=config.train.epochs * len(train_loader),
+        )
+    else:
+        raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
+
     # Initialize Weights & Biases
     if config.wandb:
         wandb.init(project="EI RNN", config=config)
@@ -249,6 +266,7 @@ def train(config: AttrDict) -> None:
             config,
             model,
             optimizer,
+            scheduler,
             criterion,
             train_loader,
             wandb_log,
@@ -301,7 +319,6 @@ if __name__ == "__main__":
 
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
-    config = AttrDict(config)
     print("Loaded Config")
 
     train(config)
