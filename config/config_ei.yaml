@@ -23,12 +23,12 @@ model:
   num_compartments: 1
   immediate_inhibition: True
   num_layers: 4
-  num_steps: 10
+  num_steps: 4
   num_classes: 10
   lrp: False
   lrp_input: hidden
   lrp_apply_timestep: 0
-  lrp_init_scale: 0.01
+  lrp_init_scale: 1.0
   agm: True
   agm_input: layer_output
   agm_apply_timestep: all
@@ -57,7 +57,7 @@ data:
   num_train_images: Null
   num_val_images: Null
   holdout: []
-  mode: every
+  mode: color
   num_workers: 8
 optimizer: 
   fn: adamw

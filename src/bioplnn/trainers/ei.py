@@ -320,5 +320,6 @@ if __name__ == "__main__":
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
     print("Loaded Config")
+    # torch.autograd.set_detect_anomaly(True)
 
     train(config)

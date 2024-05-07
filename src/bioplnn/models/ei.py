@@ -85,8 +85,7 @@ class LowRankPerturbation(nn.Module):
         rank_one_perturbation = torch.matmul(
             rank_one_vector, rank_one_vector.transpose(-2, -1)
         )
-        # Add the rank one perturbation to the mixture
-        return input + rank_one_perturbation
+        return rank_one_perturbation
 
 
 class Conv2dPositive(nn.Conv2d):
@@ -457,7 +456,7 @@ class Conv2dEIRNNCell(nn.Module):
 
             # Compute the inhibitions
             exc_inters = torch.split(
-                self.activation(exc_inter) if self.immediate_inhibition else h_inter,
+                exc_inter if self.immediate_inhibition else h_inter,
                 self.h_inter_dims,
                 dim=1,
             )
@@ -477,12 +476,14 @@ class Conv2dEIRNNCell(nn.Module):
         # Computer candidate neural memory (cnm) states
         # TODO: Figure out if relu is necessary/desirable
         if self.num_compartments == 1:
-            cnm_pyr = (
-                exc_pyr_basal
-                + exc_pyr_apical
-                + inh_pyr_soma
-                + inh_pyr_basal
-                + inh_pyr_apical
+            cnm_pyr = self.activation(
+                torch.relu(
+                    exc_pyr_basal
+                    + exc_pyr_apical
+                    + inh_pyr_soma
+                    + inh_pyr_basal
+                    + inh_pyr_apical
+                )
             )
         elif self.num_compartments == 3:
             pyr_basal = self.activation(torch.relu(exc_pyr_basal + inh_pyr_basal))
@@ -512,7 +513,7 @@ class Conv2dEIRNNCell(nn.Module):
             else:
                 cnm_inter += exc_fb_inter
 
-            # cnm_inter = self.activation(torch.relu(cnm_inter))
+            cnm_inter = self.activation(torch.relu(cnm_inter))
 
         # Euler update for the cell state
         tau_pyr = torch.sigmoid(self.tau_pyr)
@@ -835,6 +836,9 @@ class Conv2dEIRNN(nn.Module):
                 batch_size, init_mode=self.out_init_mode, device=device
             )
             outs = [None] * len(self.layers)
+            lrps_pyr = [0] * len(self.layers)
+            lrps_inter = [0] * len(self.layers)
+            lrps_out = [0] * len(self.layers)
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:
                     input = stimulation[:, t, ...]
@@ -845,6 +849,19 @@ class Conv2dEIRNN(nn.Module):
                         "The input must be a 4D tensor or a 5D tensor with sequence length."
                     )
                 for i, layer in enumerate(self.layers):
+                    if (
+                        stimulation is mixture
+                        and self.lrp
+                        and (
+                            self.agm_apply_timestep == "all"
+                            or self.agm_apply_timestep == t
+                        )
+                    ):
+                        if self.lrp_input == "hidden":
+                            h_pyrs[i] = h_pyrs[i] + lrps_pyr[i]
+                            h_inters[i] = h_inters[i] + lrps_inter[i]
+                        else:
+                            outs[i] = outs[i] + lrps_out[i]
                     (h_pyrs[i], h_inters[i], outs[i]) = layer(
                         input=input if i == 0 else outs_prev[i - 1],
                         h_pyr=h_pyrs[i],
@@ -853,27 +870,21 @@ class Conv2dEIRNN(nn.Module):
                     )
 
                     # Apply lrp and agm to mixture
-                    if stimulation is mixture:
-                        if self.agm and (
+                    if (
+                        stimulation is mixture
+                        and self.agm
+                        and (
                             self.agm_apply_timestep == "all"
                             or self.agm_apply_timestep == t
-                        ):
-                            if self.agm_input == "hidden":
-                                h_pyrs[i] = self.agms[i](h_pyrs_cue[i], h_pyrs[i])
-                                h_inters[i] = self.agms_inter[i](
-                                    h_inters_cue[i], h_inters[i]
-                                )
-                            else:
-                                outs[i] = self.agms[i](outs_cue[i], outs[i])
-                        if self.lrp and (
-                            self.agm_apply_timestep == "all"
-                            or self.agm_apply_timestep == t
-                        ):
-                            if self.lrp_input == "hidden":
-                                h_pyrs[i] = self.lrps[i](h_pyrs[i])
-                                h_inters[i] = self.lrps_inter[i](h_inters[i])
-                            else:
-                                outs[i] = self.lrps[i](outs[i])
+                        )
+                    ):
+                        if self.agm_input == "hidden":
+                            h_pyrs[i] = self.agms[i](h_pyrs_cue[i], h_pyrs[i])
+                            h_inters[i] = self.agms_inter[i](
+                                h_inters_cue[i], h_inters[i]
+                            )
+                        else:
+                            outs[i] = self.agms[i](outs_cue[i], outs[i])
 
                     # Apply feedback
                     if self.fb_adjacency is not None:
@@ -886,6 +897,13 @@ class Conv2dEIRNN(nn.Module):
                 outs_prev = outs
                 outs = [None] * len(self.layers)
 
+            if self.lrp and stimulation is cue:
+                for i in range(len(self.layers)):
+                    if self.lrp_input == "hidden":
+                        lrps_pyr[i] = self.lrps[i](h_pyrs[i])
+                        h_inters[i] = self.lrps_inter[i](h_inters[i])
+                    else:
+                        lrps_out[i] = self.lrps[i](h_pyrs[i])
             outs_cue = outs_prev
             h_pyrs_cue = h_pyrs
             h_inters_cue = h_inters

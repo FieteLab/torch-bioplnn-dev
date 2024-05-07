@@ -1,15 +1,15 @@
+import glob
 import json
 import os
-from typing import Callable
-from typing import Optional
-from PIL import Image, ImageDraw
-import torch
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-from torchvision.transforms import transforms
+from typing import Callable, Optional
+
 import numpy as np
+import torch
+from PIL import Image, ImageDraw
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import transforms
+
 from bioplnn.utils import compact, rescale, seed_worker
-import glob
 
 
 def draw_shape(
