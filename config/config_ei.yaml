@@ -1,6 +1,6 @@
 # Data and Model parameters
 model:
-  input_size: [64, 64]
+  input_size: [128, 128]
   input_dim: 3
   h_pyr_dim: [16, 32, 64, 64]
   h_inter_dims: # Null
@@ -23,30 +23,32 @@ model:
   num_compartments: 1
   immediate_inhibition: True
   num_layers: 4
-  num_steps: 4
+  num_steps: 5
   num_classes: 10
   lrp: False
   lrp_input: hidden
   lrp_apply_timestep: 0
-  lrp_init_scale: 1.0
+  lrp_op: add
   agm: True
   agm_input: layer_output
   agm_apply_timestep: all
+  layer_time_delay: False
   exc_rectify: Null
-  inh_rectify: neg
-  flush_hidden: False
+  inh_rectify: pos
+  flush_hidden: True
   hidden_init_mode: zeros
   fb_init_mode: zeros
   out_init_mode: zeros
-  fb_adjacency: # Null
-  - [0, 0, 0, 0]
-  - [1, 0, 0, 0]
-  - [0, 1, 0, 0]
-  - [0, 0, 1, 0]
+  fb_adjacency: Null
+  # - [0, 0, 0, 0]
+  # - [1, 0, 0, 0]
+  # - [0, 1, 0, 0]
+  # - [0, 0, 1, 0]
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
-  activation: tanh
+  pre_inh_activation: tanh
+  post_inh_activation: Null
   fc_dim: 256
 # Training parameters
 data:
@@ -57,7 +59,7 @@ data:
   num_train_images: Null
   num_val_images: Null
   holdout: []
-  mode: color
+  mode: every
   num_workers: 8
 optimizer: 
   fn: adamw
@@ -79,7 +81,7 @@ train:
   matmul_precision: high
   epochs: 100
   log_freq: 5
-  checkpoint_dir: checkpoints/ei
+  checkpoint_root: checkpoints/ei
   grad_clip:
     disable: True
     type: norm

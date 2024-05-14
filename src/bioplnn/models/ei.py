@@ -49,9 +49,7 @@ class SimpleAttentionalGain(nn.Module):
 
 
 class LowRankPerturbation(nn.Module):
-    def __init__(
-        self, in_channels: int, spatial_size: tuple[int, int], init_scale=1e-2
-    ):
+    def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
         """
         Initializes the EI model.
 
@@ -62,12 +60,8 @@ class LowRankPerturbation(nn.Module):
         """
         super().__init__()
         # Initialize the weight and bias matrices
-        self.W = nn.Parameter(
-            torch.randn(1, in_channels, spatial_size[0], 1) * init_scale
-        )
-        self.bias = nn.Parameter(
-            torch.randn(1, in_channels, spatial_size[0], 1) * init_scale
-        )
+        self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+        self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
 
     def forward(self, input: torch.Tensor):
         """
@@ -88,6 +82,44 @@ class LowRankPerturbation(nn.Module):
         return rank_one_perturbation
 
 
+class LowRankPerturbation_v2(nn.Module):
+    def __init__(self, hc, hx, hy):
+        super().__init__()
+
+        self.hc = hc
+        self.hx = hx
+        self.hy = hy
+
+        # # B x C x H  W
+        # self.W = nn.Parameter(torch.randn(1, hc, hx, 1))
+        # self.bias = nn.Parameter(torch.randn(1, hc, hx, 1))
+
+        # outsize is N X C X 1 X 1
+        self.spatial_average = nn.AdaptiveAvgPool2d((1, 1))
+        self.rank_one_vec_x = nn.Linear(hc, hx)
+        self.rank_one_vec_y = nn.Linear(hc, hy)
+
+    def forward(self, memory, input):
+        # rank_one_vector = torch.matmul(input, self.W) + self.bias
+        # # compute the rank one matrix
+        # rank_one_perturbation = torch.matmul(rank_one_vector, rank_one_vector.transpose(-2, -1))
+        # perturbed_input = input + rank_one_perturbation
+        # return perturbed_input
+
+        batch_size = memory.size(0)
+        x = self.spatial_average(memory)
+        x = x.flatten(1)
+        xvec = self.rank_one_vec_x(x)
+        yvec = self.rank_one_vec_y(x)
+
+        rank_one_matrix = torch.bmm(xvec.unsqueeze(-1), yvec.unsqueeze(-2)).unsqueeze(
+            -3
+        )
+        rank_one_tensor = x.view(*x.shape, 1, 1) * rank_one_matrix
+
+        return rank_one_tensor
+
+
 class Conv2dPositive(nn.Conv2d):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -96,7 +128,7 @@ class Conv2dPositive(nn.Conv2d):
         self.weight.data = torch.relu(self.weight.data)
         if self.bias is not None:
             self.bias.data = torch.relu(self.bias.data)
-        return -super().forward(*args, **kwargs)
+        return super().forward(*args, **kwargs)
 
 
 class Conv2dNegative(nn.Conv2d):
@@ -107,29 +139,7 @@ class Conv2dNegative(nn.Conv2d):
         self.weight.data = -torch.relu(-self.weight.data)
         if self.bias is not None:
             self.bias.data = -torch.relu(-self.bias.data)
-        return super().forward(*args, **kwargs)
-
-
-class ConvTranspose2dPositive(nn.ConvTranspose2d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, *args, **kwargs):
-        self.weight.data = torch.relu(self.weight.data)
-        if self.bias is not None:
-            self.bias.data = torch.relu(self.bias.data)
         return -super().forward(*args, **kwargs)
-
-
-class ConvTranspose2dNegative(nn.ConvTranspose2d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def forward(self, *args, **kwargs):
-        self.weight.data = -torch.relu(-self.weight.data)
-        if self.bias is not None:
-            self.bias.data = -torch.relu(-self.bias.data)
-        return super().forward(*args, **kwargs)
 
 
 class Conv2dEIRNNCell(nn.Module):
@@ -150,7 +160,8 @@ class Conv2dEIRNNCell(nn.Module):
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
-        activation: str = "relu",
+        pre_inh_activation: Optional[str] = "tanh",
+        post_inh_activation: Optional[str] = None,
     ):
         """
         Initialize the ConvRNNEICell.
@@ -198,7 +209,20 @@ class Conv2dEIRNNCell(nn.Module):
         self.h_inter_dims = h_inter_dims
         self.h_inter_dims_sum = sum(h_inter_dims)
         self.pool_stride = pool_stride
-        self.activation = get_activation_class(activation)()
+        if isinstance(pre_inh_activation, (list, tuple)):
+            activations = []
+            for activation in pre_inh_activation:
+                activations.append(get_activation_class(activation)())
+            self.pre_inh_activation = nn.Sequential(*activations)
+        else:
+            self.pre_inh_activation = get_activation_class(pre_inh_activation)()
+        if isinstance(post_inh_activation, (list, tuple)):
+            activations = []
+            for activation in post_inh_activation:
+                activations.append(get_activation_class(activation)())
+            self.post_inh_activation = nn.Sequential(*activations)
+        else:
+            self.post_inh_activation = get_activation_class(post_inh_activation)()
         self.out_dim = h_pyr_dim
         self.out_size = (
             ceil(input_size[0] / pool_stride[0]),
@@ -433,26 +457,32 @@ class Conv2dEIRNNCell(nn.Module):
         exc_pyr_apical = 0
         if self.use_fb:
             if self.num_compartments == 3:
-                exc_pyr_apical = self.activation(self.conv_exc_pyr_fb(fb))
+                exc_pyr_apical = self.pre_inh_activation(self.conv_exc_pyr_fb(fb))
             else:
                 exc_cat.append(fb)
-        exc_pyr_basal = self.activation(self.conv_exc_pyr(torch.cat(exc_cat, dim=1)))
+        exc_pyr_basal = self.pre_inh_activation(
+            self.conv_exc_pyr(torch.cat(exc_cat, dim=1))
+        )
 
         inhs = [0] * 4
         if self.h_inter_dims:
             # Compute the excitations for interneurons
             exc_cat = [h_pyr]
             if len(self.h_inter_dims) >= 3:
-                exc_input_inter = self.activation(self.conv_exc_input_inter(input))
+                exc_input_inter = self.pre_inh_activation(
+                    self.conv_exc_input_inter(input)
+                )
             else:
                 exc_cat.append(input)
             exc_fb_inter = 0
             if self.use_fb:
                 if len(self.h_inter_dims) == 4:
-                    exc_fb_inter = self.activation(self.conv_exc_inter_fb(fb))
+                    exc_fb_inter = self.pre_inh_activation(self.conv_exc_inter_fb(fb))
                 else:
                     exc_cat.append(fb)
-            exc_inter = self.activation(self.conv_exc_inter(torch.cat(exc_cat, dim=1)))
+            exc_inter = self.pre_inh_activation(
+                self.conv_exc_inter(torch.cat(exc_cat, dim=1))
+            )
 
             # Compute the inhibitions
             exc_inters = torch.split(
@@ -465,55 +495,51 @@ class Conv2dEIRNNCell(nn.Module):
                 conv = self.convs_inh[i]
                 if i in (2, 3) and len(self.h_inter_dims) == 4:
                     conv, conv2 = conv.conv1, conv.conv2
-                    inh_inter_2_or_3 = self.activation(conv2(exc_inters[i]))
+                    inh_inter_2_or_3 = self.pre_inh_activation(conv2(exc_inters[i]))
                     if i == 2:
                         inh_inter_3 = inh_inter_2_or_3
                     else:
                         inh_inter_2 = inh_inter_2_or_3
-                inhs[i] = self.activation(conv(exc_inters[i]))
+                inhs[i] = self.pre_inh_activation(conv(exc_inters[i]))
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
         # Computer candidate neural memory (cnm) states
         # TODO: Figure out if relu is necessary/desirable
         if self.num_compartments == 1:
-            cnm_pyr = self.activation(
-                torch.relu(
-                    exc_pyr_basal
-                    + exc_pyr_apical
-                    + inh_pyr_soma
-                    + inh_pyr_basal
-                    + inh_pyr_apical
-                )
+            cnm_pyr = self.post_inh_activation(
+                exc_pyr_basal
+                + exc_pyr_apical
+                - inh_pyr_soma
+                - inh_pyr_basal
+                - inh_pyr_apical
             )
         elif self.num_compartments == 3:
-            pyr_basal = self.activation(torch.relu(exc_pyr_basal + inh_pyr_basal))
+            pyr_basal = self.post_inh_activation(exc_pyr_basal - inh_pyr_basal)
             if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
                 exc_pyr_apical, torch.Tensor
             ):
-                pyr_apical = self.activation(
-                    torch.relu(exc_pyr_apical + inh_pyr_apical)
-                )
+                pyr_apical = self.post_inh_activation(exc_pyr_apical - inh_pyr_apical)
             else:
                 pyr_apical = 0
-            cnm_pyr = self.activation(torch.relu(pyr_apical + pyr_basal + inh_pyr_soma))
+            cnm_pyr = self.post_inh_activation(pyr_apical + pyr_basal - inh_pyr_soma)
         else:
             raise ValueError("num_compartments must be 1 or 3.")
 
         if self.h_inter_dims:
-            cnm_inter = exc_inter + inh_inter
+            cnm_inter = exc_inter - inh_inter
             if len(self.h_inter_dims) >= 3:
                 # Add excitations and inhibitions to interneuron 2
                 start = sum(self.h_inter_dims[:2])
                 end = start + self.h_inter_dims[2]
-                cnm_inter[:, start:end, ...] = exc_input_inter + inh_inter_2
+                cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
             if len(self.h_inter_dims) == 4:
                 # Add excitations and inhibitions to interneuron 3
                 start = sum(self.h_inter_dims[:3])
-                cnm_inter[:, start:, ...] = exc_fb_inter + inh_inter_3
+                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
             else:
                 cnm_inter += exc_fb_inter
 
-            cnm_inter = self.activation(torch.relu(cnm_inter))
+            cnm_inter = self.post_inh_activation(cnm_inter)
 
         # Euler update for the cell state
         tau_pyr = torch.sigmoid(self.tau_pyr)
@@ -550,13 +576,14 @@ class Conv2dEIRNN(nn.Module):
         lrp: bool = True,
         lrp_input: str = "hidden",
         lrp_apply_timestep: str | int = "all",
-        lrp_init_scale: float = 1e-2,
+        lrp_op: str = "add",
         agm: bool = True,
         agm_input: str = "layer_output",
         agm_apply_timestep: str | int = "all",
+        layer_time_delay: bool = False,
         exc_rectify: Optional[str] = None,
         inh_rectify: Optional[str] = "neg",
-        flush_hidden: bool = True,
+        flush_hidden: bool = False,
         hidden_init_mode: str = "zeros",
         fb_init_mode: str = "zeros",
         out_init_mode: str = "zeros",
@@ -564,7 +591,8 @@ class Conv2dEIRNN(nn.Module):
         pool_kernel_size: list[int, int] | list[list[int, int]] = (5, 5),
         pool_stride: list[int, int] | list[list[int, int]] = (2, 2),
         bias: bool | list[bool] = True,
-        activation: str = "tanh",
+        pre_inh_activation: Optional[str] = None,
+        post_inh_activation: Optional[str] = "tanh",
         fc_dim: int = 1024,
     ):
         """
@@ -604,9 +632,11 @@ class Conv2dEIRNN(nn.Module):
         self.lrp = lrp
         self.lrp_input = lrp_input
         self.lrp_apply_timestep = lrp_apply_timestep
+        self.lrp_op = lrp_op
         self.agm = agm
         self.agm_input = agm_input
         self.agm_apply_timestep = agm_apply_timestep
+        self.layer_time_delay = layer_time_delay
         if lrp:
             if lrp_input not in ("hidden", "layer_output"):
                 raise ValueError("lrp_input must be 'hidden' or 'layer_output'.")
@@ -614,6 +644,8 @@ class Conv2dEIRNN(nn.Module):
                 raise ValueError(
                     "lrp_apply_timestep must be 'all' or an integer between 0 and num_steps."
                 )
+            if lrp_op not in ("add", "mul"):
+                raise ValueError("lrp_op must be 'add' or 'mul'")
         if self.agm:
             if self.agm_input not in ("hidden", "layer_output"):
                 raise ValueError("agm_input must be 'hidden' or 'layer_output'.")
@@ -641,9 +673,6 @@ class Conv2dEIRNN(nn.Module):
                     ceil(self.input_sizes[i][1] / self.pool_strides[i][1]),
                 )
             )
-
-        activation_class = get_activation_class(activation)
-        self.activation = activation_class()
 
         self.use_fb = [False] * num_layers
         self.fb_adjacency = fb_adjacency
@@ -708,7 +737,8 @@ class Conv2dEIRNN(nn.Module):
                     pool_kernel_size=self.pool_kernel_sizes[i],
                     pool_stride=self.pool_strides[i],
                     bias=self.biases[i],
-                    activation=activation,
+                    pre_inh_activation=pre_inh_activation,
+                    post_inh_activation=post_inh_activation,
                 )
             )
             if lrp:
@@ -717,14 +747,12 @@ class Conv2dEIRNN(nn.Module):
                         LowRankPerturbation(
                             self.layers[i].h_pyr_dim,
                             self.layers[i].input_size,
-                            lrp_init_scale,
                         )
                     )
                     self.lrps_inter.append(
                         LowRankPerturbation(
                             self.layers[i].h_inter_dims_sum,
                             self.layers[i].inter_size,
-                            lrp_init_scale,
                         )
                     )
                 else:
@@ -732,7 +760,6 @@ class Conv2dEIRNN(nn.Module):
                         LowRankPerturbation(
                             self.layers[i].out_dim,
                             self.layers[i].out_size,
-                            lrp_init_scale,
                         )
                     )
             if agm:
@@ -849,6 +876,7 @@ class Conv2dEIRNN(nn.Module):
                         "The input must be a 4D tensor or a 5D tensor with sequence length."
                     )
                 for i, layer in enumerate(self.layers):
+                    # Apply lrp to mixture
                     if (
                         stimulation is mixture
                         and self.lrp
@@ -858,18 +886,35 @@ class Conv2dEIRNN(nn.Module):
                         )
                     ):
                         if self.lrp_input == "hidden":
-                            h_pyrs[i] = h_pyrs[i] + lrps_pyr[i]
-                            h_inters[i] = h_inters[i] + lrps_inter[i]
+                            if self.lrp_op == "add":
+                                h_pyrs[i] = h_pyrs[i] + lrps_pyr[i]
+                                h_inters[i] = h_inters[i] + lrps_inter[i]
+                            else:
+                                h_pyrs[i] = h_pyrs[i] * lrps_pyr[i]
+                                h_inters[i] = h_inters[i] * lrps_pyr[i]
                         else:
-                            outs[i] = outs[i] + lrps_out[i]
+                            if self.lrp_op == "add":
+                                outs[i] = outs[i] + lrps_out[i]
+                            else:
+                                outs[i] = outs[i] * lrps_out[i]
+
+                    # Compute layer update and output
                     (h_pyrs[i], h_inters[i], outs[i]) = layer(
-                        input=input if i == 0 else outs_prev[i - 1],
+                        input=(
+                            input
+                            if i == 0
+                            else (
+                                outs_prev[i - 1]
+                                if self.layer_time_delay
+                                else outs[i - 1]
+                            )
+                        ),
                         h_pyr=h_pyrs[i],
                         h_inter=h_inters[i],
                         fb=fbs_prev[i] if self.use_fb[i] else None,
                     )
 
-                    # Apply lrp and agm to mixture
+                    # Apply agm to mixture
                     if (
                         stimulation is mixture
                         and self.agm
@@ -902,8 +947,13 @@ class Conv2dEIRNN(nn.Module):
                     if self.lrp_input == "hidden":
                         lrps_pyr[i] = self.lrps[i](h_pyrs[i])
                         h_inters[i] = self.lrps_inter[i](h_inters[i])
+                        if self.lrp_op == "mul":
+                            lrps_pyr[i] = torch.sigmoid(lrps_pyr[i])
+                            h_inters[i] = torch.sigmoid(h_inters[i])
                     else:
                         lrps_out[i] = self.lrps[i](h_pyrs[i])
+                        if self.lrp_op == "mul":
+                            lrps_out[i] = torch.sigmoid(lrps_out[i])
             outs_cue = outs_prev
             h_pyrs_cue = h_pyrs
             h_inters_cue = h_inters

@@ -1,12 +1,13 @@
 import os
+import random
+from types import SimpleNamespace
+
 import numpy as np
 import scipy
 import scipy.interpolate
 import torch
 from torch import nn
 from torch.profiler import ProfilerActivity, profile, record_function
-from types import SimpleNamespace
-import random
 
 
 class AttrDict(dict):
@@ -42,6 +43,8 @@ def seed(seed):
 
 
 def get_activation_class(activation):
+    if activation is None or activation == "identity":
+        return nn.Identity
     if activation == "relu":
         return nn.ReLU
     elif activation == "tanh":

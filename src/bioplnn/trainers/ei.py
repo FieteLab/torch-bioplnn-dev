@@ -183,8 +183,7 @@ def train(config: dict) -> None:
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Conv2dEIRNN(**config.model).to(device)
-    # Create the checkpoint directory
-    os.makedirs(config.train.checkpoint_dir, exist_ok=True)
+
     # Compile the model if requested
     model = torch.compile(
         model,
@@ -260,6 +259,13 @@ def train(config: dict) -> None:
     else:
         wandb_log = lambda x: None
 
+    # Create the checkpoint directory
+    if config.wandb:
+        checkpoint_dir = os.path.join(config.train.checkpoint_root, wandb.run.name)
+    else:
+        checkpoint_dir = config.train.checkpoint_root
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
     for epoch in range(config.train.epochs):
         # Train the model
         train_loss, train_acc = train_iter(
@@ -290,11 +296,9 @@ def train(config: dict) -> None:
 
         # Save the model
         file_path = os.path.abspath(
-            os.path.join(config.train.checkpoint_dir, f"checkpoint_{epoch}.pt")
+            os.path.join(checkpoint_dir, f"checkpoint_{epoch}.pt")
         )
-        link_path = os.path.abspath(
-            os.path.join(config.train.checkpoint_dir, "checkpoint.pt")
-        )
+        link_path = os.path.abspath(os.path.join(checkpoint_dir, "checkpoint.pt"))
         checkpoint = {
             "epoch": epoch,
             "model_state_dict": getattr(model, "_orig_mod", model).state_dict(),
