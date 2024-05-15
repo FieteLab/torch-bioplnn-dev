@@ -6,9 +6,9 @@
 #SBATCH -c 8
 #SBATCH --constraint=rocky8
 #SBATCH --mem 20G
-#SBATCH -o trainer_%j.out
+#SBATCH -o outputs/trainer_%j.out
 
 source ~/.bashrc
 conda activate pytorch
 
-python -u src/bioplnn/trainers/ei.py --config config/config_ei.yaml
+python -u src/bioplnn/trainers/ei.py --config config/config_ei_2.yaml

@@ -23,10 +23,10 @@ model:
   num_compartments: 1
   immediate_inhibition: True
   num_layers: 4
-  num_steps: 10
+  num_steps: 5
   num_classes: 10
   modulation: True
-  modulation_type: lr
+  modulation_type: ag
   modulation_on: layer_output
   modulation_timestep: all
   pertubation: False
