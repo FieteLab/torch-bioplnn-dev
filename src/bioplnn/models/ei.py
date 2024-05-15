@@ -45,7 +45,7 @@ class SimpleAttentionalGain(nn.Module):
         # Apply sigmoid & bias
         cue = self.bias + (1 - self.bias) * torch.sigmoid(cue)
         # Apply to mixture (element mult)
-        return torch.mul(mixture, cue)
+        return mixture * cue
 
 
 class LowRankPerturbation(nn.Module):
@@ -82,13 +82,12 @@ class LowRankPerturbation(nn.Module):
         return rank_one_perturbation
 
 
-class LowRankPerturbation_v2(nn.Module):
-    def __init__(self, hc, hx, hy):
+class LowRankModulation(nn.Module):
+    def __init__(self, in_channels, spatial_size: tuple[int, int]):
         super().__init__()
 
-        self.hc = hc
-        self.hx = hx
-        self.hy = hy
+        self.in_channels = in_channels
+        self.spatial_size = spatial_size
 
         # # B x C x H  W
         # self.W = nn.Parameter(torch.randn(1, hc, hx, 1))
@@ -96,28 +95,27 @@ class LowRankPerturbation_v2(nn.Module):
 
         # outsize is N X C X 1 X 1
         self.spatial_average = nn.AdaptiveAvgPool2d((1, 1))
-        self.rank_one_vec_x = nn.Linear(hc, hx)
-        self.rank_one_vec_y = nn.Linear(hc, hy)
+        self.rank_one_vec_h = nn.Linear(in_channels, spatial_size[0])
+        self.rank_one_vec_w = nn.Linear(in_channels, spatial_size[1])
 
-    def forward(self, memory, input):
+    def forward(self, cue: torch.Tensor, mixture: torch.Tensor):
         # rank_one_vector = torch.matmul(input, self.W) + self.bias
         # # compute the rank one matrix
         # rank_one_perturbation = torch.matmul(rank_one_vector, rank_one_vector.transpose(-2, -1))
         # perturbed_input = input + rank_one_perturbation
         # return perturbed_input
 
-        batch_size = memory.size(0)
-        x = self.spatial_average(memory)
+        x = self.spatial_average(cue)
         x = x.flatten(1)
-        xvec = self.rank_one_vec_x(x)
-        yvec = self.rank_one_vec_y(x)
+        hvec = self.rank_one_vec_h(x)
+        wvec = self.rank_one_vec_w(x)
 
-        rank_one_matrix = torch.bmm(xvec.unsqueeze(-1), yvec.unsqueeze(-2)).unsqueeze(
+        rank_one_matrix = torch.bmm(hvec.unsqueeze(-1), wvec.unsqueeze(-2)).unsqueeze(
             -3
         )
-        rank_one_tensor = x.view(*x.shape, 1, 1) * rank_one_matrix
+        rank_one_tensor = x.unsqueeze(-1).unsqueeze(-1) * rank_one_matrix
 
-        return rank_one_tensor
+        return mixture * rank_one_tensor
 
 
 class Conv2dPositive(nn.Conv2d):
@@ -450,7 +448,6 @@ class Conv2dEIRNNCell(nn.Module):
         """
         if self.use_fb and fb is None:
             raise ValueError("If use_fb is True, fb_exc must be provided.")
-        batch_size = input.shape[0]
 
         # Compute the excitations for pyramidal cells
         exc_cat = [input, h_pyr]
