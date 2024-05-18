@@ -11,4 +11,6 @@ wandb
 accelerate
 lightning
 tqdm
+hydra-core
+hydra-submitit-launcher
 git+https://github.com/cai4cai/torchsparsegradutils

@@ -1,7 +1,10 @@
 import os
 from typing import Callable, Optional
 
+import hydra
 import torch
+from hydra.utils import get_original_cwd
+from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
@@ -167,13 +170,19 @@ def eval_iter(
     return test_loss, test_acc
 
 
-def train(config: dict) -> None:
+@hydra.main(
+    version_base=None,
+    config_path="/om2/user/valmiki/bioplnn/config",
+    config_name="config_ei",
+)
+def train(config: DictConfig) -> None:
     """
     Train the model using the provided configuration.
 
     Args:
         config (dict): Configuration parameters.
     """
+    config = OmegaConf.to_container(config, resolve=True)
     config = AttrDict(config)
     # Set the random seed
     if config.seed is not None:
@@ -311,17 +320,4 @@ def train(config: dict) -> None:
 
 
 if __name__ == "__main__":
-    import argparse
-
-    import yaml
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config_ei_test.yaml")
-    args = parser.parse_args()
-
-    with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
-    print("Loaded Config")
-    # torch.autograd.set_detect_anomaly(True)
-
-    train(config)
+    train()

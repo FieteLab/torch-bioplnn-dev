@@ -1,4 +1,7 @@
 # Data and Model parameters
+hydra:
+  job:
+    chdir: False
 model:
   input_size: [128, 128]
   input_dim: 3
@@ -9,7 +12,6 @@ model:
   - [16]
   - [16]
   fb_dim: [16, 32, 64, 64]
-  inter_mode: same
   exc_kernel_size: 
   - [5, 5]
   - [5, 5]
@@ -24,7 +26,8 @@ model:
   immediate_inhibition: True
   num_layers: 4
   num_steps: 5
-  num_classes: 10
+  inter_mode: same
+  num_classes: 6
   modulation: True
   modulation_type: ag
   modulation_on: layer_output
@@ -53,14 +56,15 @@ model:
   fc_dim: 256
 # Training parameters
 data:
-  root: data/CLEVR_v1.0
-  cues_path: data/CLEVR_v1.0/cues
+  root: data/qclevr
+  assets_path: data/CLEVR_v1.0/cues
   batch_size: 256
   val_batch_size: 64
   num_train_images: Null
   num_val_images: Null
   holdout: []
-  mode: every
+  mode: color
+  primitive: True
   num_workers: 8
 optimizer: 
   fn: adamw
@@ -89,4 +93,4 @@ train:
     value: 1.0
 seed: Null
 tqdm: True
-wandb: True
+wandb: False

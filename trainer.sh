@@ -5,10 +5,10 @@
 #SBATCH -N 1
 #SBATCH -c 8
 #SBATCH --constraint=rocky8
-#SBATCH --mem 20G
+#SBATCH --mem 40G
 #SBATCH -o outputs/trainer_%j.out
 
 source ~/.bashrc
 conda activate pytorch
 
-python -u src/bioplnn/trainers/ei.py --config config/config_ei_2.yaml
+python -u src/bioplnn/trainers/ei_hydra.py data.mode=conjunction data.holdout=[cube_green,cube_blue] model.modulation_type=conv optimizer.lr=0.0001 
