@@ -484,7 +484,7 @@ class qCLEVRDataset(Dataset):
                 image_path = os.path.join(self.data_paths[_mode], x["image_filename"])
                 assert os.path.exists(image_path), f"{image_path} does not exist"
                 return image_path, x["cue"], x["target_count"], _mode
-        return None
+            return None, None, None, None
 
     def get_files(self) -> list[str]:
         paths = []
@@ -506,6 +506,10 @@ class qCLEVRDataset(Dataset):
                 path, cue, count, mode = zip(
                     *[self.get_file(_mode, x) for x in scene_paths]
                 )
+            path = filter(lambda x: x is not None, path)
+            cue = filter(lambda x: x is not None, cue)
+            count = filter(lambda x: x is not None, count)
+            mode = filter(lambda x: x is not None, mode)
             paths.extend(path)
             cues.extend(cue)
             counts.extend(count)

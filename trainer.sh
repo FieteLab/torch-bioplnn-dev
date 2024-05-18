@@ -11,4 +11,4 @@
 source ~/.bashrc
 conda activate pytorch
 
-python -u src/bioplnn/trainers/ei_hydra.py data.mode=conjunction data.holdout=[cube_green,cube_blue] model.modulation_type=conv optimizer.lr=0.0001 
+python -u src/bioplnn/trainers/ei_hydra.py data.mode=shape data.holdout=[cube] model.modulation_type=attn optimizer.lr=0.0001 
