@@ -1,7 +1,10 @@
 import os
 from typing import Callable, Optional
 
+import hydra
 import torch
+from hydra.utils import get_original_cwd
+from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
@@ -69,8 +72,15 @@ def train_iter(
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(cue, mixture)
-        loss = criterion(outputs, labels)
+        outputs = model(cue, mixture, all_timesteps=config.criterion.all_timesteps)
+        if config.criterion.all_timesteps:
+            losses = []
+            for output in outputs:
+                losses.append(criterion(output, labels))
+            loss = sum(losses) / len(losses)
+            outputs = outputs[-1]
+        else:
+            loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -115,6 +125,7 @@ def train_iter(
 
 
 def eval_iter(
+    config: AttrDict,
     model: Conv2dEIRNN,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
@@ -148,8 +159,15 @@ def eval_iter(
             labels = labels.to(device)
 
             # Forward pass
-            outputs = model(cue, mixture)
-            loss = criterion(outputs, labels)
+            outputs = model(cue, mixture, all_timesteps=config.criterion.all_timesteps)
+            if config.criterion.all_timesteps:
+                losses = []
+                for output in outputs:
+                    losses.append(criterion(output, labels))
+                loss = sum(losses) / len(losses)
+                outputs = outputs[-1]
+            else:
+                loss = criterion(outputs, labels)
 
             # Update statistics
             test_loss += loss.item()
@@ -167,13 +185,19 @@ def eval_iter(
     return test_loss, test_acc
 
 
-def train(config: dict) -> None:
+@hydra.main(
+    version_base=None,
+    config_path="/om2/user/valmiki/bioplnn/config",
+    config_name="config_ei",
+)
+def train(config: DictConfig) -> None:
     """
     Train the model using the provided configuration.
 
     Args:
         config (dict): Configuration parameters.
     """
+    config = OmegaConf.to_container(config, resolve=True)
     config = AttrDict(config)
     # Set the random seed
     if config.seed is not None:
@@ -217,12 +241,12 @@ def train(config: dict) -> None:
         raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
 
     # Initialize the loss function
-    if config.criterion == "ce":
+    if config.criterion.fn == "ce":
         criterion = torch.nn.CrossEntropyLoss()
-    elif config.criterion == "edl":
+    elif config.criterion.fn == "edl":
         criterion = EDLLoss(num_classes=config.model.num_classes)
     else:
-        raise NotImplementedError(f"Criterion {config.criterion} not implemented")
+        raise NotImplementedError(f"Criterion {config.criterion.fn} not implemented")
 
     # Get the data loaders
     train_loader, val_loader = get_qclevr_dataloaders(
@@ -259,9 +283,9 @@ def train(config: dict) -> None:
 
     # Create the checkpoint directory
     if config.wandb:
-        checkpoint_dir = os.path.join(config.train.checkpoint_root, wandb.run.name)
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
     else:
-        checkpoint_dir = config.train.checkpoint_root
+        checkpoint_dir = config.checkpoint.root
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     for epoch in range(config.train.epochs):
@@ -280,7 +304,7 @@ def train(config: dict) -> None:
 
         # Evaluate the model on the validation set
         test_loss, test_acc = eval_iter(
-            model, criterion, val_loader, wandb_log, epoch, device
+            config, model, criterion, val_loader, wandb_log, epoch, device
         )
 
         # Print the epoch statistics
@@ -311,17 +335,4 @@ def train(config: dict) -> None:
 
 
 if __name__ == "__main__":
-    import argparse
-
-    import yaml
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config/config_ei_test.yaml")
-    args = parser.parse_args()
-
-    with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
-    print("Loaded Config")
-    # torch.autograd.set_detect_anomaly(True)
-
-    train(config)
+    train()

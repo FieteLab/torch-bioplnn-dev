@@ -359,6 +359,7 @@ class qCLEVRDataset(Dataset):
         data_root: str,
         assets_path: str,
         clevr_transforms: Callable,
+        return_images: bool = False,
         split: str = "train",
         holdout: list = [],
         mode: str = "color",
@@ -368,6 +369,7 @@ class qCLEVRDataset(Dataset):
         super().__init__()
         self.data_root = data_root
         self.clevr_transforms = clevr_transforms
+        self.return_images = return_images
         self.mode = mode
         self.holdout = holdout
         self.split = split
@@ -517,6 +519,8 @@ class qCLEVRDataset(Dataset):
 
         return paths, cues, counts, modes
 
+    # def visualize(self, output_dict):
+
     def __getitem__(self, index: int):
         image_path = self.files[index]
         cue_str = self.cues[index]
@@ -537,7 +541,16 @@ class qCLEVRDataset(Dataset):
         else:
             raise NotImplementedError
 
-        return (self.clevr_transforms(cue), self.clevr_transforms(img), label)
+        if self.return_images:
+            return (
+                self.clevr_transforms(cue),
+                self.clevr_transforms(img),
+                label,
+                image_path,
+                mode,
+            )
+        else:
+            return self.clevr_transforms(cue), self.clevr_transforms(img), label
 
     def __len__(self):
         return len(self.files)

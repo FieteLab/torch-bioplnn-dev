@@ -77,7 +77,9 @@ optimizer:
 scheduler:
   fn: one_cycle
   pct_start: 0.3
-criterion: ce
+criterion: 
+  fn: ce
+  all_timesteps: False
 compile:
   disable: True
   fullgraph: True
@@ -88,11 +90,15 @@ train:
   matmul_precision: high
   epochs: 500
   log_freq: 5
-  checkpoint_root: checkpoints/ei
   grad_clip:
     disable: True
     type: norm
     value: 1.0
+checkpoint:
+  disable: True
+  root: checkpoints/ei
+  run: Null
+  epoch: Null
 seed: Null
 tqdm: True
 wandb: True

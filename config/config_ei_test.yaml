@@ -29,9 +29,12 @@ model:
   inter_mode: same
   num_classes: 6
   modulation: True
-  modulation_type: ag
+  modulation_type: conv
   modulation_on: layer_output
   modulation_timestep: all
+  modulation_num_heads: 4
+  modulation_activation: relu
+  modulation_dropout: 0.2
   pertubation: False
   pertubation_type: lr
   pertubation_on: hidden
@@ -51,6 +54,7 @@ model:
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
+  dropout: 0.5
   pre_inh_activation: tanh
   post_inh_activation: Null
   fc_dim: 256
@@ -60,9 +64,7 @@ data:
   assets_path: data/CLEVR_v1.0/cues
   batch_size: 256
   val_batch_size: 64
-  num_train_images: Null
-  num_val_images: Null
-  holdout: []
+  holdout: [blue, green]
   mode: color
   primitive: True
   num_workers: 8
@@ -75,7 +77,9 @@ optimizer:
 scheduler:
   fn: one_cycle
   pct_start: 0.3
-criterion: ce
+criterion: 
+  fn: ce
+  all_timesteps: False
 compile:
   disable: True
   fullgraph: True
@@ -84,13 +88,19 @@ compile:
   mode: reduce-overhead
 train:
   matmul_precision: high
-  epochs: 100
+  epochs: 500
   log_freq: 5
-  checkpoint_root: checkpoints/ei
   grad_clip:
     disable: True
     type: norm
     value: 1.0
+checkpoint:
+  disable: True
+  root: checkpoints/ei
+  run: Null
+  epoch: Null
+visualize: True
+save_results: True
+save_results_root: outputs/predictions
 seed: Null
 tqdm: True
-wandb: False

@@ -1,205 +1,206 @@
-import argparse
-from typing import Optional
+import json
+import os
 
+import hydra
 import numpy as np
 import torch
-import tqdm
-from method import attnCNNMethod
-from params import BaselineAttentionParams
-from bioplnn.models.ei import 
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
-from utils import rescale
 
-from bioplnn.data import qCLEVRDataModule, qCLEVRDataset
-
-
-def main(args, params: Optional[BaselineAttentionParams] = None):
-    if params is None:
-        params = BaselineAttentionParams()
+from bioplnn.datasets.ei import qCLEVRDataset
+from bioplnn.models.ei import Conv2dEIRNN
+from bioplnn.utils import AttrDict, rescale
 
 
-    for mode in ["color", "shape", "conjunction"]:
-        holdout_dict = {
-            "color": [
-                ["out_dist", ["blue", "green"]],
-                [
-                    "in_dist",
-                    [
-                        "gray",
-                        "red",
-                        "brown",
-                        "purple",
-                        "cyan",
-                        "yellow",
-                        "black",
-                        "white",
-                        "pink",
-                        "orange",
-                        "teal",
-                        "navy",
-                        "maroon",
-                        "olive",
-                    ],
-                ],
-            ],
-            "shape": [["out_dist", ["cube"]], ["in_dist", ["cylinder", "sphere"]]],
-            "conjunction": [
-                ["out_dist", ["cube_blue", "cube_green"]],
-                [
-                    "in_dist",
-                    [
-                        "cube_gray",
-                        "cube_red",
-                        "cube_brown",
-                        "cube_purple",
-                        "cube_cyan",
-                        "cube_yellow",
-                        "cube_black",
-                        "cube_white",
-                        "cube_pink",
-                        "cube_orange",
-                        "cube_teal",
-                        "cube_navy",
-                        "cube_maroon",
-                        "cube_olive",
-                        "sphere_gray",
-                        "sphere_red",
-                        "sphere_blue",
-                        "sphere_green",
-                        "sphere_brown",
-                        "sphere_purple",
-                        "sphere_cyan",
-                        "sphere_yellow",
-                        "sphere_black",
-                        "sphere_white",
-                        "sphere_pink",
-                        "sphere_orange",
-                        "sphere_teal",
-                        "sphere_navy",
-                        "sphere_maroon",
-                        "sphere_olive",
-                        "cylinder_gray",
-                        "cylinder_red",
-                        "cylinder_blue",
-                        "cylinder_green",
-                        "cylinder_brown",
-                        "cylinder_purple",
-                        "cylinder_cyan",
-                        "cylinder_yellow",
-                        "cylinder_black",
-                        "cylinder_white",
-                        "cylinder_pink",
-                        "cylinder_orange",
-                        "cylinder_teal",
-                        "cylinder_navy",
-                        "cylinder_maroon",
-                        "cylinder_olive",
-                    ],
-                ],
-            ],
-        }
-        for holdout_name, holdout in holdout_dict[mode]:
-            if mode == "color":
-                ckpt = "vis_attention/l4kfni5a/checkpoints/epoch=98-step=36927.ckpt"
-            elif mode == "shape":
-                ckpt = "vis_attention/38mv67dx/checkpoints/epoch=98-step=32967.ckpt"
-            elif mode == "conjunction":
-                ckpt = "vis_attention/vngfuv3x/checkpoints/epoch=98-step=45144.ckpt"
-        
-            
-            clevr_transforms = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Lambda(rescale),
-                    transforms.Resize(params.resolution),
-                ]
-            )
-            val_dataset = qCLEVRDataset(
-                data_root=params.data_root,
-                clevr_transforms=clevr_transforms,
-                split="valid",
-                holdout=holdout,
-                mode=mode,
-            )
+@hydra.main(
+    version_base=None,
+    config_path="/om2/user/valmiki/bioplnn/config",
+    config_name="config_ei_test",
+)
+def test(config: DictConfig) -> None:
+    config = OmegaConf.to_container(config, resolve=True)
+    config = AttrDict(config)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    colors = [
+        "blue",
+        "green",
+        "gray",
+        "red",
+        "brown",
+        "purple",
+        "cyan",
+        "yellow",
+        "black",
+        "white",
+        "pink",
+        "orange",
+        "teal",
+        "navy",
+        "maroon",
+        "olive",
+    ]
+    shapes = ["cube", "cylinder", "sphere"]
+    conjunctions = [
+        "cube_blue",
+        "cube_green",
+        "cube_gray",
+        "cube_red",
+        "cube_brown",
+        "cube_purple",
+        "cube_cyan",
+        "cube_yellow",
+        "cube_black",
+        "cube_white",
+        "cube_pink",
+        "cube_orange",
+        "cube_teal",
+        "cube_navy",
+        "cube_maroon",
+        "cube_olive",
+        "sphere_gray",
+        "sphere_red",
+        "sphere_blue",
+        "sphere_green",
+        "sphere_brown",
+        "sphere_purple",
+        "sphere_cyan",
+        "sphere_yellow",
+        "sphere_black",
+        "sphere_white",
+        "sphere_pink",
+        "sphere_orange",
+        "sphere_teal",
+        "sphere_navy",
+        "sphere_maroon",
+        "sphere_olive",
+        "cylinder_gray",
+        "cylinder_red",
+        "cylinder_blue",
+        "cylinder_green",
+        "cylinder_brown",
+        "cylinder_purple",
+        "cylinder_cyan",
+        "cylinder_yellow",
+        "cylinder_black",
+        "cylinder_white",
+        "cylinder_pink",
+        "cylinder_orange",
+        "cylinder_teal",
+        "cylinder_navy",
+        "cylinder_maroon",
+        "cylinder_olive",
+    ]
 
-            val_dataloader = DataLoader(
-                val_dataset,
-                batch_size=params.val_batch_size,
-                shuffle=False,
-                num_workers=params.num_workers,
-                pin_memory=True,
-            )
-            # clevr_datamodule = qCLEVRDataModule(
-            #     data_root=params.data_root,
-            #     train_batch_size=params.batch_size,
-            #     val_batch_size=params.val_batch_size,
-            #     clevr_transforms=clevr_transforms,
-            #     num_workers=params.num_workers,
-            #     holdout=holdout,
-            #     mode=mode,
-            # )
-            try:
-                model = attnCNNMethod.load_from_checkpoint(
-                    ckpt, model=model, params=params, datamodule=None, cue=args.cue
-                )
-            except Exception as e:
-                print(f"Error loading Model: {model_class} | Exception: {e}")
+    checkpoint_path = os.path.join(
+        config.checkpoint.root,
+        config.checkpoint.run,
+        (
+            "checkpoint.pt"
+            if config.checkpoint.epoch is None
+            else f"checkpoint_{config.checkpoint.epoch}.pt"
+        ),
+    )
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    model = Conv2dEIRNN(**config.model).to(device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model = model.eval()
+
+    if config.data.mode == "colors":
+        cues = colors
+    elif config.data.mode == "shapes":
+        cues = shapes
+    elif config.data.mode == "conjunction":
+        cues = conjunctions
+    elif config.data.mode == "every":
+        cues = colors + shapes + conjunctions
+    else:
+        raise ValueError(f"Invalid mode {config.data.mode}")
+
+    if len(config.data.holdout) > 0:
+        in_dist_holdouts = [c for c in cues if c not in config.data.holdout]
+        out_dist_holdouts = config.data.holdout
+    else:
+        in_dist_holdouts = []
+        out_dist_holdouts = None
+    for dist in ("in_dist", "out_dist"):
+        if dist == "in_dist":
+            holdout = in_dist_holdouts
+        else:
+            if out_dist_holdouts is None:
                 continue
-            model = model.to("cuda")
-            model = model.eval()
+            holdout = out_dist_holdouts
 
-            accs = []
-            for batch in val_dataloader:
-                labels = batch[2]
+        clevr_transforms = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Lambda(rescale),
+                transforms.Resize(config.model.input_size),
+            ]
+        )
+        val_dataset = qCLEVRDataset(
+            data_root=config.data.root,
+            assets_path=config.data.assets_path,
+            clevr_transforms=clevr_transforms,
+            return_images=config.save_results,
+            split="valid",
+            holdout=holdout,
+            mode=config.data.mode,
+            primitive=config.data.primitive,
+            num_workers=config.data.num_workers,
+        )
 
-                # get the model preds
-                out = model([batch[0].to("cuda"), batch[1].to("cuda")])
-                preds = torch.argmax(out, axis=-1).cpu()
-                accs = accs + (preds == labels).long().numpy().tolist()
+        val_dataloader = DataLoader(
+            val_dataset,
+            batch_size=config.data.val_batch_size,
+            shuffle=False,
+            num_workers=config.data.num_workers,
+            pin_memory=torch.cuda.is_available(),
+        )
 
-            print(
-                f"Model: {model_class}, Mode: {mode}, Holdout: {holdout_name}, Acc: {np.mean(accs)}, Std: {np.std(accs)}"
+        accs = []
+        labels = []
+        preds = []
+        image_paths = []
+        modes = []
+        for batch in tqdm(val_dataloader):
+            cue = batch[0].to(device)
+            mixture = batch[1].to(device)
+            label = batch[2]
+
+            # get the model preds
+            out = model(cue, mixture)
+            pred = torch.argmax(out, axis=-1).cpu()
+            preds.extend(pred.numpy().tolist())
+            labels.extend(label.numpy().tolist())
+            accs.extend((pred == label).long().numpy().tolist())
+            if config.save_results:
+                image_paths.extend(batch[3])
+                modes.extend(batch[4])
+
+        if config.save_results:
+            os.makedirs(config.save_results_root, exist_ok=True)
+            save_path = os.path.join(
+                config.save_results_root,
+                f"{config.checkpoint.run}_{dist}.json",
             )
+            with open(save_path, "w") as f:
+                json.dump(
+                    {
+                        "preds": preds,
+                        "labels": labels,
+                        "accs": accs,
+                        "image_paths": image_paths,
+                        "modes": modes,
+                    },
+                    f,
+                )
+
+        print(f"Dist: {dist}, Acc: {np.mean(accs)}, Std: {np.std(accs)}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--logname", help="prefix for the logger", type=str)
-    parser.add_argument(
-        "--holdout", help="keep attribute out of training", nargs="+", default=[]
-    )
-    parser.add_argument(
-        "--mode",
-        help="cue specification",
-        type=str,
-        default="color",
-        choices=["color", "shape", "conjunction"],
-    )
-    parser.add_argument(
-        "--cue",
-        help="task mode",
-        type=str,
-        default=None,
-        choices=["explicit", "implicit"],
-    )
-    parser.add_argument(
-        "--model",
-        help="model type",
-        type=str,
-        default="baseline",
-        choices=[
-            "baseline",
-            "attnCNNImplicit",
-            "resnetImplicit",
-            "txferImplicitVIT",
-            "txferImplicitSwinT",
-        ],
-    )
-    parser.add_argument(
-        "--visualize", help="visualize the dataset", action="store_true", default=False
-    )
-    args = parser.parse_args()
+    test()
 
-    main(args)
+# python -u src/bioplnn/trainers/ei_tester.py data.mode=every data.holdout=[] model.modulation_type=ag checkpoint.run=skilled-spaceship-116

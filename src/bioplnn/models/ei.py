@@ -1159,8 +1159,9 @@ class Conv2dEIRNN(nn.Module):
         self,
         cue: Optional[torch.Tensor],
         mixture: torch.Tensor,
-        return_layer_outputs=False,
-        return_hidden=False,
+        all_timesteps: bool = False,
+        return_layer_outputs: bool = False,
+        return_hidden: bool = False,
     ):
         """
         Performs forward pass of the Conv2dEIRNN.
@@ -1286,7 +1287,12 @@ class Conv2dEIRNN(nn.Module):
             h_pyrs_cue = h_pyrs
             h_inters_cue = h_inters
 
-        out = self.out_layer(outs[-1][-1])
+        out = []
+        if all_timesteps:
+            for t in range(self.num_steps):
+                out.append(self.out_layer(outs[t][-1]))
+        else:
+            out = self.out_layer(outs[-1][-1])
 
         if return_layer_outputs and return_hidden:
             return out, outs, (h_pyrs, h_inters)
