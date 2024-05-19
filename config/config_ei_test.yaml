@@ -29,7 +29,7 @@ model:
   inter_mode: same
   num_classes: 6
   modulation: True
-  modulation_type: conv
+  modulation_type: ag
   modulation_on: layer_output
   modulation_timestep: all
   modulation_num_heads: 4
@@ -64,8 +64,8 @@ data:
   assets_path: data/CLEVR_v1.0/cues
   batch_size: 256
   val_batch_size: 64
-  holdout: [blue, green]
-  mode: color
+  holdout: []
+  mode: every
   primitive: True
   num_workers: 8
 optimizer: 
