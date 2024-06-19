@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-from bioplnn.datasets.ei import qCLEVRDataset
-from bioplnn.models.ei import Conv2dEIRNN
+from bioplnn.datasets import qCLEVRDataset
+from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import AttrDict, rescale
 
 
