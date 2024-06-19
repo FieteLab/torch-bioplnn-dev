@@ -68,6 +68,15 @@ data:
   mode: every
   primitive: True
   num_workers: 8
+optimizer: 
+  fn: adamw
+  lr: 0.0004
+  momentum: 0.9
+  beta1: 0.9
+  beta2: 0.999
+scheduler:
+  fn: one_cycle
+  pct_start: 0.3
 criterion: 
   fn: ce
   all_timesteps: False
@@ -79,7 +88,7 @@ compile:
   mode: reduce-overhead
 train:
   matmul_precision: high
-  epochs: 100
+  epochs: 500
   log_freq: 5
   grad_clip:
     disable: True
@@ -88,13 +97,10 @@ train:
 checkpoint:
   disable: True
   root: checkpoints/ei
-  run: whole-frost-113
+  run: Null
   epoch: Null
 visualize: True
-get_accuracy: False
-save_results: False
-save_activations: False
+save_results: True
 save_results_root: outputs/predictions
-save_activations_root: outputs/activations
 seed: Null
 tqdm: True

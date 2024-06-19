@@ -11,4 +11,4 @@
 source ~/.bashrc
 conda activate pytorch
 
-python -u src/bioplnn/trainers/ei.py data.mode=every data.holdout=[] model.modulation_type=conv optimizer.lr=0.0001 criterion.all_timesteps=True
+python -u src/bioplnn/trainers/ei.py data.mode=color data.holdout=[blue,green] model.modulation_type=ag optimizer.lr=0.0001 criterion.all_timesteps=True model.immediate_inhibition=False model.exc_rectify=pos

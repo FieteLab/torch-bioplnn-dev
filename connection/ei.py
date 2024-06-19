@@ -1283,10 +1283,9 @@ class Conv2dEIRNN(nn.Module):
                         pertubations_inter[i] = self.pertubations_inter[i](h_inters[i])
                     else:
                         pertubations_out[i] = self.pertubations[i](h_pyrs[i])
-            if stimulation is cue:
-                outs_cue = outs
-                h_pyrs_cue = h_pyrs
-                h_inters_cue = h_inters
+            outs_cue = outs
+            h_pyrs_cue = h_pyrs
+            h_inters_cue = h_inters
 
         out = []
         if all_timesteps:
@@ -1296,9 +1295,9 @@ class Conv2dEIRNN(nn.Module):
             out = self.out_layer(outs[-1][-1])
 
         if return_layer_outputs and return_hidden:
-            return out, (outs_cue, outs), (h_pyrs, h_inters)
+            return out, outs, (h_pyrs, h_inters)
         if return_layer_outputs:
-            return out, (outs_cue, outs)
+            return out, outs
         if return_hidden:
             return out, (h_pyrs, h_inters)
         return out

@@ -107,9 +107,9 @@ def test(config: DictConfig) -> None:
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.eval()
 
-    if config.data.mode == "color":
+    if config.data.mode == "colors":
         cues = colors
-    elif config.data.mode == "shape":
+    elif config.data.mode == "shapes":
         cues = shapes
     elif config.data.mode == "conjunction":
         cues = conjunctions
@@ -159,91 +159,45 @@ def test(config: DictConfig) -> None:
             pin_memory=torch.cuda.is_available(),
         )
 
-        if config.save_activations:
-            os.makedirs(config.save_activations_root, exist_ok=True)
-            cues = []
-            mixtures = []
-            outs_cues = []
-            outs_mixtures = []
-            i = 0
-            for batch in tqdm(val_dataloader):
-                cue = batch[0].to(device)
-                mixture = batch[1].to(device)
-                label = batch[2]
+        accs = []
+        labels = []
+        preds = []
+        image_paths = []
+        modes = []
+        for batch in tqdm(val_dataloader):
+            cue = batch[0].to(device)
+            mixture = batch[1].to(device)
+            label = batch[2]
 
-                # get the model preds
-                out, (outs_cue, outs_mixture) = model(
-                    cue, mixture, return_layer_outputs=True
-                )
-                for t in range(len(outs_cue)):
-                    for l in range(len(outs_cue[t])):
-                        outs_cue[t][l] = outs_cue[t][l].detach().cpu()
-                        outs_mixture[t][l] = outs_mixture[t][l].detach().cpu()
-
-                cues.append(batch[0])
-                mixtures.append(batch[1])
-                outs_cues.append(outs_cue)
-                outs_mixtures.append(outs_mixture)
-                i += 1
-                if i == 50:
-                    break
-
-            save_path = os.path.join(
-                config.save_activations_root,
-                f"{config.checkpoint.run}_{config.data.mode}.json",
-            )
-            torch.save(
-                {
-                    "cues": cues,
-                    "mixtures": mixture,
-                    "outs_cue": outs_cues,
-                    "outs_mixture": outs_mixtures,
-                },
-                save_path,
-            )
-        if config.get_accuracy or config.save_results:
-            accs = []
-            labels = []
-            preds = []
-            image_paths = []
-            modes = []
-            cues = []
-            for batch in tqdm(val_dataloader):
-                cue = batch[0].to(device)
-                mixture = batch[1].to(device)
-                label = batch[2]
-
-                # get the model preds
-                out = model(cue, mixture)
-                pred = torch.argmax(out, axis=-1).cpu()
-                preds.extend(pred.numpy().tolist())
-                labels.extend(label.numpy().tolist())
-                accs.extend((pred == label).long().numpy().tolist())
-                if config.save_results:
-                    image_paths.extend(batch[3])
-                    modes.extend(batch[4])
-                    cues.extend(batch[5])
-
+            # get the model preds
+            out = model(cue, mixture)
+            pred = torch.argmax(out, axis=-1).cpu()
+            preds.extend(pred.numpy().tolist())
+            labels.extend(label.numpy().tolist())
+            accs.extend((pred == label).long().numpy().tolist())
             if config.save_results:
-                os.makedirs(config.save_results_root, exist_ok=True)
-                save_path = os.path.join(
-                    config.save_results_root,
-                    f"{config.checkpoint.run}_{dist}.json",
-                )
-                with open(save_path, "w") as f:
-                    json.dump(
-                        {
-                            "preds": preds,
-                            "labels": labels,
-                            "accs": accs,
-                            "image_paths": image_paths,
-                            "modes": modes,
-                            "cues": cues,
-                        },
-                        f,
-                    )
+                image_paths.extend(batch[3])
+                modes.extend(batch[4])
 
-            print(f"Dist: {dist}, Acc: {np.mean(accs)}, Std: {np.std(accs)}")
+        if config.save_results:
+            os.makedirs(config.save_results_root, exist_ok=True)
+            save_path = os.path.join(
+                config.save_results_root,
+                f"{config.checkpoint.run}_{dist}.json",
+            )
+            with open(save_path, "w") as f:
+                json.dump(
+                    {
+                        "preds": preds,
+                        "labels": labels,
+                        "accs": accs,
+                        "image_paths": image_paths,
+                        "modes": modes,
+                    },
+                    f,
+                )
+
+        print(f"Dist: {dist}, Acc: {np.mean(accs)}, Std: {np.std(accs)}")
 
 
 if __name__ == "__main__":

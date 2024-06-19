@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
 import wandb
-from bioplnn.datasets.ei import get_dataloaders, get_qclevr_dataloaders
+from bioplnn.datasets.ei import get_qclevr_dataloaders
 from bioplnn.loss import EDLLoss
 from bioplnn.models.ei import Conv2dEIRNN
 from bioplnn.utils import AttrDict, seed
