@@ -8,7 +8,9 @@ from bioplnn.utils import flatten_indices, image2v1
 
 
 class V1Dataset:
-    def prepare(self, retina_path, image_top_corner, Nx, Ny, retina_radius):
+    def prepare(
+        self, retina_path, image_top_corner, Nx, Ny, retina_radius, dual_hemisphere
+    ):
         """
         Read cortex information.
         """
@@ -17,6 +19,7 @@ class V1Dataset:
         self.Nx = Nx
         self.Ny = Ny
         self.retina_radius = retina_radius
+        self.dual_hemisphere = dual_hemisphere
 
         self.image2v1 = lambda x: image2v1(
             x,
@@ -44,10 +47,9 @@ class MNIST_V1(MNIST, V1Dataset):
         dual_hemisphere=False,
     ):
         super().__init__(root, train, transform, target_transform, download)
-
-        self.image_top_corrner = image_top_corner
-        self.dual_hemisphere = dual_hemisphere
-        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
+        self.prepare(
+            retina_path, image_top_corner, Nx, Ny, retina_radius, dual_hemisphere
+        )
 
     def __getitem__(self, index):
         image, target = super().__getitem__(index)
@@ -71,10 +73,9 @@ class CIFAR10_V1(CIFAR10, V1Dataset):
         dual_hemisphere=False,
     ):
         super().__init__(root, train, transform, target_transform, download)
-
-        self.image_top_corrner = image_top_corner
-        self.dual_hemisphere = dual_hemisphere
-        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
+        self.prepare(
+            retina_path, image_top_corner, Nx, Ny, retina_radius, dual_hemisphere
+        )
 
     def __getitem__(self, index):
         image, target = super().__getitem__(index)
@@ -98,10 +99,9 @@ class CIFAR100_V1(CIFAR100, V1Dataset):
         dual_hemisphere=False,
     ):
         super().__init__(root, train, transform, target_transform, download)
-
-        self.image_top_corrner = image_top_corner
-        self.dual_hemisphere = dual_hemisphere
-        self.prepare(retina_path, image_top_corner, Nx, Ny, retina_radius)
+        self.prepare(
+            retina_path, image_top_corner, Nx, Ny, retina_radius, dual_hemisphere
+        )
 
     def __getitem__(self, index):
         image, target = super().__getitem__(index)

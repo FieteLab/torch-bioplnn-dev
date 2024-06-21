@@ -54,7 +54,7 @@ model:
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: True
-  dropout: 0.5
+  dropout: 0.2
   pre_inh_activation: tanh
   post_inh_activation: Null
   fc_dim: 256

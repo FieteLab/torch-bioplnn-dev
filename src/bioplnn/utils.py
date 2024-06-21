@@ -12,8 +12,6 @@ from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 
-from bioplnn.datasets import CIFAR10_V1, CIFAR100_V1, MNIST_V1
-
 
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
@@ -208,6 +206,8 @@ def _get_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
+    from bioplnn.datasets import CIFAR10_V1, CIFAR100_V1, MNIST_V1
+
     retina_path_arg = dict()
     if dataset in ["mnist", "mnist_v1"]:
         transform = T.Compose(
@@ -284,3 +284,93 @@ def _get_dataloaders(
     )
 
     return train_loader, test_loader
+
+
+def get_mnist_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="mnist",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_cifar10_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="cifar10",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_cifar100_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="cifar100",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_mnist_v1_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="mnist_v1",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_cifar10_v1_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="cifar10_v1",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+
+
+def get_cifar100_v1_dataloaders(
+    root="data",
+    retina_path=None,
+    batch_size=16,
+    num_workers=0,
+):
+    return _get_dataloaders(
+        dataset="cifar100_v1",
+        root=root,
+        retina_path=retina_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
