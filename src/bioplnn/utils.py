@@ -1,6 +1,5 @@
 import os
 import random
-from types import SimpleNamespace
 
 import numpy as np
 import scipy
@@ -8,41 +7,32 @@ import scipy.interpolate
 import torch
 import torchvision.transforms as T
 from torch import nn
-from torch.profiler import ProfilerActivity, profile, record_function
+from torch.profiler import ProfilerActivity, profile
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST
-
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__dict__ = self
-        for k, v in self.items():
-            if isinstance(v, dict):
-                self[k] = AttrDict(v)
-
-
-# class AttrDict2(SimpleNamespace):
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         for k, v in self.__dict__.items():
-#             if isinstance(v, dict):
-#                 self.__dict__[k] = AttrDict2(v)
-
-
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
 
 
 def seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
+def make_deterministic(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+
+def seed_worker(base_seed, worker_id):
+    seed(base_seed + worker_id)
+
+
+def make_worker_deterministic(base_seed, worker_id):
+    make_deterministic(base_seed + worker_id)
 
 
 def get_activation_class(activation):
@@ -191,15 +181,27 @@ def image2v1(
     return img_on_vfield
 
 
-def compact(l):
-    return list(filter(None, l))
+def compact(list_):
+    return list(filter(None, list_))
 
 
 def rescale(x):
     return x * 2 - 1
 
 
-def _get_dataloaders(
+def dict_flatten(d, delimiter=".", key=None):
+    key = f"{key}{delimiter}" if key is not None else ""
+    non_dicts = {f"{key}{k}": v for k, v in d.items() if not isinstance(v, dict)}
+    dicts = {
+        f"{key}{k}": v
+        for _k, _v in d.items()
+        if _v is not None and isinstance(_v, dict)
+        for k, v in dict_flatten(_v, delimiter=delimiter, key=_k).items()
+    }
+    return non_dicts | dicts
+
+
+def get_benchmark_dataloaders(
     dataset="mnist",
     root="data",
     retina_path=None,
@@ -248,8 +250,6 @@ def _get_dataloaders(
     else:
         raise NotImplementedError(f"Dataset {dataset} not implemented")
 
-    # Load the MNIST dataset
-
     train_set = dataset(
         root=root,
         train=True,
@@ -258,7 +258,6 @@ def _get_dataloaders(
         **retina_path_arg,
     )
 
-    # Load the MNIST test dataset
     test_set = dataset(
         root="./data",
         train=False,
@@ -292,7 +291,7 @@ def get_mnist_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="mnist",
         root=root,
         retina_path=retina_path,
@@ -307,7 +306,7 @@ def get_cifar10_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="cifar10",
         root=root,
         retina_path=retina_path,
@@ -322,7 +321,7 @@ def get_cifar100_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="cifar100",
         root=root,
         retina_path=retina_path,
@@ -337,7 +336,7 @@ def get_mnist_v1_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="mnist_v1",
         root=root,
         retina_path=retina_path,
@@ -352,7 +351,7 @@ def get_cifar10_v1_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="cifar10_v1",
         root=root,
         retina_path=retina_path,
@@ -367,7 +366,7 @@ def get_cifar100_v1_dataloaders(
     batch_size=16,
     num_workers=0,
 ):
-    return _get_dataloaders(
+    return get_benchmark_dataloaders(
         dataset="cifar100_v1",
         root=root,
         retina_path=retina_path,

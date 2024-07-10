@@ -27,3 +27,6 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/hpvok13/bioplnn"
 Issues = "https://github.com/hpvok13/bioplnn/issues"
+
+[tool.ruff]
+extend-select = ["I"]

@@ -1,0 +1,87 @@
+
+- sns_kwargs:
+    x: data.batch_size
+    y: avg_time
+    hue: model.synapses_per_neuron
+    hue_norm: lognorm
+  axis_labels:
+    - Batch Size
+    - Avg Time (s)
+  legend_title: Synapses per Neuron
+
+- sns_kwargs:
+    x: data.batch_size
+    y: avg_time
+    hue: model.connectivity_std
+    hue_norm: lognorm
+  axis_labels:
+    - Batch Size
+    - Avg Time (s)
+  legend_title: Std Dev of Connectivity
+
+- sns_kwargs:
+    x: model.synapses_per_neuron
+    y: avg_time
+    hue: model.connectivity_std
+    hue_norm: lognorm
+  axis_labels:
+    - Synapses per Neuron
+    - Avg Time (s)
+  legend_title: Std Dev of Connectivity
+
+- sns_kwargs:
+    x: data.batch_size
+    y: avg_time
+    hue: model.sparse_format
+  axis_labels:
+    - Batch Size
+    - Avg Time (s)
+  legend_title: Sparse Format
+
+- sns_kwargs:
+    x: data.batch_size
+    y: avg_time
+    hue: model.mm_function
+  axis_labels:
+    - Batch Size
+    - Avg Time (s)
+  legend_title: MM Function
+
+- sns_kwargs:
+    x: model.synapses_per_neuron
+    y: avg_time
+    hue: model.sparse_format
+  axis_labels:
+    - Synapses per Neuron
+    - Avg Time (s)
+  legend_title: Sparse Format
+
+- sns_kwargs:
+    x: model.synapses_per_neuron
+    y: avg_time
+    hue: model.mm_function
+  axis_labels:
+    - Synapses per Neuron
+    - Avg Time (s)
+  legend_title: MM Function
+
+- sns_kwargs:
+    x: model.connectivity_std
+    y: avg_time
+    hue: model.sparse_format
+  axis_labels:
+    - Std Dev of Connectivity
+    - Avg Time (s)
+  legend_title: Sparse Format
+
+- sns_kwargs:
+    x: model.connectivity_std
+    y: avg_time
+    hue: model.mm_function
+  axis_labels:
+    - Std Dev of Connectivity
+    - Avg Time (s)
+  legend_title: MM Function
+
+
+

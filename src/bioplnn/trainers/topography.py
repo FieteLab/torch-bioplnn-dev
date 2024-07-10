@@ -1,16 +1,16 @@
 import os
 from typing import Callable
 
-from numpy import clip
 import torch
+from addict import Dict as AttrDict
+from numpy import clip
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
 import wandb
-from bioplnn.datasets.topography import get_dataloaders
-from bioplnn.sparse_sgd import SparseSGD
 from bioplnn.models.topography import TopographicalRNN
-from bioplnn.utils import AttrDict
+from bioplnn.sparse_sgd import SparseSGD
+from bioplnn.utils import get_benchmark_dataloaders
 
 
 def train_epoch(
@@ -227,7 +227,7 @@ def train(config: AttrDict) -> None:
         raise NotImplementedError(f"Criterion {config.criterion} not implemented")
 
     # Get the data loaders
-    train_loader, val_loader = get_dataloaders(
+    train_loader, val_loader = get_benchmark_dataloaders(
         dataset=config.data.dataset,
         root=config.data.root,
         retina_path=config.data.retina_path,

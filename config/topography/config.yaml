@@ -1,20 +1,18 @@
-# Data and Model parameters
 model:
   sheet_size: [150, 300]
   connectivity_std: 10
   synapses_per_neuron: 32
-  num_timesteps: 100
+  num_timesteps: 20
   bias: True
   num_classes: 10
   mm_function: torch_sparse
   sparse_format: torch_sparse
   batch_first: True
-  adjacency_matrix_path: null
+  adjacency_matrix_path: Null
   self_recurrence: True
   input_indices: connection/V1_indices_flat.pt
   output_indices: connection/V4_indices_flat.pt
   activation: relu
-# Training parameters
 data:
   dataset: cifar10_v1
   root: data
@@ -43,3 +41,9 @@ train:
     type: value
     value: 1.0
     fn: native
+benchmark:
+  warmup_iters: 20
+  num_iters: 50
+  save_dir: outputs/topography
+seed: 0
+debug_level: 0

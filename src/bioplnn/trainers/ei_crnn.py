@@ -3,6 +3,8 @@ from typing import Callable, Optional
 
 import hydra
 import torch
+import yaml
+from addict import Dict as AttrDict
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
@@ -13,7 +15,7 @@ import wandb
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
 from bioplnn.loss import EDLLoss
 from bioplnn.models.crnn_ei import Conv2dEIRNN
-from bioplnn.utils import AttrDict, seed
+from bioplnn.utils import seed
 
 
 def train_iter(
@@ -187,8 +189,8 @@ def eval_iter(
 
 @hydra.main(
     version_base=None,
-    config_path="/om2/user/valmiki/bioplnn/config",
-    config_name="config_ei",
+    config_path="/om2/user/valmiki/bioplnn/config/crnn",
+    config_name="config",
 )
 def train(config: DictConfig) -> None:
     """
@@ -199,6 +201,8 @@ def train(config: DictConfig) -> None:
     """
     config = OmegaConf.to_container(config, resolve=True)
     config = AttrDict(config)
+
+    print(yaml.dump(config))
     # Set the random seed
     if config.seed is not None:
         seed(config.seed)
@@ -277,6 +281,7 @@ def train(config: DictConfig) -> None:
     # Initialize Weights & Biases
     if config.wandb:
         wandb.init(project="EI RNN", config=config)
+        wandb.require("core")
         wandb_log = lambda x: wandb.log(x)
     else:
         wandb_log = lambda x: None

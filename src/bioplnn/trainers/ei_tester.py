@@ -4,6 +4,7 @@ import os
 import hydra
 import numpy as np
 import torch
+from addict import Dict as AttrDict
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -11,7 +12,7 @@ from tqdm import tqdm
 
 from bioplnn.datasets import qCLEVRDataset
 from bioplnn.models import Conv2dEIRNN
-from bioplnn.utils import AttrDict, rescale
+from bioplnn.utils import rescale
 
 
 @hydra.main(
