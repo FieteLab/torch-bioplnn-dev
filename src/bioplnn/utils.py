@@ -60,6 +60,18 @@ def get_activation_class(activation):
         raise ValueError(f"Activation function {activation} not supported.")
 
 
+def clip_grad_Npass(*args, **kwargs):
+    pass
+
+
+def clip_grad_norm_(*args, **kwargs):
+    return clip_grad_norm_(*args, **kwargs)
+
+
+def clip_grad_value_(*args, **kwargs):
+    return clip_grad_value_(*args, **kwargs)
+
+
 def idx_1D_to_2D(x, m, n):
     """
     Convert a 1D index to a 2D index.

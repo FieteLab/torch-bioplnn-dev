@@ -6,6 +6,7 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
@@ -13,11 +14,9 @@ from bioplnn.loss import EDLLoss
 from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import seed
 from omegaconf import DictConfig, OmegaConf
-from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
-
-import wandb
+from utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_
 
 log = logging.getLogger(__name__)
 
@@ -48,15 +47,16 @@ def train_iter(
         tuple[float, float]: A tuple containing the training loss and accuracy.
     """
     if config.train.grad_clip.disable:
-        clip_grad_ = lambda x, y: None
+        clip_grad_ = clip_grad_pass_
     elif config.train.grad_clip.type == "norm":
-        clip_grad_ = lambda x, y: clip_grad_norm_(x, y, foreach=False)
+        clip_grad_ = clip_grad_norm_
     elif config.train.grad_clip.type == "value":
-        clip_grad_ = lambda x, y: clip_grad_value_(x, y, foreach=False)
+        clip_grad_ = clip_grad_value_
     else:
         raise NotImplementedError(
-            f"Gradient clipping type {config.train.grad_clip_type} not implemented"
+            f"Gradient clipping type {config.train.grad_clip.type} not implemented"
         )
+
     model.train()
     train_loss = 0.0
     train_correct = 0
@@ -89,7 +89,9 @@ def train_iter(
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        clip_grad_(model.parameters(), config.train.grad_clip.value)
+        clip_grad_(
+            model.parameters(), config.train.grad_clip.value, foreach=config.foreach
+        )
         optimizer.step()
         if scheduler is not None:
             scheduler.step()

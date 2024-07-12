@@ -101,5 +101,6 @@ wandb:
   project: EI RNN
   mode: disabled
   group: null
+foreach: true
 
 debug_level: 2
