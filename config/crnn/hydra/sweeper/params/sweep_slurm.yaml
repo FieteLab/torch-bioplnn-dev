@@ -1,0 +1,12 @@
+model.modulation_type: ag,lr,conv
+model.modulation_timestep: all,0
+model.pertubation: true,false
+model.pertubation_timestep: all,0
+# model.fb_adjacency: [[[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,1,0]],[[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],Null]
+model.inter_mode: half,same
+# model.h_inter_dims: [[[4],[8],[16],[16]],[[16, 32, 64, 64]],null]
+model.immediate_inhibition: true,false
+model.layer_time_delay: true,false
+criterion.all_timesteps: true,false
+model.exc_rectify: null,pos
+

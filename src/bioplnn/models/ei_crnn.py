@@ -815,6 +815,10 @@ class Conv2dEIRNN(nn.Module):
             inh_kernel_size, num_layers, depth=1
         )
         self.num_steps = num_steps
+
+        if modulation and pertubation:
+            raise ValueError("modulation and pertubation cannot be used simultaneously")
+
         self.modulation = modulation
         self.modulation_type = modulation_type
         self.modulation_on = modulation_on
@@ -1177,6 +1181,12 @@ class Conv2dEIRNN(nn.Module):
         """
         device = mixture.device
         batch_size = mixture.shape[0]
+        h_pyrs_cue = None
+        h_inters_cue = None
+        outs_cue = None
+        pertubations_pyr = None
+        pertubations_inter = None
+        pertubations_out = None
         for stimulation in (cue, mixture):
             if stimulation is None:
                 continue
@@ -1194,6 +1204,7 @@ class Conv2dEIRNN(nn.Module):
             outs[-1] = self._init_out(
                 batch_size, init_mode=self.out_init_mode, device=device
             )
+            # For linting purposes
             for t in range(self.num_steps):
                 if stimulation.dim() == 5:
                     input = stimulation[:, t, ...]
@@ -1245,7 +1256,6 @@ class Conv2dEIRNN(nn.Module):
                         )
                     ):
                         if self.modulation_on == "hidden":
-
                             h_pyr_cue = (
                                 h_pyrs_cue[t]
                                 if self.modulation_type in ("attn", "conv")

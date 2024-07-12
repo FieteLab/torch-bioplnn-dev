@@ -1,21 +1,25 @@
+import logging
 import os
-from typing import Callable, Optional
+import sys
+from traceback import print_exc
+from typing import Optional
 
 import hydra
 import torch
 import yaml
 from addict import Dict as AttrDict
-from hydra.utils import get_original_cwd
+from bioplnn.datasets.qclevr import get_qclevr_dataloaders
+from bioplnn.loss import EDLLoss
+from bioplnn.models import Conv2dEIRNN
+from bioplnn.utils import seed
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
 import wandb
-from bioplnn.datasets.qclevr import get_qclevr_dataloaders
-from bioplnn.loss import EDLLoss
-from bioplnn.models.crnn_ei import Conv2dEIRNN
-from bioplnn.utils import seed
+
+log = logging.getLogger(__name__)
 
 
 def train_iter(
@@ -25,7 +29,6 @@ def train_iter(
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
-    wandb_log: Callable[[dict[str, float, int]], None],
     epoch: int,
     device: torch.device,
 ) -> tuple[float, float]:
@@ -38,7 +41,6 @@ def train_iter(
         optimizer (torch.optim.Optimizer): The optimizer used for training.
         criterion (torch.nn.Module): The loss function.
         train_loader (torch.utils.data.DataLoader): The training data loader.
-        wandb_log (Callable[[dict[str, float, int]], None]): Function to log training statistics to Weights & Biases.
         epoch (int): The current epoch number.
         device (torch.device): The device to perform computations on.
 
@@ -68,7 +70,7 @@ def train_iter(
         desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-    for i, (cue, mixture, labels) in enumerate(bar):
+    for i, (cue, mixture, labels) in enumerate(iterable=bar):
         cue = cue.to(device)
         mixture = mixture.to(device)
         labels = labels.to(device)
@@ -107,7 +109,7 @@ def train_iter(
         if (i + 1) % config.train.log_freq == 0:
             running_loss /= config.train.log_freq
             running_acc = running_correct / running_total
-            wandb_log(dict(running_loss=running_loss, running_acc=running_acc))
+            wandb.log(dict(running_loss=running_loss, running_acc=running_acc))
             bar.set_description(
                 f"Training | Epoch: {epoch} | "
                 f"Loss: {running_loss:.4f} | "
@@ -121,7 +123,7 @@ def train_iter(
     train_loss /= len(train_loader)
     train_acc = train_correct / train_total
 
-    wandb_log(dict(train_loss=train_loss, train_acc=train_acc))
+    wandb.log(dict(train_loss=train_loss, train_acc=train_acc))
 
     return train_loss, train_acc
 
@@ -131,7 +133,6 @@ def eval_iter(
     model: Conv2dEIRNN,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
-    wandb_log: Callable[[dict[str, float, int]], None],
     epoch: int,
     device: torch.device,
 ) -> tuple[float, float]:
@@ -142,7 +143,6 @@ def eval_iter(
         model (Conv2dEIRNN): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
         val_loader (torch.utils.data.DataLoader): The test data loader.
-        wandb_log (function): Function to log evaluation statistics to Weights & Biases.
         epoch (int): The current epoch number.
         device (torch.device): The device to perform computations on.
 
@@ -182,16 +182,11 @@ def eval_iter(
     test_loss /= len(val_loader)
     test_acc = test_correct / test_total
 
-    wandb_log(dict(test_loss=test_loss, test_acc=test_acc, epoch=epoch))
+    wandb.log(dict(test_loss=test_loss, test_acc=test_acc, epoch=epoch))
 
     return test_loss, test_acc
 
 
-@hydra.main(
-    version_base=None,
-    config_path="/om2/user/valmiki/bioplnn/config/crnn",
-    config_name="config",
-)
 def train(config: DictConfig) -> None:
     """
     Train the model using the provided configuration.
@@ -199,15 +194,19 @@ def train(config: DictConfig) -> None:
     Args:
         config (dict): Configuration parameters.
     """
+    wandb.require("core")
+
     config = OmegaConf.to_container(config, resolve=True)
+    print(yaml.dump(config))
     config = AttrDict(config)
 
-    print(yaml.dump(config))
     # Set the random seed
     if config.seed is not None:
         seed(config.seed)
+
     # Set the matmul precision
     torch.set_float32_matmul_precision(config.train.matmul_precision)
+
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Conv2dEIRNN(**config.model).to(device)
@@ -279,12 +278,12 @@ def train(config: DictConfig) -> None:
         raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
 
     # Initialize Weights & Biases
-    if config.wandb:
-        wandb.init(project="EI RNN", config=config)
-        wandb.require("core")
-        wandb_log = lambda x: wandb.log(x)
-    else:
-        wandb_log = lambda x: None
+    if config.mode != "disabled":
+        wandb.init(
+            **config.wandb,
+            config=config,
+            settings=wandb.Settings(start_method="thread"),
+        )
 
     # Create the checkpoint directory
     if config.wandb:
@@ -302,14 +301,13 @@ def train(config: DictConfig) -> None:
             scheduler,
             criterion,
             train_loader,
-            wandb_log,
             epoch,
             device,
         )
 
         # Evaluate the model on the validation set
         test_loss, test_acc = eval_iter(
-            config, model, criterion, val_loader, wandb_log, epoch, device
+            config, model, criterion, val_loader, epoch, device
         )
 
         # Print the epoch statistics
@@ -339,5 +337,25 @@ def train(config: DictConfig) -> None:
         os.symlink(file_path, link_path)
 
 
+@hydra.main(
+    version_base=None,
+    config_path="/om2/user/valmiki/bioplnn/config/crnn",
+    config_name="config",
+)
+def main(config: DictConfig):
+    try:
+        train(config)
+    except Exception as e:
+        if config.debug_level > 1:
+            print_exc(file=sys.stderr)
+        else:
+            print(e, file=sys.stderr)
+        wandb.log(dict(error=str(e)))
+        raise
+    finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+
 if __name__ == "__main__":
-    train()
+    main()

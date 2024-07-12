@@ -3,14 +3,13 @@ from typing import Callable
 
 import torch
 from addict import Dict as AttrDict
-from numpy import clip
+from bioplnn.models.topography import TopographicalRNN
+from bioplnn.sparse_sgd import SparseSGD
+from bioplnn.utils import get_benchmark_dataloaders
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
 import wandb
-from bioplnn.models.topography import TopographicalRNN
-from bioplnn.sparse_sgd import SparseSGD
-from bioplnn.utils import get_benchmark_dataloaders
 
 
 def train_epoch(

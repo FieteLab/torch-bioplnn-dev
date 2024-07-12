@@ -1,12 +1,8 @@
-hydra:
-  job:
-    chdir: False
-
 model:
   input_size: [128, 128]
   input_dim: 3
   h_pyr_dim: [16, 32, 64, 64]
-  h_inter_dims: # Null
+  h_inter_dims: # null
   - [4]
   - [8]
   - [16]
@@ -23,54 +19,54 @@ model:
   - [3, 3]
   - [3, 3]
   num_compartments: 1
-  immediate_inhibition: True
+  immediate_inhibition: true
   num_layers: 4
   num_steps: 5
   inter_mode: same
   num_classes: 6
-  modulation: True
+  modulation: true
   modulation_type: conv
   modulation_on: layer_output
   modulation_timestep: all
   modulation_num_heads: 4
   modulation_activation: relu
   modulation_dropout: 0.2
-  pertubation: False
+  pertubation: false
   pertubation_type: lr
   pertubation_on: hidden
   pertubation_timestep: 0
-  layer_time_delay: False
-  exc_rectify: Null
+  layer_time_delay: false
+  exc_rectify: null
   inh_rectify: pos
-  flush_hidden: True
+  flush_hidden: true
   hidden_init_mode: zeros
   fb_init_mode: zeros
   out_init_mode: zeros
-  fb_adjacency: Null
+  fb_adjacency: null
   # - [0, 0, 0, 0]
   # - [1, 0, 0, 0]
   # - [0, 1, 0, 0]
   # - [0, 0, 1, 0]
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
-  bias: True
+  bias: true
   dropout: 0.2
   pre_inh_activation: tanh
-  post_inh_activation: Null
+  post_inh_activation: null
   fc_dim: 256
-# Training parameters
+  # Training parameters
 data:
   root: data/qclevr
   assets_path: data/CLEVR_v1.0/cues
   batch_size: 256
   val_batch_size: 64
-  holdout: [blue, green]
-  mode: color
-  primitive: True
+  holdout: [blue,green,cube,cube_blue,cube_green]
+  mode: every
+  primitive: true
   num_workers: 8
 optimizer: 
   fn: adamw
-  lr: 0.0004
+  lr: 0.001
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
@@ -79,26 +75,31 @@ scheduler:
   pct_start: 0.3
 criterion: 
   fn: ce
-  all_timesteps: False
+  all_timesteps: false
 compile:
-  disable: True
-  fullgraph: True
-  dynamic: Null
+  disable: true
+  fullgraph: true
+  dynamic: null
   backend: inductor
   mode: reduce-overhead
 train:
   matmul_precision: high
-  epochs: 500
+  epochs: 30
   log_freq: 5
   grad_clip:
-    disable: True
+    disable: true
     type: norm
     value: 1.0
 checkpoint:
-  disable: True
+  disable: true
   root: checkpoints/ei
-  run: Null
-  epoch: Null
-seed: Null
-tqdm: True
-wandb: True
+  run: null
+  epoch: null
+seed: null
+tqdm: true
+wandb:
+  project: EI RNN
+  mode: disabled
+  group: null
+
+debug_level: 2

@@ -3,13 +3,13 @@ model:
   connectivity_std: 10
   synapses_per_neuron: 32
   num_timesteps: 20
-  bias: True
+  bias: true
   num_classes: 10
   mm_function: torch_sparse
   sparse_format: torch_sparse
-  batch_first: True
-  adjacency_matrix_path: Null
-  self_recurrence: True
+  batch_first: true
+  adjacency_matrix_path: null
+  self_recurrence: true
   input_indices: connection/V1_indices_flat.pt
   output_indices: connection/V4_indices_flat.pt
   activation: relu
@@ -26,9 +26,9 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: cross_entropy
-wandb: True
+wandb: true
 visualize:
-  disable: True
+  disable: true
   save_path: visualizations/test.gif
   fps: 4
   frames: [0, 20]

@@ -4,13 +4,12 @@ import multiprocessing
 import os
 from typing import Callable, Optional
 
-import numpy as np
 import torch
 from PIL import Image, ImageDraw
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
 
-from bioplnn.utils import compact, rescale, seed_worker
+from bioplnn.utils import rescale, seed_worker
 
 
 def draw_shape(
@@ -103,7 +102,7 @@ class qCLEVRDataset(Dataset):
 
         assert (
             len(self.files) != 0
-        ), f"Something about the config results in an empty dataset!"
+        ), "Something about the config results in an empty dataset!"
 
         """object colors: gray, red, blue, green, brown, purple, cyan, yellow
         aux colors: black, white, pink, orange, teal, navy, maroon, olive

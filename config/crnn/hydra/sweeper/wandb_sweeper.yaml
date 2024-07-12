@@ -1,0 +1,15 @@
+defaults:
+  - wandb
+  - params: sweep_default
+
+wandb_sweep_config:
+  name: wandb_sweep_2
+  method: grid
+  # metric:
+  #   name: test_acc
+  #   goal: maximize
+  project: EI RNN
+  num_agents: 100
+  budget: 768
+
+  
