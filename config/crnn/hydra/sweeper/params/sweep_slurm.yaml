@@ -1,12 +1,13 @@
-model.modulation_type: ag,lr,conv
-model.modulation_timestep: all,0
-model.pertubation: true,false
-model.pertubation_timestep: all,0
 # model.fb_adjacency: [[[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,1,0]],[[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],Null]
-model.inter_mode: half,same
 # model.h_inter_dims: [[[4],[8],[16],[16]],[[16, 32, 64, 64]],null]
+# model.exc_rectify: null,pos
+optimizer.lr: 0.004,0.001,0.0001,0.01
+model.inter_mode: same,half
+model.layer_time_delay: false,true
 model.immediate_inhibition: true,false
-model.layer_time_delay: true,false
-criterion.all_timesteps: true,false
-model.exc_rectify: null,pos
+criterion.all_timesteps: false,true
+model.modulation.timestep_mix: all,last
+model.modulation.type: ag,lr,conv
+model.modulation.op: mul,add
 
+# python src/bioplnn/trainers/ei_crnn.py -m hydra/launcher=slurm +hydra/launcher/params=sweep_slurm wandb.mode=online wandb.group=sweep1

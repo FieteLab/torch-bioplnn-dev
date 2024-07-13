@@ -6,17 +6,17 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
 from bioplnn.loss import EDLLoss
 from bioplnn.models import Conv2dEIRNN
-from bioplnn.utils import seed
+from bioplnn.utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_, seed
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
-from utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_
+
+import wandb
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,12 @@ def train_iter(
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(cue, mixture, all_timesteps=config.criterion.all_timesteps)
+        outputs = model(
+            cue,
+            mixture,
+            config.train.num_steps,
+            all_timesteps=config.criterion.all_timesteps,
+        )
         if config.criterion.all_timesteps:
             losses = []
             for output in outputs:
@@ -163,7 +168,12 @@ def eval_iter(
             labels = labels.to(device)
 
             # Forward pass
-            outputs = model(cue, mixture, all_timesteps=config.criterion.all_timesteps)
+            outputs = model(
+                cue,
+                mixture,
+                config.train.num_steps,
+                all_timesteps=config.criterion.all_timesteps,
+            )
             if config.criterion.all_timesteps:
                 losses = []
                 for output in outputs:
@@ -196,7 +206,6 @@ def train(config: DictConfig) -> None:
     Args:
         config (dict): Configuration parameters.
     """
-    wandb.require("core")
 
     config = OmegaConf.to_container(config, resolve=True)
     print(yaml.dump(config))
@@ -207,7 +216,7 @@ def train(config: DictConfig) -> None:
         seed(config.seed)
 
     # Set the matmul precision
-    torch.set_float32_matmul_precision(config.train.matmul_precision)
+    torch.set_float32_matmul_precision(config.matmul_precision)
 
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -280,18 +289,17 @@ def train(config: DictConfig) -> None:
         raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
 
     # Initialize Weights & Biases
-    if config.mode != "disabled":
+    if config.wandb.mode != "disabled":
+        wandb.require("core")
         wandb.init(
             **config.wandb,
             config=config,
             settings=wandb.Settings(start_method="thread"),
         )
-
-    # Create the checkpoint directory
-    if config.wandb:
         checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
     else:
-        checkpoint_dir = config.checkpoint.root
+        checkpoint_dir = os.path.join(config.checkpoint.root, "test")
+
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     for epoch in range(config.train.epochs):

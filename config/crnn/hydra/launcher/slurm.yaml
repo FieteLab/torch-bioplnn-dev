@@ -1,10 +1,11 @@
 defaults:
   - submitit_slurm
 
-timeout_min: 360
+timeout_min: 1440
 cpus_per_task: 8
 nodes: 1
 max_num_timeout: 0
-array_parallelism: 768
+array_parallelism: 10000
 mem_gb: 12
 gres: gpu:a100:1
+stderr_to_stdout: true

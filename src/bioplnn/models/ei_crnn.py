@@ -1,16 +1,17 @@
 from collections.abc import Iterable
 from math import ceil, prod
-from typing import Optional
+from typing import Any, Optional
 from warnings import warn
 
 import torch
 import torch.nn as nn
+from addict import Dict as AttrDict
 
 from bioplnn.utils import get_activation_class
 
 
 class AttentionalGainModulation(nn.Module):
-    def __init__(self, in_channels, spatial_size: tuple[int, int]):
+    def __init__(self, spatial_size: tuple[int, int], op: str = "mul"):
         """
         Initializes the SimpleAttentionalGain module.
 
@@ -26,7 +27,12 @@ class AttentionalGainModulation(nn.Module):
         self.slope = nn.Parameter(torch.ones(1))  # init slope to one
         self.threshold = nn.Parameter(torch.zeros(1))  # init threshold to zero
 
-    def forward(self, cue, mixture):
+        if op != "mul":
+            raise ValueError("op must be 'mul'.")
+        self.op = op
+        self.cached = None
+
+    def forward(self, cue, mixture, use_cache=False):
         """
         Forward pass of the EI model.
 
@@ -37,20 +43,26 @@ class AttentionalGainModulation(nn.Module):
         Returns:
             torch.Tensor: The output after applying gain modulation to the mixture input.
         """
-        # Process cue
-        cue = self.spatial_average(cue)
-        # Apply threshold shift
-        cue = cue - self.threshold
-        # Apply slope
-        cue = cue * self.slope
-        # Apply sigmoid & bias
-        cue = self.bias + (1 - self.bias) * torch.sigmoid(cue)
-        # Apply to mixture (element mult)
-        return mixture * cue
+        if use_cache:
+            cue = self.cached
+        else:
+            # Process cue
+            cue = self.spatial_average(cue)
+            # Apply threshold shift
+            cue = cue - self.threshold
+            # Apply slope
+            cue = cue * self.slope
+            # Apply sigmoid & bias
+            cue = self.bias + (1 - self.bias) * torch.sigmoid(cue)
+
+        self.cached = cue
+
+        if self.op == "mul":
+            return mixture * cue
 
 
 class LowRankModulation(nn.Module):
-    def __init__(self, in_channels, spatial_size: tuple[int, int]):
+    def __init__(self, in_channels, spatial_size: tuple[int, int], op: str = "mul"):
         super().__init__()
 
         self.in_channels = in_channels
@@ -65,24 +77,35 @@ class LowRankModulation(nn.Module):
         self.rank_one_vec_h = nn.Linear(in_channels, spatial_size[0])
         self.rank_one_vec_w = nn.Linear(in_channels, spatial_size[1])
 
-    def forward(self, cue: torch.Tensor, mixture: torch.Tensor):
+        if op not in ("add", "mul"):
+            raise ValueError("op must be 'add' or 'mul'.")
+        self.op = op
+        self.cached = None
+
+    def forward(self, cue: torch.Tensor, mixture: torch.Tensor, use_cache=False):
         # rank_one_vector = torch.matmul(input, self.W) + self.bias
         # # compute the rank one matrix
         # rank_one_perturbation = torch.matmul(rank_one_vector, rank_one_vector.transpose(-2, -1))
         # perturbed_input = input + rank_one_perturbation
         # return perturbed_input
 
-        x = self.spatial_average(cue)
-        x = x.flatten(1)
-        hvec = self.rank_one_vec_h(x)
-        wvec = self.rank_one_vec_w(x)
+        if use_cache:
+            cue = self.cached
+        else:
+            x = self.spatial_average(cue)
+            x = x.flatten(1)
+            hvec = self.rank_one_vec_h(x)
+            wvec = self.rank_one_vec_w(x)
 
-        rank_one_matrix = torch.bmm(hvec.unsqueeze(-1), wvec.unsqueeze(-2)).unsqueeze(
-            -3
-        )
-        rank_one_tensor = x.unsqueeze(-1).unsqueeze(-1) * rank_one_matrix
+            cue = torch.bmm(hvec.unsqueeze(-1), wvec.unsqueeze(-2)).unsqueeze(-3)
+            cue = x.unsqueeze(-1).unsqueeze(-1) * cue
 
-        return mixture * rank_one_tensor
+        self.cached = cue
+
+        if self.op == "add":
+            return mixture + cue
+        elif self.op == "mul":
+            return mixture * torch.sigmoid(cue)
 
 
 class ConvModulation(nn.Module):
@@ -94,6 +117,7 @@ class ConvModulation(nn.Module):
         kernel_size: tuple[int, int] = (3, 3),
         activation: str = "relu",
         bias: bool = True,
+        op: str = "mul",
     ):
         """
         Initializes the SimpleAttentionalGain module.
@@ -119,8 +143,14 @@ class ConvModulation(nn.Module):
             padding=(kernel_size[0] // 2, kernel_size[1] // 2),
             bias=bias,
         )
+        if op not in ("add", "mul"):
+            raise ValueError("op must be 'add' or 'mul'.")
+        self.op = op
+        self.cached = None
 
-    def forward(self, cues, mixture):
+    def forward(
+        self, cues: list[torch.Tensor], mixture: torch.Tensor, use_cache: bool = False
+    ):
         """
         Forward pass of the EI model.
 
@@ -131,14 +161,23 @@ class ConvModulation(nn.Module):
         Returns:
             torch.Tensor: The output after applying gain modulation to the mixture input.
         """
-        upsampled_cues = []
-        for cue in cues:
-            upsampled_cues.append(self.upsample(cue))
-        cue = torch.cat(upsampled_cues, dim=1)
-        cue = self.activation(self.conv1(cue))
-        cue = self.conv2(cue)
-        cue = torch.sigmoid(cue)
-        return mixture * cue
+
+        if use_cache:
+            cue = self.cached
+        else:
+            upsampled_cues = []
+            for cue in cues:
+                upsampled_cues.append(self.upsample(cue))
+            cue = torch.cat(upsampled_cues, dim=1)
+            cue = self.activation(self.conv1(cue))
+            cue = self.conv2(cue)
+
+        self.cached = cue
+
+        if self.op == "add":
+            return mixture + cue
+        elif self.op == "mul":
+            return mixture * torch.sigmoid(cue)
 
 
 class AttnModulation(nn.Module):
@@ -152,6 +191,7 @@ class AttnModulation(nn.Module):
         activation: str = "relu",
         dropout: float = 0.0,
         bias: bool = True,
+        op: str = "mul",
     ):
         """
         Initializes the EI model.
@@ -203,8 +243,13 @@ class AttnModulation(nn.Module):
             bias=bias,
         )
         self.ff = nn.Sequential(conv1, self.activation, conv2)
+        if op not in ("add", "mul"):
+            raise ValueError("op must be 'add' or 'mul'.")
+        self.op = op
 
-    def forward(self, cues: list[torch.Tensor], mixture: torch.Tensor):
+        self.cached = None
+
+    def forward(self, cues: list[torch.Tensor], mixture: torch.Tensor, use_cache=False):
         """
         Forward pass of the model.
 
@@ -216,6 +261,9 @@ class AttnModulation(nn.Module):
             torch.Tensor: The output tensor after adding the rank one perturbation to the mixture.
         """
         # Compute the rank one matrix
+        if use_cache:
+            cue = self.cached
+
         upsampled_cues = []
         for cue in cues:
             upsampled_cues.append(self.upsample(cue))
@@ -226,42 +274,45 @@ class AttnModulation(nn.Module):
         q, k, v = self.qkv(cue).flatten(2).chunk(3, dim=1)
         cue = self.attn(q, k, v, need_weights=False)[0]
         cue = self.norm2(cue).reshape(cue_shape)
-        cue = torch.sigmoid(self.ff(cue))
-        return mixture * cue
+        cue = self.ff(cue)
+        if self.op == "add":
+            return mixture + cue
+        elif self.op == "mul":
+            return mixture * torch.sigmoid(cue)
 
 
-class LowRankPerturbation(nn.Module):
-    def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
-        """
-        Initializes the EI model.
+# class LowRankPerturbation(nn.Module):
+#     def __init__(self, in_channels: int, spatial_size: tuple[int, int]):
+#         """
+#         Initializes the EI model.
 
-        Args:
-            in_channels (int): The number of input channels.
-            spatial_size (tuple[int, int]): The spatial size of the input.
+#         Args:
+#             in_channels (int): The number of input channels.
+#             spatial_size (tuple[int, int]): The spatial size of the input.
 
-        """
-        super().__init__()
-        # Initialize the weight and bias matrices
-        self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
-        self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+#         """
+#         super().__init__()
+#         # Initialize the weight and bias matrices
+#         self.W = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
+#         self.bias = nn.Parameter(torch.randn(1, in_channels, spatial_size[0], 1))
 
-    def forward(self, input: torch.Tensor):
-        """
-        Forward pass of the model.
+#     def forward(self, input: torch.Tensor):
+#         """
+#         Forward pass of the model.
 
-        Args:
-            cue (torch.Tensor): The cue tensor.
-            mixture (torch.Tensor): The mixture tensor.
+#         Args:
+#             cue (torch.Tensor): The cue tensor.
+#             mixture (torch.Tensor): The mixture tensor.
 
-        Returns:
-            torch.Tensor: The output tensor after adding the rank one perturbation to the mixture.
-        """
-        # Compute the rank one matrix
-        rank_one_vector = torch.matmul(input, self.W) + self.bias
-        rank_one_perturbation = torch.matmul(
-            rank_one_vector, rank_one_vector.transpose(-2, -1)
-        )
-        return rank_one_perturbation
+#         Returns:
+#             torch.Tensor: The output tensor after adding the rank one perturbation to the mixture.
+#         """
+#         # Compute the rank one matrix
+#         rank_one_vector = torch.matmul(input, self.W) + self.bias
+#         rank_one_perturbation = torch.matmul(
+#             rank_one_vector, rank_one_vector.transpose(-2, -1)
+#         )
+#         return rank_one_perturbation
 
 
 class Conv2dPositive(nn.Conv2d):
@@ -292,7 +343,7 @@ class Conv2dEIRNNCell(nn.Module):
         input_size: tuple[int, int],
         input_dim: int,
         h_pyr_dim: int = 4,
-        h_inter_dims: tuple[int] = (4),
+        h_inter_dims: list[int] = (4),
         fb_dim: int = 0,
         inter_mode: str = "half",
         exc_kernel_size: tuple[int, int] = (5, 5),
@@ -336,9 +387,9 @@ class Conv2dEIRNNCell(nn.Module):
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
         h_inter_dims = h_inter_dims if h_inter_dims is not None else []
-        if len(h_inter_dims) < 0 or len(h_inter_dims) > 4:
+        if h_inter_dims is not None and len(h_inter_dims) > 4:
             raise ValueError(
-                "h_inter_dims must be a tuple of length 0 to 4, or None."
+                "h_inter_dims must be less than , or None."
                 f"Got length {len(h_inter_dims)}."
             )
         self.fb_dim = fb_dim
@@ -715,14 +766,7 @@ class Conv2dEIRNNCell(nn.Module):
 # num_steps: int,
 # inter_mode: str = "same",
 # num_classes: Optional[int] = None,
-# modulation: bool = True,
-# modulation_type: str = "ag",
-# modulation_on: str = "layer_output",
-# modulation_timestep: str = "all",
-# pertubation: bool = False,
-# pertubation_type: str = "lr",
-# pertubation_on: str = "hidden",
-# pertubation_timestep: int = 0,
+# modulation: dict[str, Any] = {},
 # layer_time_delay: bool = False,
 # exc_rectify: Optional[str] = None,
 # inh_rectify: Optional[str] = "neg",
@@ -751,20 +795,9 @@ class Conv2dEIRNN(nn.Module):
         num_compartments: int,
         immediate_inhibition: bool,
         num_layers: int,
-        num_steps: int,
         inter_mode: str,
         num_classes: Optional[int],
-        modulation: bool,
-        modulation_type: str,
-        modulation_on: str,
-        modulation_timestep: str,
-        modulation_num_heads: int,
-        modulation_activation: str,
-        modulation_dropout: float,
-        pertubation: bool,
-        pertubation_type: str,
-        pertubation_on: str,
-        pertubation_timestep: int,
+        modulation: AttrDict[str, Any],
         layer_time_delay: bool,
         exc_rectify: Optional[str],
         inh_rectify: Optional[str],
@@ -814,40 +847,18 @@ class Conv2dEIRNN(nn.Module):
         self.inh_kernel_sizes = self._extend_for_multilayer(
             inh_kernel_size, num_layers, depth=1
         )
-        self.num_steps = num_steps
-
-        if modulation and pertubation:
-            raise ValueError("modulation and pertubation cannot be used simultaneously")
-
         self.modulation = modulation
-        self.modulation_type = modulation_type
-        self.modulation_on = modulation_on
-        self.modulation_timestep = modulation_timestep
-        self.pertubation = pertubation
-        self.pertubation_type = pertubation_type
-        self.pertubation_on = pertubation_on
-        self.pertubation_timestep = pertubation_timestep
         self.layer_time_delay = layer_time_delay
-        if modulation:
-            if modulation_type not in ("ag", "lr", "attn", "conv"):
+        if modulation.enable:
+            if modulation.type not in ("ag", "lr", "attn", "conv"):
                 raise ValueError(
-                    "modulation_type must be 'ag', 'lr', 'attn', or 'conv'"
+                    "modulation.type must be 'ag', 'lr', 'attn', or 'conv'"
                 )
-            if modulation_on not in ("hidden", "layer_output"):
-                raise ValueError("modulation_on must be 'hidden' or 'layer_output'.")
-            if modulation_timestep != "all" and 0 < modulation_timestep < num_steps:
+            if modulation.apply_to not in ("hidden", "layer_output"):
                 raise ValueError(
-                    "modulation_timestep must be 'all' or an integer between 0 and num_steps."
+                    "modulation.apply_to must be 'hidden' or 'layer_output'."
                 )
-        if pertubation:
-            if pertubation_type not in ("ag", "lr"):
-                raise ValueError("pertubation_type must be 'ag' or 'lr'.")
-            if pertubation_on not in ("hidden", "layer_output"):
-                raise ValueError("pertubation_on must be 'hidden' or 'layer_output'.")
-            if pertubation_timestep != "all" and 0 < pertubation_timestep < num_steps:
-                raise ValueError(
-                    "modulation_timestep must be 'all' or an integer between 0 and num_steps."
-                )
+
         self.flush_hidden = flush_hidden
         self.hidden_init_mode = hidden_init_mode
         self.fb_init_mode = fb_init_mode
@@ -912,10 +923,9 @@ class Conv2dEIRNN(nn.Module):
         self.layers = nn.ModuleList()
         self.pertubations = nn.ModuleList()
         self.pertubations_inter = nn.ModuleList()
-        self.modulations = nn.ModuleList([nn.ModuleList() for _ in range(num_steps)])
-        self.modulations_inter = nn.ModuleList(
-            [nn.ModuleList() for _ in range(num_steps)]
-        )
+        self.modulations = nn.ModuleList()
+        self.modulations_inter = nn.ModuleList()
+
         for i in range(num_layers):
             self.layers.append(
                 Conv2dEIRNNCell(
@@ -939,169 +949,148 @@ class Conv2dEIRNN(nn.Module):
                 )
             )
 
-        for i in range(num_layers):
-            if pertubation:
-                if pertubation_on == "hidden":
-                    self.pertubations.append(
-                        LowRankPerturbation(
-                            self.layers[i].h_pyr_dim,
-                            self.layers[i].input_size,
+            if modulation.enable:
+                if modulation.type == "ag":
+                    if modulation.apply_to == "hidden":
+                        self.modulations.append(
+                            AttentionalGainModulation(
+                                self.layers[i].input_size,
+                                op=modulation.op,
+                            )
                         )
-                    )
-                    self.pertubations.append(
-                        LowRankPerturbation(
-                            self.layers[i].h_inter_dims_sum,
-                            self.layers[i].inter_size,
+                        self.modulations_inter.append(
+                            AttentionalGainModulation(
+                                self.layers[i].inter_size,
+                                op=modulation.op,
+                            )
                         )
-                    )
-                else:
-                    self.pertubations.append(
-                        LowRankPerturbation(
-                            self.layers[i].out_dim,
-                            self.layers[i].out_size,
+                    else:
+                        self.modulations.append(
+                            AttentionalGainModulation(
+                                self.layers[i].out_size,
+                                op=modulation.op,
+                            )
                         )
-                    )
-            if modulation:
-                if modulation_type == "ag":
-                    for t in range(num_steps):
-                        if modulation_on == "hidden":
-                            self.modulations[t].append(
-                                AttentionalGainModulation(
-                                    self.layers[i].h_pyr_dim,
-                                    self.layers[i].input_size,
-                                )
+                elif modulation.type == "lr":
+                    if modulation.apply_to == "hidden":
+                        self.modulations.append(
+                            LowRankModulation(
+                                self.layers[i].h_pyr_dim,
+                                self.layers[i].input_size,
+                                op=modulation.op,
                             )
-                            self.modulations_inter.append(
-                                AttentionalGainModulation(
-                                    self.layers[i].h_inter_dims_sum,
-                                    self.layers[i].inter_size,
-                                )
+                        )
+                        self.modulations_inter.append(
+                            LowRankModulation(
+                                self.layers[i].h_inter_dims_sum,
+                                self.layers[i].inter_size,
+                                op=modulation.op,
                             )
-                        else:
-                            self.modulations[t].append(
-                                AttentionalGainModulation(
-                                    self.layers[i].out_dim, self.layers[i].out_size
-                                )
+                        )
+                    else:
+                        self.modulations.append(
+                            LowRankModulation(
+                                self.layers[i].out_dim,
+                                self.layers[i].out_size,
+                                op=modulation.op,
                             )
-                elif modulation_type == "lr":
-                    for t in range(num_steps):
-                        if modulation_on == "hidden":
-                            self.modulations[t].append(
-                                LowRankModulation(
-                                    self.layers[i].h_pyr_dim,
-                                    self.layers[i].input_size,
-                                )
+                        )
+                elif modulation.type == "attn":
+                    if modulation.apply_to == "hidden":
+                        h_pyr_in_dim = sum(
+                            [self.layers[j].h_pyr_dim for j in range(num_layers)]
+                        )
+                        h_inter_in_dim = sum(
+                            [self.layers[j].h_inter_dims_sum for j in range(num_layers)]
+                        )
+                        self.modulations.append(
+                            AttnModulation(
+                                h_pyr_in_dim,
+                                self.layers[i].h_pyr_dim,
+                                self.layers[i].input_size,
+                                kernel_size=self.exc_kernel_sizes[i],
+                                num_heads=modulation.num_heads,
+                                activation=modulation.activation,
+                                bias=bias,
+                                dropout=modulation.dropout,
+                                op=modulation.op,
                             )
-                            self.modulations_inter.append(
-                                LowRankModulation(
-                                    self.layers[i].h_inter_dims_sum,
-                                    self.layers[i].inter_size,
-                                )
+                        )
+                        self.modulations_inter.append(
+                            AttnModulation(
+                                h_inter_in_dim,
+                                self.layers[i].h_inter_dims_sum,
+                                self.layers[i].inter_size,
+                                kernel_size=self.inh_kernel_sizes[i],
+                                num_heads=modulation.num_heads,
+                                activation=modulation.activation,
+                                bias=bias,
+                                dropout=modulation.dropout,
+                                op=modulation.op,
                             )
-                        else:
-                            self.modulations[t].append(
-                                LowRankModulation(
-                                    self.layers[i].out_dim, self.layers[i].out_size
-                                )
+                        )
+                    else:
+                        in_dim = sum(
+                            [self.layers[j].out_dim for j in range(num_layers)]
+                        )
+                        self.modulations.append(
+                            AttnModulation(
+                                in_dim,
+                                self.layers[i].out_dim,
+                                self.layers[i].out_size,
+                                kernel_size=self.exc_kernel_sizes[i],
+                                num_heads=modulation.num_heads,
+                                activation=modulation.activation,
+                                bias=bias,
+                                dropout=modulation.dropout,
+                                op=modulation.op,
                             )
-                elif modulation_type == "attn":
-                    for t in range(num_steps):
-                        if modulation_on == "hidden":
-                            h_pyr_in_dim = sum(
-                                [self.layers[j].h_pyr_dim for j in range(num_layers)]
+                        )
+                elif modulation.type == "conv":
+                    if modulation.apply_to == "hidden":
+                        h_pyr_in_dim = sum(
+                            [self.layers[j].h_pyr_dim for j in range(num_layers)]
+                        )
+                        h_inter_in_dim = sum(
+                            [self.layers[j].h_inter_dims_sum for j in range(num_layers)]
+                        )
+                        self.modulations.append(
+                            ConvModulation(
+                                h_pyr_in_dim,
+                                self.layers[i].h_pyr_dim,
+                                self.layers[i].input_size,
+                                kernel_size=self.exc_kernel_sizes[i],
+                                activation=modulation.activation,
+                                bias=bias,
+                                op=modulation.op,
                             )
-                            h_inter_in_dim = sum(
-                                [
-                                    self.layers[j].h_inter_dims_sum
-                                    for j in range(num_layers)
-                                ]
+                        )
+                        self.modulations_inter.append(
+                            ConvModulation(
+                                h_inter_in_dim,
+                                self.layers[i].h_inter_dims_sum,
+                                self.layers[i].inter_size,
+                                kernel_size=self.inh_kernel_sizes[i],
+                                activation=modulation.activation,
+                                bias=bias,
+                                op=modulation.op,
                             )
-                            self.modulations[t].append(
-                                AttnModulation(
-                                    h_pyr_in_dim,
-                                    self.layers[i].h_pyr_dim,
-                                    self.layers[i].input_size,
-                                    kernel_size=self.exc_kernel_sizes[i],
-                                    num_heads=modulation_num_heads,
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                    dropout=modulation_dropout,
-                                )
+                        )
+                    else:
+                        in_dim = sum(
+                            [self.layers[j].out_dim for j in range(num_layers)]
+                        )
+                        self.modulations.append(
+                            ConvModulation(
+                                in_dim,
+                                self.layers[i].out_dim,
+                                self.layers[i].out_size,
+                                kernel_size=self.exc_kernel_sizes[i],
+                                activation=modulation.activation,
+                                bias=bias,
+                                op=modulation.op,
                             )
-                            self.modulations_inter.append(
-                                AttnModulation(
-                                    h_inter_in_dim,
-                                    self.layers[i].h_inter_dims_sum,
-                                    self.layers[i].inter_size,
-                                    kernel_size=self.inh_kernel_sizes[i],
-                                    num_heads=modulation_num_heads,
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                    dropout=modulation_dropout,
-                                )
-                            )
-                        else:
-                            in_dim = sum(
-                                [self.layers[j].out_dim for j in range(num_layers)]
-                            )
-                            self.modulations[t].append(
-                                AttnModulation(
-                                    in_dim,
-                                    self.layers[i].out_dim,
-                                    self.layers[i].out_size,
-                                    kernel_size=self.exc_kernel_sizes[i],
-                                    num_heads=modulation_num_heads,
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                    dropout=modulation_dropout,
-                                )
-                            )
-                elif modulation_type == "conv":
-                    for t in range(num_steps):
-                        if modulation_on == "hidden":
-                            h_pyr_in_dim = sum(
-                                [self.layers[j].h_pyr_dim for j in range(num_layers)]
-                            )
-                            h_inter_in_dim = sum(
-                                [
-                                    self.layers[j].h_inter_dims_sum
-                                    for j in range(num_layers)
-                                ]
-                            )
-                            self.modulations[t].append(
-                                ConvModulation(
-                                    h_pyr_in_dim,
-                                    self.layers[i].h_pyr_dim,
-                                    self.layers[i].input_size,
-                                    kernel_size=self.exc_kernel_sizes[i],
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                )
-                            )
-                            self.modulations_inter.append(
-                                ConvModulation(
-                                    h_inter_in_dim,
-                                    self.layers[i].h_inter_dims_sum,
-                                    self.layers[i].inter_size,
-                                    kernel_size=self.inh_kernel_sizes[i],
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                )
-                            )
-                        else:
-                            in_dim = sum(
-                                [self.layers[j].out_dim for j in range(num_layers)]
-                            )
-                            self.modulations[t].append(
-                                ConvModulation(
-                                    in_dim,
-                                    self.layers[i].out_dim,
-                                    self.layers[i].out_size,
-                                    kernel_size=self.exc_kernel_sizes[i],
-                                    activation=modulation_activation,
-                                    bias=bias,
-                                )
-                            )
+                        )
 
         self.out_layer = (
             nn.Sequential(
@@ -1159,10 +1148,23 @@ class Conv2dEIRNN(nn.Module):
             )
         return param
 
+    def check_num_steps(self, num_steps):
+        if (
+            self.modulation.timestep_cue not in ("all", "first", "last")
+            and self.modulation.timestep_cue < 0
+            and self.modulation.timestep_cue >= num_steps
+        ) or (
+            self.modulation.timestep_mix not in ("all", "first", "last")
+            and self.modulation.timestep_mix < 0
+            and self.modulation.timestep_mix >= num_steps
+        ):
+            raise ValueError("num_steps is not consistent with modulation timesteps.")
+
     def forward(
         self,
         cue: Optional[torch.Tensor],
         mixture: torch.Tensor,
+        num_steps: int,
         all_timesteps: bool = False,
         return_layer_outputs: bool = False,
         return_hidden: bool = False,
@@ -1179,33 +1181,47 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor after pooling of shape (b, n), where n is the number of classes.
         """
+        # Check if the number of steps is consistent with modulation timesteps
+        if self.modulation.enabled:
+            self.check_num_steps(num_steps)
+            if self.modulation.timestep_cue == "first":
+                timestep_cue = 0
+            elif self.modulation.timestep_cue == "last":
+                timestep_cue = num_steps - 1
+            else:
+                timestep_cue = self.modulation.timestep_cue
+
+            if self.modulation.timestep_mix == "first":
+                timestep_mix = 0
+            elif self.modulation.timestep_mix == "last":
+                timestep_mix = num_steps - 1
+            else:
+                timestep_mix = self.modulation.timestep_mix
+
         device = mixture.device
         batch_size = mixture.shape[0]
         h_pyrs_cue = None
         h_inters_cue = None
         outs_cue = None
-        pertubations_pyr = None
-        pertubations_inter = None
-        pertubations_out = None
         for stimulation in (cue, mixture):
             if stimulation is None:
                 continue
             if stimulation is cue or cue is None or self.flush_hidden:
-                h_pyrs = [[None] * len(self.layers) for _ in range(self.num_steps)]
-                h_inters = [[None] * len(self.layers) for _ in range(self.num_steps)]
+                h_pyrs = [[None] * len(self.layers) for _ in range(num_steps)]
+                h_inters = [[None] * len(self.layers) for _ in range(num_steps)]
                 h_pyrs[-1], h_inters[-1] = self._init_hidden(
                     batch_size, init_mode=self.hidden_init_mode, device=device
                 )
-            fbs = [[None] * len(self.layers) for _ in range(self.num_steps)]
+            fbs = [[None] * len(self.layers) for _ in range(num_steps)]
             fbs[-1] = self._init_fb(
                 batch_size, init_mode=self.fb_init_mode, device=device
             )
-            outs = [[None] * len(self.layers) for _ in range(self.num_steps)]
+            outs = [[None] * len(self.layers) for _ in range(num_steps)]
             outs[-1] = self._init_out(
                 batch_size, init_mode=self.out_init_mode, device=device
             )
             # For linting purposes
-            for t in range(self.num_steps):
+            for t in range(num_steps):
                 if stimulation.dim() == 5:
                     input = stimulation[:, t, ...]
                 elif stimulation.dim() == 4:
@@ -1215,20 +1231,43 @@ class Conv2dEIRNN(nn.Module):
                         "The input must be a 4D tensor or a 5D tensor with sequence length."
                     )
                 for i, layer in enumerate(self.layers):
-                    # Apply lrp to mixture
-                    if (
-                        stimulation is mixture
-                        and self.pertubation
-                        and (
-                            self.pertubation_timestep == "all"
-                            or self.pertubation_timestep == t
+                    # Get modulation parameters ready
+                    do_modulation = (
+                        self.modulation.enabled
+                        and stimulation is mixture
+                        and timestep_mix in ("all", t)
+                    )
+                    if do_modulation:
+                        t_cue = num_steps - 1 if timestep_cue == "all" else timestep_cue
+                        use_cache = timestep_cue != "all" and t != 0
+                        h_pyr_cue = (
+                            h_pyrs_cue[t_cue]
+                            if self.modulation.type in ("attn", "conv")
+                            else h_pyrs_cue[t_cue][i]
                         )
-                    ):
-                        if self.pertubation_on == "hidden":
-                            h_pyrs[t][i] = h_pyrs[t][i] + pertubations_pyr[i]
-                            h_inters[t][i] = h_inters[t][i] + pertubations_inter[i]
+                        h_inter_cue = (
+                            h_inters_cue[t_cue]
+                            if self.modulation.type in ("attn", "conv")
+                            else h_inters_cue[t_cue][i]
+                        )
+                        out_cue = (
+                            outs_cue[t_cue]
+                            if self.modulation.type in ("attn", "conv")
+                            else outs_cue[t_cue][i]
+                        )
+                    # Apply additive modulation to mixture
+                    if do_modulation and self.modulation.op == "add":
+                        if self.modulation.apply_to == "hidden":
+                            h_pyrs[t][i] = self.modulations[i](
+                                h_pyr_cue, h_pyrs[t][i], use_cache=use_cache
+                            )
+                            h_inters[t][i] = self.modulations_inter[i](
+                                h_inter_cue, h_inters[t][i], use_cache=use_cache
+                            )
                         else:
-                            outs[t][i] = outs[t][i] + pertubations_out[i]
+                            outs[t][i] = self.modulations[i](
+                                out_cue, outs[t][i], use_cache=use_cache
+                            )
 
                     # Compute layer update and output
                     (h_pyrs[t][i], h_inters[t][i], outs[t][i]) = layer(
@@ -1246,53 +1285,25 @@ class Conv2dEIRNN(nn.Module):
                         fb=fbs[t - 1][i] if self.use_fb[i] else None,
                     )
 
-                    # Apply modulation to mixture
-                    if (
-                        stimulation is mixture
-                        and self.modulation
-                        and (
-                            self.modulation_timestep == "all"
-                            or self.modulation_timestep == t
-                        )
-                    ):
-                        if self.modulation_on == "hidden":
-                            h_pyr_cue = (
-                                h_pyrs_cue[t]
-                                if self.modulation_type in ("attn", "conv")
-                                else h_pyrs_cue[t][i]
+                    # Apply multiplicative modulation to mixture
+                    if do_modulation and self.modulation.op == "mul":
+                        if self.modulation.apply_to == "hidden":
+                            h_pyrs[t][i] = self.modulations[i](
+                                h_pyr_cue, h_pyrs[t][i], use_cache=use_cache
                             )
-                            h_inter_cue = (
-                                h_inters_cue[t]
-                                if self.modulation_type in ("attn", "conv")
-                                else h_inters_cue[t][i]
-                            )
-                            h_pyrs[t][i] = self.modulations[t][i](h_pyr_cue, h_pyrs[t])
-                            h_inters[t][i] = self.modulations_inter[t][i](
-                                h_inter_cue, h_inters[t]
+                            h_inters[t][i] = self.modulations_inter[i](
+                                h_inter_cue, h_inters[t][i], use_cache=use_cache
                             )
                         else:
-                            out_cue = (
-                                outs_cue[t]
-                                if self.modulation_type in ("attn", "conv")
-                                else outs_cue[t][i]
+                            outs[t][i] = self.modulations[i](
+                                out_cue, outs[t][i], use_cache=use_cache
                             )
-                            outs[t][i] = self.modulations[t][i](out_cue, outs[t][i])
 
                     # Apply feedback
                     if self.fb_adjacency is not None:
                         for j in self.fb_adjacency[i]:
-                            fbs[j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[t][i])
+                            fbs[t][j] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[t][i])
 
-            if self.pertubation and stimulation is cue:
-                pertubations_pyr = [0] * len(self.layers)
-                pertubations_inter = [0] * len(self.layers)
-                pertubations_out = [0] * len(self.layers)
-                for i in range(len(self.layers)):
-                    if self.pertubation_on == "hidden":
-                        pertubations_pyr[i] = self.pertubations[i](h_pyrs[i])
-                        pertubations_inter[i] = self.pertubations_inter[i](h_inters[i])
-                    else:
-                        pertubations_out[i] = self.pertubations[i](h_pyrs[i])
             if stimulation is cue:
                 outs_cue = outs
                 h_pyrs_cue = h_pyrs
@@ -1300,7 +1311,7 @@ class Conv2dEIRNN(nn.Module):
 
         out = []
         if all_timesteps:
-            for t in range(self.num_steps):
+            for t in range(num_steps):
                 out.append(self.out_layer(outs[t][-1]))
         else:
             out = self.out_layer(outs[-1][-1])

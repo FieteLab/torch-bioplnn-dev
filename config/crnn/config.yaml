@@ -21,20 +21,16 @@ model:
   num_compartments: 1
   immediate_inhibition: true
   num_layers: 4
-  num_steps: 5
-  inter_mode: same
+  inter_mode: half
   num_classes: 6
-  modulation: true
-  modulation_type: conv
-  modulation_on: layer_output
-  modulation_timestep: all
-  modulation_num_heads: 4
-  modulation_activation: relu
-  modulation_dropout: 0.2
-  pertubation: false
-  pertubation_type: lr
-  pertubation_on: hidden
-  pertubation_timestep: 0
+  modulation:
+    enable: true
+    type: ag
+    apply_to: layer_output
+    op: mul
+    timestep_cue: all
+    timestep_mix: all
+    activation: relu
   layer_time_delay: false
   exc_rectify: null
   inh_rectify: pos
@@ -66,7 +62,7 @@ data:
   num_workers: 8
 optimizer: 
   fn: adamw
-  lr: 0.001
+  lr: 0.0004
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
@@ -75,7 +71,7 @@ scheduler:
   pct_start: 0.3
 criterion: 
   fn: ce
-  all_timesteps: false
+  all_timesteps: true
 compile:
   disable: true
   fullgraph: true
@@ -83,15 +79,15 @@ compile:
   backend: inductor
   mode: reduce-overhead
 train:
-  matmul_precision: high
-  epochs: 30
+  num_steps: 5
+  epochs: 100
   log_freq: 5
   grad_clip:
     disable: true
     type: norm
     value: 1.0
 checkpoint:
-  disable: true
+  load: false
   root: checkpoints/ei
   run: null
   epoch: null
@@ -102,5 +98,5 @@ wandb:
   mode: disabled
   group: null
 foreach: true
-
+matmul_precision: high
 debug_level: 2

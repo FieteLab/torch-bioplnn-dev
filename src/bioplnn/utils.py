@@ -60,7 +60,7 @@ def get_activation_class(activation):
         raise ValueError(f"Activation function {activation} not supported.")
 
 
-def clip_grad_Npass(*args, **kwargs):
+def clip_grad_pass_(*args, **kwargs):
     pass
 
 
