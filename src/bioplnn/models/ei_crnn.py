@@ -949,6 +949,7 @@ class Conv2dEIRNN(nn.Module):
                 )
             )
 
+        for i in range(num_layers):
             if modulation.enable:
                 if modulation.type == "ag":
                     if modulation.apply_to == "hidden":

@@ -6,6 +6,7 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
@@ -15,8 +16,6 @@ from bioplnn.utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_, se
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
-
-import wandb
 
 log = logging.getLogger(__name__)
 
