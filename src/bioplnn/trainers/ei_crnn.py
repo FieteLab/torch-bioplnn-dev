@@ -13,6 +13,7 @@ from bioplnn.datasets.qclevr import get_qclevr_dataloaders
 from bioplnn.loss import EDLLoss
 from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_, seed
+from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
@@ -300,6 +301,8 @@ def train(config: DictConfig) -> None:
         checkpoint_dir = os.path.join(config.checkpoint.root, "test")
 
     os.makedirs(checkpoint_dir, exist_ok=True)
+
+    wandb.log(dict(run_id=HydraConfig.get().job.run, job_id=HydraConfig.get().job.id))
 
     for epoch in range(config.train.epochs):
         # Train the model
