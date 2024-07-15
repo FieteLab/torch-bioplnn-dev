@@ -858,6 +858,14 @@ class Conv2dEIRNN(nn.Module):
                 raise ValueError(
                     "modulation.apply_to must be 'hidden' or 'layer_output'."
                 )
+            if modulation.op == "add" and modulation.apply_to == "layer_output":
+                raise ValueError(
+                    "modulation.op cannot be 'add' when modulation.apply_to is 'layer_output'."
+                )
+            if modulation.op == "mul" and modulation.apply_to == "hidden":
+                raise ValueError(
+                    "modulation.op cannot be 'mul' when modulation.apply_to is 'hidden'."
+                )
 
         self.flush_hidden = flush_hidden
         self.hidden_init_mode = hidden_init_mode

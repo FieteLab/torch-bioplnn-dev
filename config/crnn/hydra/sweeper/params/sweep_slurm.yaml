@@ -8,6 +8,7 @@ model.immediate_inhibition: true,false
 criterion.all_timesteps: false,true
 model.modulation.timestep_mix: all,last
 model.modulation.type: ag,lr,conv
+model.modulation.apply_to: layer_output,hidden
 model.modulation.op: mul,add
 
-# python src/bioplnn/trainers/ei_crnn.py -m hydra/launcher=slurm +hydra/launcher/params=sweep_slurm wandb.mode=online wandb.group=sweep1
+# python src/bioplnn/trainers/ei_crnn.py -m hydra/launcher=slurm +hydra/sweeper/params=sweep_slurm wandb.mode=online wandb.group=sweep1
