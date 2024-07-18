@@ -6,7 +6,6 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
@@ -17,6 +16,8 @@ from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
+
+import wandb
 
 log = logging.getLogger(__name__)
 
@@ -211,6 +212,27 @@ def train(config: DictConfig) -> None:
     print(yaml.dump(config))
     config = AttrDict(config)
 
+    # Initialize Weights & Biases
+    if config.wandb.mode != "disabled":
+        wandb.require("core")
+        wandb.init(
+            **config.wandb,
+            config=config,
+            settings=wandb.Settings(start_method="thread"),
+        )
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
+    else:
+        checkpoint_dir = os.path.join(config.checkpoint.root, "test")
+
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    try:
+        wandb.log(
+            dict(run_id=HydraConfig.get().job.run, job_id=HydraConfig.get().job.id)
+        )
+    except Exception as e:
+        print(e)
+
     # Set the random seed
     if config.seed is not None:
         seed(config.seed)
@@ -287,22 +309,6 @@ def train(config: DictConfig) -> None:
         )
     else:
         raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
-
-    # Initialize Weights & Biases
-    if config.wandb.mode != "disabled":
-        wandb.require("core")
-        wandb.init(
-            **config.wandb,
-            config=config,
-            settings=wandb.Settings(start_method="thread"),
-        )
-        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
-    else:
-        checkpoint_dir = os.path.join(config.checkpoint.root, "test")
-
-    os.makedirs(checkpoint_dir, exist_ok=True)
-
-    wandb.log(dict(run_id=HydraConfig.get().job.run, job_id=HydraConfig.get().job.id))
 
     for epoch in range(config.train.epochs):
         # Train the model

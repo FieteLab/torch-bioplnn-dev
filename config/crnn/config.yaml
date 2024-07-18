@@ -25,7 +25,7 @@ model:
   num_classes: 6
   modulation:
     enable: true
-    type: ag
+    type: conv
     apply_to: layer_output
     op: mul
     timestep_cue: all
