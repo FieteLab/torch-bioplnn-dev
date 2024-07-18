@@ -6,3 +6,4 @@ wandb/
 *.out
 checkpoints/
 outputs/
+.DS_Store
