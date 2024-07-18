@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioplnn"
@@ -27,6 +27,4 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/hpvok13/bioplnn"
 Issues = "https://github.com/hpvok13/bioplnn/issues"
-
-[tool.ruff]
-extend-select = ["I"]
+  
