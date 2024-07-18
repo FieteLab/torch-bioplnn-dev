@@ -7,3 +7,4 @@ wandb/
 checkpoints/
 outputs/
 multirun/
+.DS_Store

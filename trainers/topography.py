@@ -10,6 +10,10 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
 import wandb
+from bioplnn.utils import _get_dataloaders
+from bioplnn.optimizers.sparse_sgd import SparseSGD
+from bioplnn.models.topography import TopographicalRNN
+from bioplnn.utils import AttrDict
 
 
 def train_epoch(
