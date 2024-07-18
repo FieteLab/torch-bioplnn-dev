@@ -21,7 +21,18 @@ dependencies = [
   "torchvision",
   "torch-scatter",
   "torch-sparse",
-  "wandb",
+  "opencv-python",
+  "torchsummary",
+  "scipy",
+  "tabulate",
+  "scikit-learn",
+  "pandas",
+  "matplotlib",
+  "accelerate",
+  "lightning",
+  "hydra-core",
+  "hydra-submitit-launcher",
+  "addict"
 ]
 
 [project.urls]
