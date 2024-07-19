@@ -1,5 +1,6 @@
 import os
 import random
+from typing import Iterable
 
 import numpy as np
 import scipy
@@ -211,6 +212,24 @@ def dict_flatten(d, delimiter=".", key=None):
         for k, v in dict_flatten(_v, delimiter=delimiter, key=_k).items()
     }
     return non_dicts | dicts
+
+
+def extend_for_multilayer(param, num_layers, depth=0):
+    inner = param
+    for _ in range(depth):
+        if not isinstance(inner, Iterable):
+            break
+        inner = inner[0]
+
+    if isinstance(inner, Iterable):
+        param = [param] * num_layers
+
+    if len(param) != num_layers:
+        raise ValueError(
+            "The length of param must match the number of layers if it is a list."
+        )
+
+    return param
 
 
 def get_benchmark_dataloaders(

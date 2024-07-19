@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from math import ceil, prod
 from typing import Any, Optional
 from warnings import warn
@@ -7,7 +6,7 @@ import torch
 import torch.nn as nn
 from addict import Dict as AttrDict
 
-from bioplnn.utils import get_activation_class
+from bioplnn.utils import extend_for_multilayer, get_activation_class
 
 
 class AttentionalGainModulation(nn.Module):
@@ -836,15 +835,13 @@ class Conv2dEIRNN(nn.Module):
             fc_dim (int, optional): Dimension of the fully connected layer.
         """
         super().__init__()
-        self.h_pyr_dims = self._extend_for_multilayer(h_pyr_dim, num_layers)
-        self.h_inter_dims = self._extend_for_multilayer(
-            h_inter_dims, num_layers, depth=1
-        )
-        self.fb_dims = self._extend_for_multilayer(fb_dim, num_layers)
-        self.exc_kernel_sizes = self._extend_for_multilayer(
+        self.h_pyr_dims = extend_for_multilayer(h_pyr_dim, num_layers)
+        self.h_inter_dims = extend_for_multilayer(h_inter_dims, num_layers, depth=1)
+        self.fb_dims = extend_for_multilayer(fb_dim, num_layers)
+        self.exc_kernel_sizes = extend_for_multilayer(
             exc_kernel_size, num_layers, depth=1
         )
-        self.inh_kernel_sizes = self._extend_for_multilayer(
+        self.inh_kernel_sizes = extend_for_multilayer(
             inh_kernel_size, num_layers, depth=1
         )
         self.modulation = modulation
@@ -871,13 +868,11 @@ class Conv2dEIRNN(nn.Module):
         self.hidden_init_mode = hidden_init_mode
         self.fb_init_mode = fb_init_mode
         self.out_init_mode = out_init_mode
-        self.pool_kernel_sizes = self._extend_for_multilayer(
+        self.pool_kernel_sizes = extend_for_multilayer(
             pool_kernel_size, num_layers, depth=1
         )
-        self.pool_strides = self._extend_for_multilayer(
-            pool_stride, num_layers, depth=1
-        )
-        self.biases = self._extend_for_multilayer(bias, num_layers)
+        self.pool_strides = extend_for_multilayer(pool_stride, num_layers, depth=1)
+        self.biases = extend_for_multilayer(bias, num_layers)
 
         self.input_sizes = [input_size]
         for i in range(num_layers - 1):
@@ -1140,22 +1135,6 @@ class Conv2dEIRNN(nn.Module):
             out = layer.init_out(batch_size, init_mode=init_mode, device=device)
             outs.append(out)
         return outs
-
-    @staticmethod
-    def _extend_for_multilayer(param, num_layers, depth=0):
-        inner = param
-        for _ in range(depth):
-            if not isinstance(inner, Iterable):
-                break
-            inner = inner[0]
-
-        if not isinstance(inner, Iterable):
-            param = [param] * num_layers
-        elif len(param) != num_layers:
-            raise ValueError(
-                "The length of param must match the number of layers if it is a list."
-            )
-        return param
 
     def check_num_steps(self, num_steps):
         if (

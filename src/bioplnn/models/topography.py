@@ -126,10 +126,6 @@ class TopographicalCorticalCell(nn.Module):
             # He initialization of values (synapses_per_neuron is the fan_in)
             # if initialization == "he":
             values = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
-            # elif initialization == "identity":
-            #     values = torch.cat(values)
-            # else:
-            #     raise ValueError(f"Invalid initialization: {initialization}")
 
         self.num_neurons = self.sheet_size[0] * self.sheet_size[1]
 

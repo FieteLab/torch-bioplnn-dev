@@ -22,7 +22,6 @@ dependencies = [
   "torch-scatter",
   "torch-sparse",
   "opencv-python",
-  "torchsummary",
   "scipy",
   "tabulate",
   "scikit-learn",
