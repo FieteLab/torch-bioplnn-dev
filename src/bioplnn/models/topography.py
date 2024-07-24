@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 from warnings import warn
 
 import matplotlib.pyplot as plt
@@ -9,7 +10,8 @@ import torch_sparse
 import torchsparsegradutils as tsgu
 from matplotlib import animation
 
-from bioplnn.utils import get_activation_class, idx_2D_to_1D
+from bioplnn.models.sparse_rnn import SparseRNN
+from bioplnn.utils import get_activation_class, idx_1D_to_2D, idx_2D_to_1D
 
 
 class TopographicalCorticalCell(nn.Module):
@@ -20,7 +22,7 @@ class TopographicalCorticalCell(nn.Module):
         synapses_per_neuron: int = 32,
         bias: bool = True,
         mm_function: str = "torch_sparse",
-        sparse_format: str = None,
+        sparse_layout: str = None,
         batch_first: bool = True,
         adjacency_matrix_path: str | None = None,
         self_recurrence: bool = False,
@@ -35,33 +37,33 @@ class TopographicalCorticalCell(nn.Module):
             bias (bool, optional): Whether to include bias or not. Defaults to True.
             mm_function (str, optional): The sparse matrix multiplication function to use.
                 Possible values are  'torch_sparse', 'native', and 'tsgu'. Defaults to 'torch_sparse'.
-            sparse_format (str, optional): The sparse format to use.
+            sparse_layout (str, optional): The sparse format to use.
                 Possible values are 'coo' and 'csr'. Defaults to 'coo'.
             batch_first (bool, optional): Whether the batch dimension is the first dimension. Defaults to False.
             adjacency_matrix_path (str, optional): The path to the adjacency matrix file. Defaults to None.
             self_recurrence (bool, optional): Whether to include self-recurrence connections. Defaults to False.
 
         Raises:
-            ValueError: If an invalid mm_function or sparse_format is provided.
+            ValueError: If an invalid mm_function or sparse_layout is provided.
         """
         super().__init__()
         # Save the sparse matrix multiplication function
         self.sheet_size = sheet_size
-        self.sparse_format = sparse_format
+        self.sparse_layout = sparse_layout
         self.batch_first = batch_first
 
         # Select the sparse matrix multiplication function
         if mm_function == "torch_sparse":
-            if sparse_format != "torch_sparse":
+            if sparse_layout != "torch_sparse":
                 raise ValueError(
-                    "sparse_format must be 'torch_sparse' or None if mm_function is 'torch_sparse'"
+                    "sparse_layout must be 'torch_sparse' or None if mm_function is 'torch_sparse'"
                 )
-            self.sparse_format = "torch_sparse"
+            self.sparse_layout = "torch_sparse"
             self.mm_function = torch_sparse.spmm
         elif mm_function in ("native", "tsgu"):
-            if sparse_format not in ("coo", "csr"):
+            if sparse_layout not in ("coo", "csr"):
                 raise ValueError(
-                    "sparse_format must be 'coo' or 'csr' if mm_function is 'native' or 'tsgu'"
+                    "sparse_layout must be 'coo' or 'csr' if mm_function is 'native' or 'tsgu'"
                 )
             if mm_function == "native":
                 self.mm_function = torch.sparse.mm
@@ -141,7 +143,7 @@ class TopographicalCorticalCell(nn.Module):
                 (self.num_neurons, self.num_neurons),  # type: ignore
                 check_invariants=True,
             ).coalesce()
-            if sparse_format == "csr":
+            if sparse_layout == "csr":
                 weight = weight.to_sparse_csr()
         self.weight = nn.Parameter(weight)  # type: ignore
 
@@ -173,7 +175,7 @@ class TopographicalCorticalCell(nn.Module):
             x = x.t()
 
         # Perform sparse matrix multiplication with or without bias
-        if self.sparse_format == "torch_sparse":
+        if self.sparse_layout == "torch_sparse":
             x = (
                 self.mm_function(
                     self.indices,
@@ -198,19 +200,19 @@ class TopographicalRNN(nn.Module):
     def __init__(
         self,
         sheet_size: tuple[int, int] = (150, 300),
-        connectivity_std: float = 10,
+        synapse_std: float = 10,
         synapses_per_neuron: int = 32,
-        num_classes: int = 10,
-        bias: bool = True,
+        self_recurrence: bool = True,
+        connectivity_ih: Optional[str | torch.Tensor] = None,
+        connectivity_hh: Optional[str | torch.Tensor] = None,
+        sparse_layout: str = "torch_sparse",
         mm_function: str = "torch_sparse",
-        sparse_format: str = "torch_sparse",
+        num_classes: int = 10,
         batch_first: bool = True,
-        adjacency_matrix_path: str = None,
-        self_recurrence: bool = False,
-        num_timesteps: int = 100,
-        input_indices: str | torch.Tensor = None,
-        output_indices: str | torch.Tensor = None,
-        activation: str = "relu",
+        input_indices: Optional[str | torch.Tensor] = None,
+        output_indices: Optional[str | torch.Tensor] = None,
+        nonlinearity: str = "relu",
+        bias: bool = True,
     ):
         """
         Initialize the TopographicalCorticalRNN object.
@@ -222,7 +224,7 @@ class TopographicalRNN(nn.Module):
             bias (bool, optional): Whether to include bias in the cortical sheet. Defaults to True.
             mm_function (str, optional): The sparse matrix multiplication function to use in the cortical sheet.
                 Possible values are "native", "torch_sparse", and "tsgu". Defaults to "torch_sparse".
-            sparse_format (str, optional): The sparse format to use in the cortical sheet.
+            sparse_layout (str, optional): The sparse format to use in the cortical sheet.
                 Possible values are "coo", "csr", and "torch_sparse". Defaults to "torch_sparse".
             batch_first (bool, optional): Whether the batch dimension is the first dimension in the cortical sheet. Defaults to True.
             adjacency_matrix_path (str, optional): The path to the adjacency matrix file. Defaults to None.
@@ -236,52 +238,126 @@ class TopographicalRNN(nn.Module):
             initialization (str, optional): The initialization method for the cortical sheet. Defaults to "identity".
         """
         super().__init__()
-        if (
-            sheet_size is not None
-            or connectivity_std is not None
-            or synapses_per_neuron is not None
-        ) and adjacency_matrix_path is not None:
-            warn(
-                "If adjacency_matrix_path is provided, sheet_size, connectivity_std, and synapses_per_neuron will be ignored"
-            )
-        self.num_timesteps = num_timesteps
-        self.batch_first = batch_first
-        self.activation = get_activation_class(activation)()
 
-        if isinstance(input_indices, str):
-            if input_indices.endswith("npy"):
+        self.batch_first = batch_first
+        self.nonlinearity = get_activation_class(nonlinearity)()
+
+        use_random = synapse_std is not None and synapses_per_neuron is not None
+        use_connectivity = connectivity_hh is not None and connectivity_ih is not None
+        if use_connectivity:
+            if use_random:
+                warn(
+                    "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
+                )
+                use_random = False
+            try:
+                connectivity_ih = torch.load(connectivity_ih)
+                connectivity_hh = torch.load(connectivity_hh)
+            except Exception:
+                pass
+
+            if connectivity_ih.layout != "coo" or connectivity_hh.layout != "coo":
+                raise ValueError("Connectivity matrices must be in COO format")
+            if (
+                connectivity_ih.shape[0]
+                != connectivity_ih.shape[1]
+                != connectivity_hh.shape[0]
+                != connectivity_hh.shape[1]
+            ):
+                raise ValueError("Connectivity matrices must be square")
+
+            num_neurons = connectivity_ih.shape[0]
+
+        elif use_random:
+            num_neurons = math.prod(sheet_size)
+
+            idx_1d = torch.arange(num_neurons)
+            idx = idx_1D_to_2D(idx_1d, sheet_size[0], sheet_size[1]).t()
+            synapses = (
+                torch.randn(num_neurons, 2, synapses_per_neuron) * synapse_std
+                + idx.unsqueeze(-1)
+            ).long()
+            if self_recurrence:
+                synapses = torch.cat([synapses, idx.unsqueeze(-1)], dim=2)
+            synapses = synapses.clamp(
+                torch.zeros(2).view(1, 2, 1),
+                torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1)).view(1, 2, 1),
+            )
+            synapses = idx_2D_to_1D(
+                synapses.transpose(0, 1).flatten(1), sheet_size[0], sheet_size[1]
+            ).view(num_neurons, -1)
+
+            synapse_root = idx_1d.expand(-1, synapses_per_neuron + 1)
+
+            indices = torch.stack((synapses, synapse_root)).flatten(1)
+
+            # He initialization of values (synapses_per_neuron is the fan_in)
+            values_ih = torch.randn(indices.shape[1]) * math.sqrt(
+                2 / synapses_per_neuron
+            )
+            values_hh = torch.randn(indices.shape[1]) * math.sqrt(
+                2 / synapses_per_neuron
+            )
+
+            connectivity_ih = torch.sparse_coo_tensor(
+                indices,
+                values_ih,
+                (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
+                check_invariants=True,
+            ).coalesce()
+
+            connectivity_hh = torch.sparse_coo_tensor(
+                indices,
+                values_hh,
+                (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
+                check_invariants=True,
+            ).coalesce()
+        else:
+            raise ValueError(
+                "Either connectivity or random initialization must be provided"
+            )
+
+        try:
+            try:
+                input_indices = torch.load(input_indices)
+            except Exception:
                 input_indices = np.load(input_indices)
                 input_indices = torch.tensor(input_indices)
-            else:
-                input_indices = torch.load(input_indices)
+        except Exception:
+            pass
 
-        if isinstance(output_indices, str):
-            if output_indices.endswith("npy"):
+        try:
+            try:
+                output_indices = torch.load(output_indices)
+            except Exception:
                 output_indices = np.load(output_indices)
                 output_indices = torch.tensor(output_indices)
-            else:
-                output_indices = torch.load(output_indices)
+        except Exception:
+            pass
+
+        if (input_indices is not None and input_indices.dim() > 1) or (
+            output_indices is not None and output_indices.dim() > 1
+        ):
+            raise ValueError("Input and output indices must be 1D tensors")
 
         self.input_indices = input_indices
         self.output_indices = output_indices
 
         # Create the CorticalSheet layer
-        self.cortical_sheet = TopographicalCorticalCell(
-            sheet_size=sheet_size,
-            connectivity_std=connectivity_std,
-            synapses_per_neuron=synapses_per_neuron,
-            bias=bias,
+        self.rnn = SparseRNN(
+            num_neurons,
+            num_neurons,
+            connectivity_ih,
+            connectivity_hh,
+            num_layers=1,
+            sparse_layout=sparse_layout,
             mm_function=mm_function,
-            sparse_format=sparse_format,
-            batch_first=False,
-            adjacency_matrix_path=adjacency_matrix_path,
-            self_recurrence=self_recurrence,
+            batch_first=batch_first,
+            nonlinearity=nonlinearity,
+            bias=bias,
         )
-
         num_out_neurons = (
-            self.cortical_sheet.num_neurons
-            if output_indices is None
-            else output_indices.shape[0]
+            num_neurons if output_indices is None else output_indices.shape[0]
         )
 
         # Create output block
@@ -338,10 +414,7 @@ class TopographicalRNN(nn.Module):
     def forward(
         self,
         x,
-        visualize=False,
-        visualization_save_path=None,
-        visualization_fps=4,
-        visualization_frames=None,
+        num_steps=None,
         return_activations=False,
     ):
         """
@@ -378,12 +451,12 @@ class TopographicalRNN(nn.Module):
         input_x = x
 
         # Pass the input through the CorticalSheet layer num_timesteps times
-        if visualize or return_activations:
+        if return_activations:
             activations = [x.t().detach().cpu()]
 
         for _ in range(self.num_timesteps):
             x = self.activation(self.cortical_sheet(input_x + x))
-            if visualize or return_activations:
+            if return_activations:
                 activations.append(x.t().detach().cpu())
 
         # Transpose back
@@ -394,17 +467,9 @@ class TopographicalRNN(nn.Module):
         if self.output_indices is not None:
             x = x[:, self.output_indices]
 
-        # Visualize if required
-        if visualize:
-            self.visualize(
-                activations,
-                visualization_save_path,
-                visualization_fps,
-                visualization_frames,
-            )
-
         # Return classification from out_block
         if return_activations:
+            activations = torch.stack(activations)
             return self.out_block(x), activations
         else:
             return self.out_block(x)

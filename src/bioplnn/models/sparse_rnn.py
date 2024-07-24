@@ -11,8 +11,7 @@ class SparseLinear(nn.Module):
         self,
         in_features: int,
         out_features: int,
-        connectivity_indices: torch.Tensor,
-        connectivity_values: torch.Tensor,
+        connectivity: torch.Tensor,
         sparse_layout: str = "torch_sparse",
         mm_function: str = "torch_sparse",
         features_first: bool = True,
@@ -26,14 +25,17 @@ class SparseLinear(nn.Module):
         self.features_first = features_first
         self.mm_function = mm_function
 
+        if connectivity.layout != "coo":
+            raise ValueError("connectivity must be in COO format.")
+
         if mm_function == "torch_sparse":
             if sparse_layout != "torch_sparse":
                 raise ValueError(
                     "mm_function must be 'torch_sparse' when sparse_layout is 'torch_sparse'."
                 )
             indices, values = torch_sparse.coalesce(
-                connectivity_indices.clone(),
-                connectivity_values.clone(),
+                connectivity.indices().clone(),
+                connectivity.values().clone(),
                 self.out_features,
                 self.in_features,
             )
@@ -44,15 +46,7 @@ class SparseLinear(nn.Module):
                 raise ValueError(
                     "mm_function must be 'native' or 'tsgu' when sparse_layout is 'coo' or 'csr'."
                 )
-            weight = (
-                torch.sparse_coo_tensor(
-                    connectivity_indices.clone(),
-                    connectivity_values.clone(),
-                    (self.out_features, self.in_features),
-                )
-                .coalesce()
-                .float()
-            )
+            weight = connectivity.clone().coalesce().float()
             if sparse_layout == "csr":
                 weight = weight.to_sparse_csr()
             self.weight = nn.Parameter(weight)
@@ -107,10 +101,8 @@ class SparseRNN(nn.Module):
         self,
         input_size: int | list[int],
         hidden_size: int | list[int],
-        connectivity_values_ih: torch.Tensor | list[torch.Tensor],
-        connectivity_indices_ih: torch.Tensor | list[torch.Tensor],
-        connectivity_values_hh: torch.Tensor | list[torch.Tensor],
-        connectivity_indices_hh: torch.Tensor | list[torch.Tensor],
+        connectivity_ih: torch.Tensor | list[torch.Tensor],
+        connectivity_hh: torch.Tensor | list[torch.Tensor],
         num_layers: int = 1,
         sparse_layout: str = "torch_sparse",
         mm_function: str = "torch_sparse",
@@ -129,18 +121,8 @@ class SparseRNN(nn.Module):
 
         self.input_size = extend_for_multilayer(input_size, num_layers)
         self.hidden_size = extend_for_multilayer(hidden_size, num_layers)
-        connectivity_values_ih = extend_for_multilayer(
-            connectivity_values_ih, num_layers
-        )
-        connectivity_values_ih = extend_for_multilayer(
-            connectivity_indices_ih, num_layers
-        )
-        connectivity_values_hh = extend_for_multilayer(
-            connectivity_values_hh, num_layers
-        )
-        connectivity_values_hh = extend_for_multilayer(
-            connectivity_indices_hh, num_layers
-        )
+        connectivity_ih = extend_for_multilayer(connectivity_ih, num_layers)
+        connectivity_hh = extend_for_multilayer(connectivity_hh, num_layers)
 
         self.layers = nn.ModuleList()
         for i in range(num_layers):
@@ -148,8 +130,8 @@ class SparseRNN(nn.Module):
             layer.ih = SparseLinear(
                 input_size if i == 0 else hidden_size[i - 1],
                 hidden_size[i],
-                connectivity_values_ih[i],
-                connectivity_indices_ih[i],
+                connectivity_ih[i],
+                connectivity_hh[i],
                 sparse_layout=sparse_layout,
                 mm_function=mm_function,
                 features_first=True,
@@ -158,8 +140,8 @@ class SparseRNN(nn.Module):
             layer.hh = SparseLinear(
                 hidden_size[i],
                 hidden_size[i],
-                connectivity_values_hh[i],
-                connectivity_indices_hh[i],
+                connectivity_ih[i],
+                connectivity_hh[i],
                 sparse_layout=sparse_layout,
                 mm_function=mm_function,
                 features_first=True,
@@ -167,7 +149,7 @@ class SparseRNN(nn.Module):
             )
             self.layers.append(layer)
 
-    def forward(self, x, num_steps=None):
+    def forward(self, x, num_steps=None, return_activations=False):
         """
         Forward pass of the TopographicalCorticalCell.
 
@@ -177,21 +159,20 @@ class SparseRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-        # x: Dense (strided) tensor of shape (batch_size, num_neurons) if
-        # batch_first, otherwise (num_neurons, batch_size)
-        # assert self.weight.is_coalesced()
 
         if x.dim() == 2:
-            if self.batch_first:
+            if self.batch_first:  # x.shape == (batch_size, input_size)
                 x = x.t()
             if num_steps is None:
                 raise ValueError("num_steps must be provided for 2D input.")
             x = [x] * num_steps
+            # x.shape = (num_steps, input_size, batch_size)
         elif x.dim() == 3:
-            if self.batch_first:
+            if self.batch_first:  # x.shape == (batch_size, num_steps, input_size)
                 x = x.permute(1, 2, 0)
-            else:
+            else:  # x.shape == (num_steps, batch_size, input_size)
                 x = x.permute(0, 2, 1)
+            # x.shape = (num_steps, input_size, batch_size)
             if num_steps is not None and x.shape[0] != num_steps:
                 raise ValueError(
                     "num_steps must be None or equal to the length of the first dimension of x"
@@ -205,6 +186,9 @@ class SparseRNN(nn.Module):
         batch_size = x.shape[-1]
         out = []
 
+        if return_activations:
+            activations = []
+
         h = torch.zeros(self.num_layers, self.hidden_size, batch_size)
         for t in range(num_steps):
             for i, layer in enumerate(self.layers):
@@ -212,12 +196,24 @@ class SparseRNN(nn.Module):
                     layer.ih(x[t] if i == 0 else h[i - 1]) + layer.hh(h[i])
                 )
             out.append(h[-1])
+            if return_activations:
+                activations.append(h.clone())
 
         out = torch.stack(out)
+        if return_activations:
+            activations = torch.stack(activations)
 
         if self.batch_first:
             out = out.permute(2, 0, 1)
+            h = h.permute(2, 0, 1)
+            if return_activations:
+                activations = activations.permute(3, 0, 1, 2)
         else:
             out = out.permute(0, 2, 1)
+            h = h.permute(0, 2, 1)
+            if return_activations:
+                activations = activations.permute(0, 3, 1, 2)
 
-        return out
+        if return_activations:
+            return out, h, activations
+        return out, h
