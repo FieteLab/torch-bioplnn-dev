@@ -14,7 +14,7 @@ class SparseLinear(nn.Module):
         connectivity: torch.Tensor,
         sparse_layout: str = "torch_sparse",
         mm_function: str = "torch_sparse",
-        features_first: bool = True,
+        feature_dim: int = -1,
         bias: bool = True,
     ):
         super().__init__()
@@ -22,7 +22,7 @@ class SparseLinear(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.bias = bias
-        self.features_first = features_first
+        self.feature_dim = feature_dim
         self.mm_function = mm_function
 
         if connectivity.layout != "coo":
@@ -59,17 +59,18 @@ class SparseLinear(nn.Module):
     def forward(self, x):
         """
         Args:
-            x (torch.Tensor): Input tensor of shape (H, *) if features_first, otherwise (*, H).
+            x (torch.Tensor): Input tensor of shape (H, *) if feature_first, otherwise (*, H).
 
         Returns:
             torch.Tensor: Output tensor.
         """
         shape = x.shape
-        if self.features_first:
-            x = x.flatten(start_dim=1)
-        else:
-            x = x.flatten(start_dim=0, end_dim=-2)
-            x = x.t()
+        permutation = list(range(x.dim()))
+        permutation[self.feature_dim] = 0
+        permutation[0] = self.feature_dim
+        if self.feature_dim != 0:
+            x = x.permute(*permutation)
+        x = x.flatten(start_dim=1)
 
         if self.mm_function == "torch_sparse":
             x = torch_sparse.spmm(
@@ -87,11 +88,10 @@ class SparseLinear(nn.Module):
         if self.bias is not None:
             x = x + self.bias
 
-        if self.features_first:
-            x = x.view(self.out_features, *shape[1:])
-        else:
-            x = x.t()
-            x = x.view(*shape[:-1], self.out_features)
+        if self.feature_dim != 0:
+            x = x.permute(*permutation)
+        shape[self.feature_dim] = self.out_features
+        x = x.view(*shape)
 
         return x
 
@@ -110,7 +110,7 @@ class SparseRNN(nn.Module):
         nonlinearity: str = "tanh",
         bias: bool = True,
     ):
-        super(SparseRNN, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -134,7 +134,7 @@ class SparseRNN(nn.Module):
                 connectivity_hh[i],
                 sparse_layout=sparse_layout,
                 mm_function=mm_function,
-                features_first=True,
+                feature_dim=0,
                 bias=bias,
             )
             layer.hh = SparseLinear(
@@ -144,7 +144,7 @@ class SparseRNN(nn.Module):
                 connectivity_hh[i],
                 sparse_layout=sparse_layout,
                 mm_function=mm_function,
-                features_first=True,
+                feature_dim=0,
                 bias=bias,
             )
             self.layers.append(layer)
@@ -183,7 +183,7 @@ class SparseRNN(nn.Module):
                 f"Input tensor must be 2D or 3D, but got {x.dim()} dimensions."
             )
 
-        batch_size = x.shape[-1]
+        batch_size = x[0].shape[-1]
         out = []
 
         if return_activations:

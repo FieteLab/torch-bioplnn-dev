@@ -87,8 +87,6 @@ class TopographicalCorticalCell(nn.Module):
         # Create adjacency matrix with normal distribution randomized weights
         else:
             indices = []
-            # if initialization == "identity":
-            #     values = []
             for i in range(sheet_size[0]):
                 for j in range(sheet_size[1]):
                     synapses = (
@@ -114,19 +112,9 @@ class TopographicalCorticalCell(nn.Module):
                         ),
                     )
                     indices.append(torch.stack((synapses, synapse_root)))
-                    # if initialization == "identity":
-                    #     values.append(
-                    #         torch.cat(
-                    #             [
-                    #                 torch.zeros(synapses_per_neuron),
-                    #                 torch.ones(1),
-                    #             ]
-                    #         )
-                    #     )
             indices = torch.cat(indices, dim=1)
 
             # He initialization of values (synapses_per_neuron is the fan_in)
-            # if initialization == "he":
             values = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
 
         self.num_neurons = self.sheet_size[0] * self.sheet_size[1]
@@ -149,12 +137,6 @@ class TopographicalCorticalCell(nn.Module):
 
         # Initialize the bias vector
         self.bias = nn.Parameter(torch.zeros(self.num_neurons, 1)) if bias else None
-
-    def coalesce(self):
-        """
-        Coalesce the weight matrix.
-        """
-        self.weight.data = self.weight.data.coalesce()
 
     def forward(self, x):
         """
@@ -203,8 +185,8 @@ class TopographicalRNN(nn.Module):
         synapse_std: float = 10,
         synapses_per_neuron: int = 32,
         self_recurrence: bool = True,
-        connectivity_ih: Optional[str | torch.Tensor] = None,
         connectivity_hh: Optional[str | torch.Tensor] = None,
+        connectivity_ih: Optional[str | torch.Tensor] = None,
         sparse_layout: str = "torch_sparse",
         mm_function: str = "torch_sparse",
         num_classes: int = 10,
@@ -251,8 +233,8 @@ class TopographicalRNN(nn.Module):
                 )
                 use_random = False
             try:
-                connectivity_ih = torch.load(connectivity_ih)
                 connectivity_hh = torch.load(connectivity_hh)
+                connectivity_ih = torch.load(connectivity_ih)
             except Exception:
                 pass
 
@@ -266,52 +248,13 @@ class TopographicalRNN(nn.Module):
             ):
                 raise ValueError("Connectivity matrices must be square")
 
-            num_neurons = connectivity_ih.shape[0]
+            self.num_neurons = connectivity_ih.shape[0]
 
         elif use_random:
-            num_neurons = math.prod(sheet_size)
-
-            idx_1d = torch.arange(num_neurons)
-            idx = idx_1D_to_2D(idx_1d, sheet_size[0], sheet_size[1]).t()
-            synapses = (
-                torch.randn(num_neurons, 2, synapses_per_neuron) * synapse_std
-                + idx.unsqueeze(-1)
-            ).long()
-            if self_recurrence:
-                synapses = torch.cat([synapses, idx.unsqueeze(-1)], dim=2)
-            synapses = synapses.clamp(
-                torch.zeros(2).view(1, 2, 1),
-                torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1)).view(1, 2, 1),
+            connectivity_ih, connectivity_hh = self.random_connectivity(
+                sheet_size, synapse_std, synapses_per_neuron, self_recurrence
             )
-            synapses = idx_2D_to_1D(
-                synapses.transpose(0, 1).flatten(1), sheet_size[0], sheet_size[1]
-            ).view(num_neurons, -1)
-
-            synapse_root = idx_1d.expand(-1, synapses_per_neuron + 1)
-
-            indices = torch.stack((synapses, synapse_root)).flatten(1)
-
-            # He initialization of values (synapses_per_neuron is the fan_in)
-            values_ih = torch.randn(indices.shape[1]) * math.sqrt(
-                2 / synapses_per_neuron
-            )
-            values_hh = torch.randn(indices.shape[1]) * math.sqrt(
-                2 / synapses_per_neuron
-            )
-
-            connectivity_ih = torch.sparse_coo_tensor(
-                indices,
-                values_ih,
-                (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
-                check_invariants=True,
-            ).coalesce()
-
-            connectivity_hh = torch.sparse_coo_tensor(
-                indices,
-                values_hh,
-                (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
-                check_invariants=True,
-            ).coalesce()
+            self.num_neurons = sheet_size[0] * sheet_size[1]
         else:
             raise ValueError(
                 "Either connectivity or random initialization must be provided"
@@ -345,8 +288,8 @@ class TopographicalRNN(nn.Module):
 
         # Create the CorticalSheet layer
         self.rnn = SparseRNN(
-            num_neurons,
-            num_neurons,
+            self.num_neurons,
+            self.num_neurons,
             connectivity_ih,
             connectivity_hh,
             num_layers=1,
@@ -357,7 +300,7 @@ class TopographicalRNN(nn.Module):
             bias=bias,
         )
         num_out_neurons = (
-            num_neurons if output_indices is None else output_indices.shape[0]
+            self.num_neurons if output_indices is None else output_indices.shape[0]
         )
 
         # Create output block
@@ -366,6 +309,51 @@ class TopographicalRNN(nn.Module):
             self.activation,
             nn.Linear(64, num_classes),
         )
+
+    def random_connectivity(
+        self, sheet_size, synapse_std, synapses_per_neuron, self_recurrence
+    ):
+        num_neurons = sheet_size[0] * sheet_size[1]
+
+        idx_1d = torch.arange(num_neurons)
+        idx = idx_1D_to_2D(idx_1d, sheet_size[0], sheet_size[1]).t()
+        synapses = (
+            torch.randn(num_neurons, 2, synapses_per_neuron) * synapse_std
+            + idx.unsqueeze(-1)
+        ).long()
+        if self_recurrence:
+            synapses = torch.cat([synapses, idx.unsqueeze(-1)], dim=2)
+        synapses = synapses.clamp(
+            torch.zeros(2).view(1, 2, 1),
+            torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1)).view(1, 2, 1),
+        )
+        synapses = idx_2D_to_1D(
+            synapses.transpose(0, 1).flatten(1), sheet_size[0], sheet_size[1]
+        ).view(num_neurons, -1)
+
+        synapse_root = idx_1d.expand(-1, synapses_per_neuron + 1)
+
+        indices = torch.stack((synapses, synapse_root)).flatten(1)
+
+        # He initialization of values (synapses_per_neuron is the fan_in)
+        values_ih = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
+        values_hh = torch.randn(indices.shape[1]) * math.sqrt(2 / synapses_per_neuron)
+
+        connectivity_ih = torch.sparse_coo_tensor(
+            indices,
+            values_ih,
+            (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
+            check_invariants=True,
+        ).coalesce()
+
+        connectivity_hh = torch.sparse_coo_tensor(
+            indices,
+            values_hh,
+            (math.prod(sheet_size), math.prod(sheet_size)),  # type: ignore
+            check_invariants=True,
+        ).coalesce()
+
+        return connectivity_ih, connectivity_hh
 
     def visualize(self, activations, save_path=None, fps=4, frames=None):
         """
@@ -426,42 +414,26 @@ class TopographicalRNN(nn.Module):
         Returns:
             torch.Tensor: Output tensor.
         """
-
-        # Average out channel dimension if it exists
-        if x.dim() > 2:
-            x = x.flatten(2)
-            x = x.mean(dim=1)
+        if self.batch_first:
+            B, L, H = x.shape
+        else:
+            L, B, H = x.shape
 
         if self.input_indices is not None:
             input_x = torch.zeros(
-                x.shape[0],
-                self.cortical_sheet.num_neurons,
+                B,
+                self.num_neurons,
                 device=x.device,
                 dtype=x.dtype,
             )
             input_x[:, self.input_indices] = x
             x = input_x
 
-        # To avoid tranposing x before and after every iteration, we tranpose
-        # before and after ALL iterations and do not tranpose within forward()
-        # of self.cortical_sheet
-        if self.batch_first:
-            x = x.t()
-
-        input_x = x
-
-        # Pass the input through the CorticalSheet layer num_timesteps times
+        ret = self.rnn(x, num_steps, return_activations=return_activations)
         if return_activations:
-            activations = [x.t().detach().cpu()]
-
-        for _ in range(self.num_timesteps):
-            x = self.activation(self.cortical_sheet(input_x + x))
-            if return_activations:
-                activations.append(x.t().detach().cpu())
-
-        # Transpose back
-        if self.batch_first:
-            x = x.t()
+            out, _, activations = ret
+        else:
+            out, _ = ret
 
         # Select output indices if provided
         if self.output_indices is not None:
@@ -469,15 +441,5 @@ class TopographicalRNN(nn.Module):
 
         # Return classification from out_block
         if return_activations:
-            activations = torch.stack(activations)
             return self.out_block(x), activations
-        else:
-            return self.out_block(x)
-
-
-if __name__ == "__main__":
-    import os
-
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(dir_path, "topography_trainer.py")) as file:
-        exec(file.read())
+        return self.out_block(x)
