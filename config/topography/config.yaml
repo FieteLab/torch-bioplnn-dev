@@ -26,9 +26,8 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 criterion: cross_entropy
-wandb: true
 visualize:
-  disable: true
+  enable: False
   save_path: visualizations/test.gif
   fps: 4
   frames: [0, 20]
@@ -37,7 +36,7 @@ train:
   log_freq: 50
   model_dir: models
   grad_clip: 
-    disable: False
+    enable: True
     type: value
     value: 1.0
     fn: native
@@ -45,5 +44,10 @@ benchmark:
   warmup_iters: 20
   num_iters: 50
   save_dir: outputs/topography
+wandb:
+  project: Cortical RNN
+  mode: disabled
+  group: null
+tqdm: True
 seed: 0
 debug_level: 0

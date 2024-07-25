@@ -6,6 +6,7 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
@@ -17,12 +18,10 @@ from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import wandb
-
 log = logging.getLogger(__name__)
 
 
-def train_iter(
+def train_epoch(
     config: AttrDict,
     model: Conv2dEIRNN,
     optimizer: torch.optim.Optimizer,
@@ -136,7 +135,7 @@ def train_iter(
     return train_loss, train_acc
 
 
-def eval_iter(
+def eval_epoch(
     config: AttrDict,
     model: Conv2dEIRNN,
     criterion: torch.nn.Module,
@@ -312,7 +311,7 @@ def train(config: DictConfig) -> None:
 
     for epoch in range(config.train.epochs):
         # Train the model
-        train_loss, train_acc = train_iter(
+        train_loss, train_acc = train_epoch(
             config,
             model,
             optimizer,
@@ -324,7 +323,7 @@ def train(config: DictConfig) -> None:
         )
 
         # Evaluate the model on the validation set
-        test_loss, test_acc = eval_iter(
+        test_loss, test_acc = eval_epoch(
             config, model, criterion, val_loader, epoch, device
         )
 
