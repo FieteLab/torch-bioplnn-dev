@@ -1,6 +1,5 @@
 import os
 import random
-from typing import Iterable
 
 import numpy as np
 import scipy
@@ -13,27 +12,24 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 
 
-def seed(seed):
+def without_keys(d, keys):
+    return {x: d[x] for x in d if x not in keys}
+
+
+def manual_seed(seed):
     torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
 
 
-def make_deterministic(seed):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+def manual_seed_deterministic(seed):
+    manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.use_deterministic_algorithms(True)
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
-
-def seed_worker(base_seed, worker_id):
-    seed(base_seed + worker_id)
-
-
-def make_worker_deterministic(base_seed, worker_id):
-    make_deterministic(base_seed + worker_id)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 
 def get_activation_class(activation):
@@ -57,20 +53,14 @@ def get_activation_class(activation):
         return nn.GELU
     elif activation == "leaky_relu":
         return nn.LeakyReLU
+    elif activation == "silu":
+        return nn.SiLU
     else:
         raise ValueError(f"Activation function {activation} not supported.")
 
 
-def clip_grad_pass_(*args, **kwargs):
+def pass_fn(*args, **kwargs):
     pass
-
-
-def clip_grad_norm_(*args, **kwargs):
-    return clip_grad_norm_(*args, **kwargs)
-
-
-def clip_grad_value_(*args, **kwargs):
-    return clip_grad_value_(*args, **kwargs)
 
 
 def idx_1D_to_2D(x, m, n):
@@ -214,19 +204,19 @@ def dict_flatten(d, delimiter=".", key=None):
     return non_dicts | dicts
 
 
-def extend_for_multilayer(param, num_layers, depth=0):
+def expand_list(param, n, depth=0):
     inner = param
     for _ in range(depth):
-        if not isinstance(inner, Iterable):
-            break
+        if not isinstance(inner, (list, tuple)):
+            raise ValueError(f"The intermediate depth {depth} is not a list or tuple")
         inner = inner[0]
 
-    if isinstance(inner, Iterable):
-        param = [param] * num_layers
+    if not isinstance(inner, (list, tuple)):
+        param = [param] * n
 
-    if len(param) != num_layers:
+    if len(param) != n:
         raise ValueError(
-            "The length of param must match the number of layers if it is a list."
+            "The length of param must equal n if the inner variable at the given depth is already a list or tuple."
         )
 
     return param
@@ -238,10 +228,10 @@ def get_benchmark_dataloaders(
     retina_path=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
     from bioplnn.datasets import CIFAR10_V1, CIFAR100_V1, MNIST_V1
 
-    retina_path_arg = dict()
     if dataset in ["mnist", "mnist_v1"]:
         transform = T.Compose(
             [
@@ -250,10 +240,9 @@ def get_benchmark_dataloaders(
             ]
         )
         if dataset == "mnist":
-            dataset = MNIST
+            dataset_cls = MNIST
         else:
-            dataset = MNIST_V1
-            retina_path_arg = {"retina_path": retina_path}
+            dataset_cls = MNIST_V1
     elif dataset in ["cifar10", "cifar10_v1"]:
         transform = T.Compose(
             [
@@ -262,10 +251,9 @@ def get_benchmark_dataloaders(
             ]
         )
         if dataset == "cifar10":
-            dataset = CIFAR10
+            dataset_cls = CIFAR10
         else:
-            dataset = CIFAR10_V1
-            retina_path_arg = {"retina_path": retina_path}
+            dataset_cls = CIFAR10_V1
     elif dataset in ["cifar100", "cifar100_v1"]:
         transform = T.Compose(
             [
@@ -274,28 +262,28 @@ def get_benchmark_dataloaders(
             ]
         )
         if dataset == "cifar100":
-            dataset = CIFAR100
+            dataset_cls = CIFAR100
         else:
-            dataset = CIFAR100_V1
-            retina_path_arg = {"retina_path": retina_path}
+            dataset_cls = CIFAR100_V1
     else:
         raise NotImplementedError(f"Dataset {dataset} not implemented")
 
-    train_set = dataset(
-        root=root,
-        train=True,
-        download=True,
-        transform=transform,
-        **retina_path_arg,
-    )
+    if dataset.endswith("_v1"):
+        kwargs = {
+            "root": root,
+            "download": True,
+            "transform": transform,
+            "retina_path": retina_path,
+        }
+    else:
+        kwargs = {
+            "root": root,
+            "download": True,
+            "transform": transform,
+        }
 
-    test_set = dataset(
-        root="./data",
-        train=False,
-        transform=transform,
-        download=True,
-        **retina_path_arg,
-    )
+    train_set = dataset_cls(train=True, **kwargs)
+    test_set = dataset_cls(train=False, **kwargs)
 
     train_loader = DataLoader(
         dataset=train_set,
@@ -303,6 +291,8 @@ def get_benchmark_dataloaders(
         shuffle=True,
         pin_memory=torch.cuda.is_available(),
         num_workers=num_workers,
+        worker_init_fn=(lambda x: manual_seed(x + seed)) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
 
     test_loader = DataLoader(
@@ -311,6 +301,8 @@ def get_benchmark_dataloaders(
         shuffle=False,
         pin_memory=torch.cuda.is_available(),
         num_workers=num_workers,
+        worker_init_fn=(lambda x: manual_seed(x + seed)) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
 
     return train_loader, test_loader

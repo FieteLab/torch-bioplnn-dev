@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
 
-from bioplnn.utils import rescale, seed_worker
+from bioplnn.utils import manual_seed, rescale
 
 
 def draw_shape(
@@ -308,7 +308,7 @@ def get_qclevr_dataloaders(
         shuffle=True,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        worker_init_fn=seed_worker if seed is not None else None,
+        worker_init_fn=manual_seed if seed is not None else None,
         generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
     val_dataloader = DataLoader(
@@ -317,7 +317,7 @@ def get_qclevr_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        worker_init_fn=seed_worker if seed is not None else None,
+        worker_init_fn=manual_seed if seed is not None else None,
         generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
     return train_dataloader, val_dataloader

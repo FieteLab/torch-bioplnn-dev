@@ -1,5 +1,14 @@
 from .ei_crnn import Conv2dEIRNN
-from .sparse_rnn import SparseLinear, SparseRNN
-from .topography import TopographicalRNN
+from .sparse import SparseLinear, SparseRChebyKAN, SparseRKAN, SparseRNN
+from .topography import TopographicalRChebyKAN, TopographicalRKAN, TopographicalRNN
 
-__all__ = ["SparseLinear", "SparseRNN", "TopographicalRNN", "Conv2dEIRNN"]
+__all__ = [
+    "Conv2dEIRNN",
+    "SparseLinear",
+    "SparseRNN",
+    "SparseRKAN",
+    "SparseRChebyKAN",
+    "TopographicalRNN",
+    "TopographicalRKAN",
+    "TopographicalRChebyKAN",
+]

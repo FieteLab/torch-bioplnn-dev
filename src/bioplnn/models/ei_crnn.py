@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from addict import Dict as AttrDict
 
-from bioplnn.utils import extend_for_multilayer, get_activation_class
+from bioplnn.utils import expand_list, get_activation_class
 
 
 class AttentionalGainModulation(nn.Module):
@@ -835,15 +835,11 @@ class Conv2dEIRNN(nn.Module):
             fc_dim (int, optional): Dimension of the fully connected layer.
         """
         super().__init__()
-        self.h_pyr_dims = extend_for_multilayer(h_pyr_dim, num_layers)
-        self.h_inter_dims = extend_for_multilayer(h_inter_dims, num_layers, depth=1)
-        self.fb_dims = extend_for_multilayer(fb_dim, num_layers)
-        self.exc_kernel_sizes = extend_for_multilayer(
-            exc_kernel_size, num_layers, depth=1
-        )
-        self.inh_kernel_sizes = extend_for_multilayer(
-            inh_kernel_size, num_layers, depth=1
-        )
+        self.h_pyr_dims = expand_list(h_pyr_dim, num_layers)
+        self.h_inter_dims = expand_list(h_inter_dims, num_layers, depth=1)
+        self.fb_dims = expand_list(fb_dim, num_layers)
+        self.exc_kernel_sizes = expand_list(exc_kernel_size, num_layers, depth=1)
+        self.inh_kernel_sizes = expand_list(inh_kernel_size, num_layers, depth=1)
         self.modulation = modulation
         self.layer_time_delay = layer_time_delay
         if modulation.enable:
@@ -868,11 +864,9 @@ class Conv2dEIRNN(nn.Module):
         self.hidden_init_mode = hidden_init_mode
         self.fb_init_mode = fb_init_mode
         self.out_init_mode = out_init_mode
-        self.pool_kernel_sizes = extend_for_multilayer(
-            pool_kernel_size, num_layers, depth=1
-        )
-        self.pool_strides = extend_for_multilayer(pool_stride, num_layers, depth=1)
-        self.biases = extend_for_multilayer(bias, num_layers)
+        self.pool_kernel_sizes = expand_list(pool_kernel_size, num_layers, depth=1)
+        self.pool_strides = expand_list(pool_stride, num_layers, depth=1)
+        self.biases = expand_list(bias, num_layers)
 
         self.input_sizes = [input_size]
         for i in range(num_layers - 1):

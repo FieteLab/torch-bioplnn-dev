@@ -1,22 +1,11 @@
-model:
-  sheet_size: [150, 300]
-  connectivity_std: 10
-  synapses_per_neuron: 32
-  num_timesteps: 20
-  bias: true
-  num_classes: 10
-  mm_function: torch_sparse
-  sparse_format: torch_sparse
-  batch_first: true
-  adjacency_matrix_path: null
-  self_recurrence: true
-  input_indices: connection/V1_indices_flat.pt
-  output_indices: connection/V4_indices_flat.pt
-  activation: relu
+defaults:
+  - model: random_rnn
+  - _self_
+
 data:
   dataset: cifar10_v1
   root: data
-  retina_path: connection/V1_indices.npy
+  retina_path: connectivity/V1_indices.npy
   batch_size: 16
   num_workers: 8
 optimizer: 
@@ -25,29 +14,36 @@ optimizer:
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
+scheduler:
+  fn: one_cycle
+  pct_start: 0.3
 criterion: cross_entropy
 visualize:
-  enable: False
-  save_path: visualizations/test.gif
+  enable: false
+  save_dir: visualizations
   fps: 4
   frames: [0, 20]
 train:
-  epochs: 30
-  log_freq: 50
+  num_steps: 20
+  epochs: 100
+  log_freq: 10
   model_dir: models
-  grad_clip: 
-    enable: True
-    type: value
+  grad_clip:
+    enable: false
+    type: norm
     value: 1.0
-    fn: native
-benchmark:
-  warmup_iters: 20
-  num_iters: 50
-  save_dir: outputs/topography
+checkpoint:
+  root: checkpoints/topography
+  load: false
+  run: test2
+  epoch: null
 wandb:
   project: Cortical RNN
-  mode: disabled
+  mode: online
   group: null
-tqdm: True
+tqdm: true
+deterministic: false
 seed: 0
-debug_level: 0
+foreach: true
+matmul_precision: high
+debug_level: 2

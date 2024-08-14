@@ -6,17 +6,17 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from addict import Dict as AttrDict
 from bioplnn.datasets.qclevr import get_qclevr_dataloaders
 from bioplnn.loss import EDLLoss
 from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import clip_grad_norm_, clip_grad_pass_, clip_grad_value_, seed
-from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
+
+import wandb
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ def train_epoch(
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
     epoch: int,
+    global_step: int,
     device: torch.device,
 ) -> tuple[float, float]:
     """
@@ -116,7 +117,10 @@ def train_epoch(
         if (i + 1) % config.train.log_freq == 0:
             running_loss /= config.train.log_freq
             running_acc = running_correct / running_total
-            wandb.log(dict(running_loss=running_loss, running_acc=running_acc))
+            wandb.log(
+                dict(running_loss=running_loss, running_acc=running_acc),
+                step=global_step,
+            )
             bar.set_description(
                 f"Training | Epoch: {epoch} | "
                 f"Loss: {running_loss:.4f} | "
@@ -126,16 +130,16 @@ def train_epoch(
             running_correct = 0
             running_total = 0
 
+        global_step += len(labels)
+
     # Calculate average training loss and accuracy
     train_loss /= len(train_loader)
     train_acc = train_correct / train_total
 
-    wandb.log(dict(train_loss=train_loss, train_acc=train_acc))
-
     return train_loss, train_acc
 
 
-def eval_epoch(
+def val_epoch(
     config: AttrDict,
     model: Conv2dEIRNN,
     criterion: torch.nn.Module,
@@ -149,17 +153,17 @@ def eval_epoch(
     Args:
         model (Conv2dEIRNN): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
-        val_loader (torch.utils.data.DataLoader): The test data loader.
+        val_loader (torch.utils.data.DataLoader): The val data loader.
         epoch (int): The current epoch number.
         device (torch.device): The device to perform computations on.
 
     Returns:
-        tuple: A tuple containing the test loss and accuracy.
+        tuple: A tuple containing the val loss and accuracy.
     """
     model.eval()
-    test_loss = 0.0
-    test_correct = 0
-    test_total = 0
+    val_loss = 0.0
+    val_correct = 0
+    val_total = 0
 
     with torch.no_grad():
         for cue, mixture, labels in val_loader:
@@ -184,19 +188,17 @@ def eval_epoch(
                 loss = criterion(outputs, labels)
 
             # Update statistics
-            test_loss += loss.item()
+            val_loss += loss.item()
             predicted = outputs.argmax(-1)
             correct = (predicted == labels).sum().item()
-            test_correct += correct
-            test_total += len(labels)
+            val_correct += correct
+            val_total += len(labels)
 
-    # Calculate average test loss and accuracy
-    test_loss /= len(val_loader)
-    test_acc = test_correct / test_total
+    # Calculate average val loss and accuracy
+    val_loss /= len(val_loader)
+    val_acc = val_correct / val_total
 
-    wandb.log(dict(test_loss=test_loss, test_acc=test_acc, epoch=epoch))
-
-    return test_loss, test_acc
+    return val_loss, val_acc
 
 
 def train(config: DictConfig) -> None:
@@ -212,25 +214,19 @@ def train(config: DictConfig) -> None:
     config = AttrDict(config)
 
     # Initialize Weights & Biases
+    wandb.require("core")
+    wandb.init(
+        **config.wandb,
+        config=config,
+        settings=wandb.Settings(start_method="thread"),
+    )
+    global_step = 0
     if config.wandb.mode != "disabled":
-        wandb.require("core")
-        wandb.init(
-            **config.wandb,
-            config=config,
-            settings=wandb.Settings(start_method="thread"),
-        )
         checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
     else:
-        checkpoint_dir = os.path.join(config.checkpoint.root, "test")
+        checkpoint_dir = os.path.join(config.checkpoint.root, config.checkpoint.run)
 
     os.makedirs(checkpoint_dir, exist_ok=True)
-
-    try:
-        wandb.log(
-            dict(run_id=HydraConfig.get().job.run, job_id=HydraConfig.get().job.id)
-        )
-    except Exception as e:
-        print(e)
 
     # Set the random seed
     if config.seed is not None:
@@ -310,8 +306,9 @@ def train(config: DictConfig) -> None:
         raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
 
     for epoch in range(config.train.epochs):
+        wandb.log(dict(epoch=epoch), step=global_step)
         # Train the model
-        train_loss, train_acc = train_epoch(
+        train_loss, train_acc, global_step = train_epoch(
             config,
             model,
             optimizer,
@@ -319,21 +316,24 @@ def train(config: DictConfig) -> None:
             criterion,
             train_loader,
             epoch,
+            global_step,
             device,
         )
+        wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
 
         # Evaluate the model on the validation set
-        test_loss, test_acc = eval_epoch(
+        val_loss, val_acc = val_epoch(
             config, model, criterion, val_loader, epoch, device
         )
+        wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 
         # Print the epoch statistics
         print(
             f"Epoch [{epoch}/{config.train.epochs}] | "
             f"Train Loss: {train_loss:.4f} | "
             f"Train Accuracy: {train_acc:.2%} | "
-            f"Test Loss: {test_loss:.4f}, "
-            f"Test Accuracy: {test_acc:.2%}"
+            f"Test Loss: {val_loss:.4f}, "
+            f"Test Accuracy: {val_acc:.2%}"
         )
 
         # Save the model

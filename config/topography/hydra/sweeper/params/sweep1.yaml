@@ -1,5 +1,0 @@
-data.batch_size: 4,16,64,256
-model.connectivity_std: 1,10,100,1000
-model.synapses_per_neuron: 10,100,1000
-model.mm_function: torch_sparse,native,tsgu
-model.sparse_format: torch_sparse,csr

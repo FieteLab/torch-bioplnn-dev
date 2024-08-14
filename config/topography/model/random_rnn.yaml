@@ -1,0 +1,17 @@
+cls: topographical_rnn
+sheet_size: [150, 300]
+synapse_std: 10
+synapses_per_neuron: 32
+self_recurrence: true
+connectivity_hh: null 
+connectivity_ih: null
+sparse_format: torch_sparse
+mm_function: torch_sparse
+num_classes: 10
+batch_first: true
+input_indices: connectivity/V1_indices_flat.pt
+output_indices: connectivity/V4_indices_flat.pt
+rnn_nonlinearity: relu
+out_nonlinearity: relu
+use_layernorm: true
+bias: true

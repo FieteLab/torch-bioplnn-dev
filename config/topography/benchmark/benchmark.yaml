@@ -1,0 +1,3 @@
+warmup_iters: 20
+num_iters: 50
+save_dir: outputs/topography

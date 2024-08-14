@@ -1,0 +1,21 @@
+cls: topographical_rkan
+sheet_size: [150, 300]
+synapse_std: 10
+synapses_per_neuron: 32
+self_recurrence: true
+connectivity_hh: null
+connectivity_ih: null
+input_indices: connectivity/V1_indices_flat.pt
+output_indices: connectivity/V4_indices_flat.pt
+num_classes: 10
+batch_first: true
+grid_min: -2.0
+grid_max: 2.0
+num_grids: 8
+use_base_update: true
+spline_weight_init_scale: 0.1
+use_layernorm: true
+sparse_format: torch_sparse
+mm_function: torch_sparse
+base_nonlinearity: silu
+out_nonlinearity: relu
