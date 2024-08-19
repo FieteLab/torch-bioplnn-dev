@@ -406,11 +406,11 @@ class SparseRNN(nn.Module):
         if self.batch_first:
             out = out.permute(2, 0, 1)
             if return_activations:
-                activations = [x.permute(2, 0, 1) for h_t in activations]
+                activations = [h_t.permute(2, 0, 1) for h_t in activations]
         else:
             out = out.permute(0, 2, 1)
             if return_activations:
-                activations = [x.permute(0, 2, 1) for h_t in activations]
+                activations = [h_t.permute(0, 2, 1) for h_t in activations]
 
         if return_activations:
             return out, h, activations

@@ -2,14 +2,10 @@ import glob
 import json
 import multiprocessing
 import os
-from typing import Callable, Optional
+from typing import Callable
 
-import torch
 from PIL import Image, ImageDraw
-from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms import transforms
-
-from bioplnn.utils import manual_seed, rescale
+from torch.utils.data import Dataset
 
 
 def draw_shape(
@@ -20,8 +16,6 @@ def draw_shape(
     draw = ImageDraw.Draw(image)
 
     if shape_type == "cylinder":
-        width, height = size[0], size[1]
-
         # Draw top cap (ellipse)
         x1_top, y1_top = center[0] - size[0] // 2, center[1] + size[1] // 2 - 25
         x2_top, y2_top = center[0] + size[0] // 2, center[1] + size[1] // 2 + 25
@@ -212,10 +206,10 @@ class qCLEVRDataset(Dataset):
                 path, cue, count, mode = zip(
                     *[self.get_file(_mode, x) for x in scene_paths]
                 )
-            path = filter(lambda x: x is not None, path)
-            cue = filter(lambda x: x is not None, cue)
-            count = filter(lambda x: x is not None, count)
-            mode = filter(lambda x: x is not None, mode)
+            path = filter(None, path)
+            cue = filter(None, cue)
+            count = filter(None, count)
+            mode = filter(None, mode)
             paths.extend(path)
             cues.extend(cue)
             counts.extend(count)
@@ -261,63 +255,3 @@ class qCLEVRDataset(Dataset):
 
     def __len__(self):
         return len(self.files)
-
-
-def get_qclevr_dataloaders(
-    data_root: str,
-    assets_path: str,
-    train_batch_size: int,
-    val_batch_size: int,
-    resolution: tuple[int, int],
-    holdout: list = [],
-    mode: str = "color",
-    primitive: bool = True,
-    num_workers: int = 0,
-    seed: Optional[int] = None,
-):
-    clevr_transforms = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Lambda(rescale),
-            transforms.Resize(resolution),
-        ]
-    )
-    train_dataset = qCLEVRDataset(
-        data_root=data_root,
-        assets_path=assets_path,
-        clevr_transforms=clevr_transforms,
-        split="train",
-        holdout=holdout,
-        mode=mode,
-        primitive=primitive,
-        num_workers=num_workers,
-    )
-    val_dataset = qCLEVRDataset(
-        data_root=data_root,
-        assets_path=assets_path,
-        clevr_transforms=clevr_transforms,
-        split="valid",
-        holdout=holdout,
-        mode=mode,
-        primitive=primitive,
-        num_workers=num_workers,
-    )
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=train_batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
-    )
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=val_batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
-    )
-    return train_dataloader, val_dataloader

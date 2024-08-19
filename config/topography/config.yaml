@@ -5,7 +5,7 @@ defaults:
 data:
   dataset: cifar10_v1
   root: data
-  retina_path: connectivity/V1_indices.npy
+  retina_path: connectivity/V1_indices.pt
   batch_size: 16
   num_workers: 8
 optimizer: 

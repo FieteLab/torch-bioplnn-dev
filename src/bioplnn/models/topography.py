@@ -230,27 +230,36 @@ class TopographicalRNNBase(nn.Module):
         Forward pass of the TopographicalCorticalRNN.
 
         Args:
-            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_channels, num_neurons).
+            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_steps, num_neurons) or (num_steps, batch_size, num_neurons).
 
         Returns:
             torch.Tensor: Output tensor.
         """
         # TODO: Add sparse-dense hybrid functionality for channels
-        x = x.mean(dim=1)
-        if self.batch_first:
+        if self.batch_first or x.dim() == 2:
             batch_size = x.shape[0]
         else:
             batch_size = x.shape[1]
 
         if self.input_indices is not None:
-            input_x = torch.zeros(
-                batch_size,
-                self.num_neurons,
-                device=x.device,
-                dtype=x.dtype,
-            )
-            input_x[..., self.input_indices] = x
-            x = input_x
+            T = x.shape[1] if x.dim() == 3 else 1
+            xs = []
+            for t in range(T):
+                x_t = torch.zeros(
+                    batch_size,
+                    self.num_neurons,
+                    device=x.device,
+                    dtype=x.dtype,
+                )
+                if x.dim() == 3:
+                    if self.batch_first:
+                        x_t[:, self.input_indices] = x[:, t]
+                    else:
+                        x_t[:, self.input_indices] = x[t]
+                else:
+                    x_t[:, self.input_indices] = x
+                xs.append(x_t)
+            x = torch.stack(xs)
 
         ret = self.rnn(x, num_steps, return_activations=return_activations)
         if return_activations:
