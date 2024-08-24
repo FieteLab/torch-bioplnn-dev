@@ -224,7 +224,6 @@ class TopographicalRNNBase(nn.Module):
         self,
         x,
         num_steps=None,
-        return_activations=False,
     ):
         """
         Forward pass of the TopographicalCorticalRNN.
@@ -236,13 +235,20 @@ class TopographicalRNNBase(nn.Module):
             torch.Tensor: Output tensor.
         """
         # TODO: Add sparse-dense hybrid functionality for channels
-        if self.batch_first or x.dim() == 2:
+        if self.batch_first:
+            if x.dim() == 2:
+                T = 1
+            else:
+                T = x.shape[1]
             batch_size = x.shape[0]
         else:
+            if x.dim() == 2:
+                T = 1
+            else:
+                T = x.shape[0]
             batch_size = x.shape[1]
 
         if self.input_indices is not None:
-            T = x.shape[1] if x.dim() == 3 else 1
             xs = []
             for t in range(T):
                 x_t = torch.zeros(
@@ -259,13 +265,9 @@ class TopographicalRNNBase(nn.Module):
                 else:
                     x_t[:, self.input_indices] = x
                 xs.append(x_t)
-            x = torch.stack(xs)
+            x = torch.stack(xs).squeeze()
 
-        ret = self.rnn(x, num_steps, return_activations=return_activations)
-        if return_activations:
-            x, _, activations = ret
-        else:
-            x, _ = ret
+        x, h = self.rnn(x, num_steps)
 
         if self.batch_first:
             x = x[:, -1]
@@ -274,12 +276,10 @@ class TopographicalRNNBase(nn.Module):
 
         # Select output indices if provided
         if self.output_indices is not None:
-            x = x[..., self.output_indices]
+            x = x[:, self.output_indices]
 
         # Return classification from out_block
-        if return_activations:
-            return self.out_block(x), activations
-        return self.out_block(x)
+        return self.out_block(x), h
 
 
 class TopographicalRNN(TopographicalRNNBase):

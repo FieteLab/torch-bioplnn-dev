@@ -22,19 +22,9 @@ model:
   immediate_inhibition: true
   num_layers: 4
   inter_mode: half
-  num_classes: 6
-  modulation:
-    enable: true
-    type: conv
-    apply_to: layer_output
-    op: mul
-    timestep_cue: all
-    timestep_mix: all
-    activation: relu
   layer_time_delay: false
   exc_rectify: null
   inh_rectify: pos
-  flush_hidden: true
   hidden_init_mode: zeros
   fb_init_mode: zeros
   out_init_mode: zeros
@@ -46,19 +36,31 @@ model:
   pool_kernel_size: [5, 5]
   pool_stride: [2, 2]
   bias: true
-  dropout: 0.2
   pre_inh_activation: tanh
   post_inh_activation: null
-  fc_dim: 256
-  # Training parameters
+  modulation_enable: true
+  modulation_type: conv
+  modulation_op: mul
+  modulation_activation: relu
+  modulation_apply_to: layer_output
+  modulation_timestep_cue: all
+  modulation_timestep_mix: all
+  flush_hidden: true
+  flush_out: true
+  flush_fb: true
+  num_classes: 6
+  fc_dim: 512
+  dropout: 0.2
 data:
   root: data/qclevr
-  assets_path: data/CLEVR_v1.0/cues
-  batch_size: 256
+  cue_assets_root: null # data/CLEVR_v1.0/cues
+  train_batch_size: 256
   val_batch_size: 64
-  holdout: [blue,green,cube,cube_blue,cube_green]
   mode: every
+  holdout: [] # [blue,green,cube,cube_blue,cube_green]
   primitive: true
+  shape_cue_color: orange
+  use_cache: true
   num_workers: 8
 optimizer: 
   fn: adamw
@@ -83,13 +85,13 @@ train:
   epochs: 100
   log_freq: 5
   grad_clip:
-    disable: true
+    enable: false
     type: norm
     value: 1.0
 checkpoint:
   load: false
   root: checkpoints/ei
-  run: null
+  run: test
   epoch: null
 seed: null
 tqdm: true

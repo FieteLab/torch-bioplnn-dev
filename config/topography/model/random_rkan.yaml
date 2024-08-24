@@ -5,7 +5,7 @@ synapses_per_neuron: 32
 self_recurrence: true
 connectivity_hh: null
 connectivity_ih: null
-input_indices: connectivity/V1_indices_flat.pt
+input_indices: null
 output_indices: connectivity/V4_indices_flat.pt
 num_classes: 10
 batch_first: true

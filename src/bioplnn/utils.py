@@ -150,43 +150,53 @@ def profile_fn(fn, kwargs, sort_by="cuda_time_total", row_limit=50):
     return prof.key_averages.table(sort_by=sort_by, row_limit=row_limit)
 
 
+def rescale(x):
+    return x * 2 - 1
+
+
 def get_qclevr_dataloaders(
-    data_root: str,
-    assets_path: str,
+    root: str,
+    cue_assets_root: str,
     train_batch_size: int,
     val_batch_size: int,
-    resolution: tuple[int, int],
-    holdout: list = [],
+    resolution: tuple[int, int] = (128, 128),
     mode: str = "color",
+    holdout: list = [],
     primitive: bool = True,
+    shape_cue_color: str = "orange",
+    use_cache: bool = False,
     num_workers: int = 0,
     seed: Optional[int] = None,
 ):
-    clevr_transforms = transforms.Compose(
+    transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Lambda(lambda x: x * 2 - 1),
+            transforms.Lambda(rescale),
             transforms.Resize(resolution),
         ]
     )
     train_dataset = qCLEVRDataset(
-        data_root=data_root,
-        assets_path=assets_path,
-        clevr_transforms=clevr_transforms,
+        root=root,
+        cue_assets_root=cue_assets_root,
+        transform=transform,
         split="train",
-        holdout=holdout,
         mode=mode,
+        holdout=holdout,
         primitive=primitive,
+        shape_cue_color=shape_cue_color,
+        use_cache=use_cache,
         num_workers=num_workers,
     )
     val_dataset = qCLEVRDataset(
-        data_root=data_root,
-        assets_path=assets_path,
-        clevr_transforms=clevr_transforms,
-        split="valid",
-        holdout=holdout,
+        root=root,
+        cue_assets_root=cue_assets_root,
+        transform=transform,
+        split="val",
         mode=mode,
+        holdout=holdout,
         primitive=primitive,
+        shape_cue_color=shape_cue_color,
+        use_cache=use_cache,
         num_workers=num_workers,
     )
     train_dataloader = DataLoader(

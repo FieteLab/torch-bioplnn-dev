@@ -1,6 +1,6 @@
 import glob
 import json
-import multiprocessing
+import multiprocessing as mp
 import os
 from typing import Callable
 
@@ -8,97 +8,85 @@ from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
 
 
-def draw_shape(
-    image_size, shape_type, center, size=None, radius=None, color=(255, 0, 0)
-):
-    # Create a new image with a white background
-    image = Image.new("RGB", image_size, "gray")
-    draw = ImageDraw.Draw(image)
-
-    if shape_type == "cylinder":
-        # Draw top cap (ellipse)
-        x1_top, y1_top = center[0] - size[0] // 2, center[1] + size[1] // 2 - 25
-        x2_top, y2_top = center[0] + size[0] // 2, center[1] + size[1] // 2 + 25
-        draw.ellipse([x1_top, y1_top, x2_top, y2_top], fill=color)
-
-        # Draw body (rectangle)
-        x1_body, y1_body = center[0] - size[0] // 2, center[1] - size[1] // 2
-        x2_body, y2_body = center[0] + size[0] // 2, center[1] + size[1] // 2
-        draw.rectangle([x1_body, y1_body, x2_body, y2_body], fill=color)
-
-        # Draw bottom cap (ellipse)
-        x1_bottom, y1_bottom = center[0] - size[0] // 2, center[1] - size[1] // 2 - 25
-        x2_bottom, y2_bottom = center[0] + size[0] // 2, center[1] - size[1] // 2 + 25
-        draw.ellipse([x1_bottom, y1_bottom, x2_bottom, y2_bottom], fill=color)
-
-    elif shape_type == "cube":
-        if size is None:
-            raise ValueError("Size must be provided for a square.")
-        x1, y1 = center[0] - size // 2, center[1] - size // 2
-        x2, y2 = center[0] + size // 2, center[1] + size // 2
-        draw.rectangle([x1, y1, x2, y2], fill=color)
-
-    elif shape_type == "sphere":
-        if radius is None:
-            raise ValueError("Radius must be provided for a circle.")
-        x1, y1 = center[0] - radius, center[1] - radius
-        x2, y2 = center[0] + radius, center[1] + radius
-        draw.ellipse([x1, y1, x2, y2], fill=color)
-
-    else:
-        raise ValueError("Invalid shape_type. Use 'cylinder', 'square', or 'circle'.")
-
-    return image
-
-
 class qCLEVRDataset(Dataset):
     def __init__(
         self,
-        data_root: str,
-        assets_path: str,
-        clevr_transforms: Callable,
-        return_images: bool = False,
+        root: str,
+        cue_assets_root: str = None,
+        transform: Callable = None,
+        return_image_metadata: bool = False,
         split: str = "train",
-        holdout: list = [],
         mode: str = "color",
+        holdout: list = [],
         primitive: bool = True,
+        shape_cue_color: str = "orange",
+        use_cache: bool = True,
         num_workers: int = 0,
     ):
         super().__init__()
-        self.data_root = data_root
-        self.clevr_transforms = clevr_transforms
-        self.return_images = return_images
+        self.root = root
+        self.transform = transform
+        self.return_image_metadata = return_image_metadata
+        self.split = "valid" if split == "val" else split
         self.mode = mode
-        self.holdout = holdout
-        self.split = split
+        self.holdout = sorted(holdout)
         self.primitive = primitive
+        self.shape_cue_color = shape_cue_color
         self.num_workers = num_workers
 
-        assert os.path.exists(self.data_root), f"Path {self.data_root} does not exist"
-        assert self.split == "train" or self.split == "valid" or self.split == "test"
+        if num_workers > 1 and not use_cache:
+            mp.set_start_method("fork", force=True)
 
-        self._modes = (
+        if not os.path.exists(root):
+            raise ValueError(f"root path '{root}' does not exist")
+        if not (self.split == "train" or self.split == "valid" or self.split == "test"):
+            raise ValueError("split must be 'train', 'valid', or 'test'")
+
+        self.modes_avail = (
             ["color", "shape", "conjunction"] if self.mode == "every" else [self.mode]
         )
         self.data_paths = {
-            _mode: os.path.join(data_root, "{}_{}".format(split, _mode), "images")
-            for _mode in self._modes
+            _mode: os.path.join(root, "{}_{}".format(self.split, _mode), "images")
+            for _mode in self.modes_avail
         }
-        assert all(
+        if not all(
             [os.path.exists(data_path) for data_path in self.data_paths.values()]
-        )
+        ):
+            raise ValueError("Data paths for all modes must exist.")
 
         print("*** Holding out: {}".format(self.holdout))
         print("*** Mode: {}".format(self.mode))
 
         # populate this by reading in meta data
-        self.files, self.cues, self.counts, self.modes = self.get_files()
+        parent_dir = os.path.dirname(os.path.dirname(self.root))
+        cache_dir = os.path.join(
+            parent_dir, "qclevr_cache", self.split, mode, f"holdout={self.holdout}"
+        )
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(cache_dir, "cache.json")
+        if use_cache:
+            cache = json.load(open(cache_path, "r"))
+            self.files = cache["files"]
+            self.cues = cache["cues"]
+            self.counts = cache["counts"]
+            self.modes = cache["modes"]
+        else:
+            self.files, self.cues, self.counts, self.modes = self.get_files()
+            json.dump(
+                {
+                    "files": self.files,
+                    "cues": self.cues,
+                    "counts": self.counts,
+                    "modes": self.modes,
+                },
+                open(cache_path, "w"),
+            )
 
-        assert (
-            len(self.files) != 0
-        ), "Something about the config results in an empty dataset!"
+        if len(self.files) == 0:
+            raise ValueError("No files found in the dataset. Check your parameters.")
 
-        """object colors: gray, red, blue, green, brown, purple, cyan, yellow
+        """
+        object colors: gray, red, blue, green, brown, purple, cyan, yellow
         aux colors: black, white, pink, orange, teal, navy, maroon, olive
         """
         self.color_dict = {
@@ -120,71 +108,34 @@ class qCLEVRDataset(Dataset):
             "cyan": (41, 208, 208),
         }
 
-        self.color_list = list(self.color_dict.keys())
-        self.shape_list = ["cylinder", "cube", "sphere"]
-        self.iter_thresh = 10
-
-        asset_list = glob.glob(os.path.join(assets_path, "*.png"))
-        self.assets = {k: {} for k in self.shape_list}
-
-        """populate the shape cue images
-        """
-        for x in asset_list:
-            shp, col = x.split("/")[-1].split(".")[0].split("_")
-            if col == "orange":
-                col = "shapecue"
-            self.assets[shp][col] = Image.open(x).convert("RGB")
-
-    def gen_shape(self, img, shape, sz=100):
-        if self.primitive:
-            if shape == "cylinder":
-                sz = (50, 100)
-            cue = draw_shape(
-                (img.size[0], img.size[1]),
-                shape,
-                (img.size[0] / 2, img.size[1] / 2),
-                size=sz,
-                radius=100,
-                color=(255, 255, 255),
-            )
+        if not primitive:
+            if cue_assets_root is None:
+                raise ValueError(
+                    "cue_assets_root must be provided if primitive is False"
+                )
+            cue_paths = glob.glob(os.path.join(cue_assets_root, "*.png"))
+            self.cue_assets = {k: {} for k in ["cylinder", "cube", "sphere"]}
+            for path in cue_paths:
+                shape, color = path.split("/")[-1].split(".")[0].split("_")
+                self.cue_assets[shape][color] = Image.open(path).convert("RGB")
         else:
-            cue = self.assets[shape]["shapecue"].copy()
-        return cue
+            if cue_assets_root is not None:
+                raise ValueError("cue_assets_root must be None if primitive is True")
 
-    def gen_conjunction_trial(self, img, cue_str):
-        col = cue_str[1]
-        shape = cue_str[0]
-        if self.primitive:
-            sz = 100
-            if shape == "cylinder":
-                sz = (50, 100)
-            cue = draw_shape(
-                (img.size[0], img.size[1]),
-                shape,
-                (img.size[0] / 2, img.size[1] / 2),
-                size=sz,
-                radius=100,
-                color=col,
-            )
-        else:
-            cue = self.assets[shape][col].copy()
-
-        return cue
-
-    def get_file(self, _mode, scene_path):
-        with open(scene_path, "r") as f:
-            x = json.load(f)
-            cue_type = x["cue"]
-            if _mode == "conjunction":
-                cue_type = "{}_{}".format(cue_type[0], cue_type[1])
-            if (self.split == "train" and cue_type not in self.holdout) or (
-                self.split in ("valid", "test")
-                and (len(self.holdout) == 0 or cue_type in self.holdout)
-            ):
-                image_path = os.path.join(self.data_paths[_mode], x["image_filename"])
-                assert os.path.exists(image_path), f"{image_path} does not exist"
-                return image_path, x["cue"], x["target_count"], _mode
-            return None, None, None, None
+    def get_file(self, mode, scene_path):
+        scene = json.load(open(scene_path, "r"))
+        cue_type = scene["cue"]
+        if mode == "conjunction":
+            cue_type = f"{cue_type[0]}_{cue_type[1]}"
+        if (self.split == "train" and cue_type not in self.holdout) or (
+            self.split in ("valid", "test")
+            and (len(self.holdout) == 0 or cue_type in self.holdout)
+        ):
+            image_path = os.path.join(self.data_paths[mode], scene["image_filename"])
+            if not os.path.exists(image_path):
+                raise ValueError(f"Image path '{image_path}' does not exist")
+            return image_path, scene["cue"], scene["target_count"], mode
+        return None, None, None, None
 
     def get_files(self) -> list[str]:
         paths = []
@@ -192,9 +143,9 @@ class qCLEVRDataset(Dataset):
         counts = []
         modes = []
         if self.num_workers > 1:
-            pool = multiprocessing.Pool(self.num_workers)
-        for _mode in self._modes:
-            spath = os.path.join(self.data_root, f"{self.split}_{_mode}", "scenes")
+            pool = mp.Pool(self.num_workers)
+        for _mode in self.modes_avail:
+            spath = os.path.join(self.root, f"{self.split}_{_mode}", "scenes")
             scene_paths = sorted(glob.glob(os.path.join(spath, "*")))
             if self.num_workers > 1:
                 path, cue, count, mode = zip(
@@ -206,18 +157,130 @@ class qCLEVRDataset(Dataset):
                 path, cue, count, mode = zip(
                     *[self.get_file(_mode, x) for x in scene_paths]
                 )
-            path = filter(None, path)
-            cue = filter(None, cue)
-            count = filter(None, count)
-            mode = filter(None, mode)
+            path = filter(lambda x: x is not None, path)
+            cue = filter(lambda x: x is not None, cue)
+            count = filter(lambda x: x is not None, count)
+            mode = filter(lambda x: x is not None, mode)
             paths.extend(path)
             cues.extend(cue)
             counts.extend(count)
             modes.extend(mode)
 
+        if not (len(paths) == len(cues) == len(counts) == len(modes)):
+            raise ValueError(
+                "Length of paths, cues, counts, and modes must be equal, "
+                f"currently {len(paths)}, {len(cues)}, {len(counts)}, {len(modes)}"
+            )
+
         return paths, cues, counts, modes
 
-    # def visualize(self, output_dict):
+    @staticmethod
+    def draw_shape(
+        image_size, shape_type, center, shape_size=None, radius=None, color=(255, 0, 0)
+    ):
+        # Create a new image with a white background
+        image = Image.new("RGB", image_size, "gray")
+        draw = ImageDraw.Draw(image)
+
+        if shape_type == "cylinder":
+            if shape_size is None:
+                raise ValueError("shape_size must be provided for a cylinder.")
+            # Draw top cap (ellipse)
+            x1_top, y1_top = (
+                center[0] - shape_size[0] // 2,
+                center[1] + shape_size[1] // 2 - 25,
+            )
+            x2_top, y2_top = (
+                center[0] + shape_size[0] // 2,
+                center[1] + shape_size[1] // 2 + 25,
+            )
+            draw.ellipse([x1_top, y1_top, x2_top, y2_top], fill=color)
+
+            # Draw body (rectangle)
+            x1_body, y1_body = (
+                center[0] - shape_size[0] // 2,
+                center[1] - shape_size[1] // 2,
+            )
+            x2_body, y2_body = (
+                center[0] + shape_size[0] // 2,
+                center[1] + shape_size[1] // 2,
+            )
+            draw.rectangle([x1_body, y1_body, x2_body, y2_body], fill=color)
+
+            # Draw bottom cap (ellipse)
+            x1_bottom, y1_bottom = (
+                center[0] - shape_size[0] // 2,
+                center[1] - shape_size[1] // 2 - 25,
+            )
+            x2_bottom, y2_bottom = (
+                center[0] + shape_size[0] // 2,
+                center[1] - shape_size[1] // 2 + 25,
+            )
+            draw.ellipse([x1_bottom, y1_bottom, x2_bottom, y2_bottom], fill=color)
+
+        elif shape_type == "cube":
+            if shape_size is None:
+                raise ValueError("shape_size must be provided for a square.")
+            x1, y1 = center[0] - shape_size // 2, center[1] - shape_size // 2
+            x2, y2 = center[0] + shape_size // 2, center[1] + shape_size // 2
+            draw.rectangle([x1, y1, x2, y2], fill=color)
+
+        elif shape_type == "sphere":
+            if radius is None:
+                raise ValueError("Radius must be provided for a circle.")
+            x1, y1 = center[0] - radius, center[1] - radius
+            x2, y2 = center[0] + radius, center[1] + radius
+            draw.ellipse([x1, y1, x2, y2], fill=color)
+
+        else:
+            raise ValueError(
+                f"Invalid shape_type {shape_type}. Use 'cylinder', 'square', or 'circle'."
+            )
+
+        return image
+
+    def gen_color(self, img, cue_str):
+        cue = img.copy()
+        cue.paste(self.color_dict[cue_str], [0, 0, cue.size[0], cue.size[1]])
+        return cue
+
+    def gen_shape(self, img, cue_str, shape_size=100):
+        if self.primitive:
+            if cue_str == "cylinder":
+                shape_size = (50, 100)
+            cue = self.draw_shape(
+                image_size=(img.size[0], img.size[1]),
+                shape_type=cue_str,
+                center=(img.size[0] / 2, img.size[1] / 2),
+                shape_size=shape_size,
+                radius=100,
+                color=(255, 255, 255),
+            )
+        else:
+            cue = self.cue_assets[cue_str][self.shape_cue_color].copy()
+        return cue
+
+    def gen_conjunction(self, img, cue_str, shape_size=100):
+        shape = cue_str[0]
+        color = cue_str[1]
+        if self.primitive:
+            if shape == "cylinder":
+                shape_size = (50, 100)
+            cue = self.draw_shape(
+                image_size=(img.size[0], img.size[1]),
+                shape_type=shape,
+                center=(img.size[0] / 2, img.size[1] / 2),
+                shape_size=shape_size,
+                radius=100,
+                color=color,
+            )
+        else:
+            cue = self.cue_assets[shape][color].copy()
+
+        return cue
+
+    def __len__(self):
+        return len(self.files)
 
     def __getitem__(self, index: int):
         image_path = self.files[index]
@@ -230,28 +293,24 @@ class qCLEVRDataset(Dataset):
 
         # create a cue and get the right numerical label
         if mode == "color":
-            cue = img.copy()
-            cue.paste(self.color_dict[cue_str], [0, 0, cue.size[0], cue.size[1]])
+            cue = self.gen_color(img, cue_str)
         elif mode == "shape":
             cue = self.gen_shape(img, cue_str)
         elif mode == "conjunction":
-            cue = self.gen_conjunction_trial(img, cue_str)
+            cue = self.gen_conjunction(img, cue_str)
         else:
-            raise NotImplementedError
+            raise ValueError("Invalid mode. Must be 'color', 'shape', or 'conjunction'")
 
-        if self.return_images:
+        if self.return_image_metadata:
             if mode == "conjunction":
-                cue_str = "{}_{}".format(cue_str[0], cue_str[1])
+                cue_str = "f{cue_str[0]}_{cue_str[1]}"
             return (
-                self.clevr_transforms(cue),
-                self.clevr_transforms(img),
+                self.transform(cue),
+                self.transform(img),
                 label,
                 image_path,
                 mode,
                 cue_str,
             )
         else:
-            return self.clevr_transforms(cue), self.clevr_transforms(img), label
-
-    def __len__(self):
-        return len(self.files)
+            return self.transform(cue), self.transform(img), label

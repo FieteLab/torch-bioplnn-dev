@@ -338,7 +338,7 @@ class SparseRNN(nn.Module):
             ]
         )
 
-    def forward(self, x, num_steps=None, return_activations=False):
+    def forward(self, x, num_steps=None):
         """
         Forward pass of the TopographicalCorticalCell.
 
@@ -351,21 +351,17 @@ class SparseRNN(nn.Module):
         device = x.device
 
         if x.dim() == 2:
-            if not self.batch_first:
-                raise ValueError("batch_first must be False for 2D input.")
             if num_steps is None:
                 raise ValueError("num_steps must be provided for 2D input.")
             x = x.t()
-            x = [x] * num_steps
+            x = x.unsqueeze(0).expand(num_steps, -1, -1)
         elif x.dim() == 3:
             if self.batch_first:
-                x = x.permute(
-                    1, 2, 0
-                )  # (batch_size, num_steps, input_size) -> (num_steps, input_size, batch_size)
+                # (batch_size, num_steps, input_size) -> (num_steps, input_size, batch_size)
+                x = x.permute(1, 2, 0)
             else:
-                x = x.permute(
-                    0, 2, 1
-                )  # (num_steps, batch_size, input_size) -> (num_steps, input_size, batch_size)
+                # (num_steps, batch_size, input_size) -> (num_steps, input_size, batch_size)
+                x = x.permute(0, 2, 1)
             if num_steps is not None and x.shape[0] != num_steps:
                 raise ValueError(
                     "num_steps must be None or equal to the length of the first dimension of x"
@@ -376,16 +372,13 @@ class SparseRNN(nn.Module):
                 f"Input tensor must be 2D or 3D, but got {x.dim()} dimensions."
             )
 
-        batch_size = x[0].shape[-1]
-        out = []
-
-        if return_activations:
-            activations = [[] for _ in range(len(self.layers))]
+        batch_size = x.shape[-1]
 
         h = [
-            torch.zeros(self.hidden_size[i], batch_size).to(device)
-            for i in range(len(self.layers))
+            torch.zeros(self.hidden_size[0], batch_size).to(device)
+            for _ in range(len(self.layers))
         ]
+        out = []
 
         for t in range(num_steps):
             for i, layer in enumerate(self.layers):
@@ -393,27 +386,17 @@ class SparseRNN(nn.Module):
                     layer.ih(x[t] if i == 0 else h[i - 1]) + layer.hh(h[i])
                 )
                 h[i] = self.layernorms[i](h[i].t()).t()
-                if return_activations:
-                    activations.append([h_i.clone() for h_i in h])
             out.append(h[-1])
 
         out = torch.stack(out)
 
-        if return_activations:
-            activations = [torch.stack([h_i for h_i in h_t]) for h_t in activations]
-
-        h = [h_i.t() for h_i in h]
         if self.batch_first:
             out = out.permute(2, 0, 1)
-            if return_activations:
-                activations = [h_t.permute(2, 0, 1) for h_t in activations]
         else:
             out = out.permute(0, 2, 1)
-            if return_activations:
-                activations = [h_t.permute(0, 2, 1) for h_t in activations]
 
-        if return_activations:
-            return out, h, activations
+        h = [h_i.transpose(0, 1) for h_i in h]
+
         return out, h
 
 
@@ -441,7 +424,7 @@ class SparseRKANBase(nn.Module):
             ]
         )
 
-    def forward(self, x, num_steps=None, return_activations=False):
+    def forward(self, x, num_steps=None):
         """
         Forward pass of the TopographicalCorticalCell.
 
@@ -477,37 +460,23 @@ class SparseRKANBase(nn.Module):
             )
         # x.shape == (num_steps, batch_size, input_size)
         # Note difference from SparseRNN
-        out = []
         h = [
-            torch.zeros(batch_size, self.hidden_size[i]).to(device)
-            for i in range(len(self.layers))
+            torch.zeros(batch_size, self.hidden_size[0]).to(device)
+            for _ in range(len(self.layers))
         ]
-        if return_activations:
-            activations = [[] for _ in range(len(self.layers))]
+        out = []
 
         for t in range(num_steps):
             for i, layer in enumerate(self.layers):
                 h[i] = layer.ih(x[t] if i == 0 else h[i - 1]) + layer.hh(h[i])
                 h[i] = self.layernorms[i](h[i])
-                if return_activations:
-                    activations[i].append(h[i].clone())
             out.append(h[-1])
 
         out = torch.stack(out)
-        if return_activations:
-            activations = [torch.stack(activations_i) for activations_i in activations]
 
         if self.batch_first:
-            out = out.transpose(
-                0, 1
-            )  # (num_steps, batch_size, hidden_size) -> (batch_size, num_steps, hidden_size)
-            if return_activations:
-                activations = [
-                    activations_i.transpose(0, 1) for activations_i in activations
-                ]  # (num_layers, num_steps, batch_size, hidden_size) -> (num_layers, batch_size, num_steps, hidden_size)
+            out = out.transpose(0, 1)
 
-        if return_activations:
-            return out, h, activations
         return out, h
 
 
