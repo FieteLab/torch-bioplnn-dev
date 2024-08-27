@@ -2,7 +2,7 @@ import glob
 import json
 import multiprocessing as mp
 import os
-from typing import Callable
+from typing import Callable, Optional
 
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
@@ -12,7 +12,7 @@ class qCLEVRDataset(Dataset):
     def __init__(
         self,
         root: str,
-        cue_assets_root: str = None,
+        cue_assets_root: Optional[str] = None,
         transform: Callable = None,
         return_image_metadata: bool = False,
         split: str = "train",
@@ -37,6 +37,8 @@ class qCLEVRDataset(Dataset):
         if num_workers > 1 and not use_cache:
             mp.set_start_method("fork", force=True)
 
+        if root.endswith("/"):
+            root = root[:-1]
         if not os.path.exists(root):
             raise ValueError(f"root path '{root}' does not exist")
         if not (self.split == "train" or self.split == "valid" or self.split == "test"):
@@ -58,7 +60,7 @@ class qCLEVRDataset(Dataset):
         print("*** Mode: {}".format(self.mode))
 
         # populate this by reading in meta data
-        parent_dir = os.path.dirname(os.path.dirname(self.root))
+        parent_dir = os.path.dirname(self.root)
         cache_dir = os.path.join(
             parent_dir, "qclevr_cache", self.split, mode, f"holdout={self.holdout}"
         )

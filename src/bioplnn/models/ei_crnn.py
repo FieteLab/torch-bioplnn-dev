@@ -41,10 +41,9 @@ class Conv2dEIRNNCell(nn.Module):
         inter_mode: str = "half",
         exc_kernel_size: tuple[int, int] = (5, 5),
         inh_kernel_size: tuple[int, int] = (5, 5),
-        num_compartments: int = 3,
+        num_compartments: int = 1,
         immediate_inhibition: bool = False,
-        exc_rectify: Optional[str] = None,
-        inh_rectify: Optional[str] = "neg",
+        exc_rectify: bool = False,
         pool_kernel_size: tuple[int, int] = (5, 5),
         pool_stride: tuple[int, int] = (2, 2),
         bias: bool = True,
@@ -124,18 +123,14 @@ class Conv2dEIRNNCell(nn.Module):
                 torch.randn((1, self.h_inter_dims_sum, *self.inter_size))
             )
 
-        if exc_rectify == "pos":
+        if exc_rectify:
             Conv2dExc = Conv2dPositive
-        elif exc_rectify is None:
-            Conv2dExc = nn.Conv2d
         else:
-            raise ValueError("pyr_rectify must be 'pos' or None.")
+            Conv2dExc = nn.Conv2d
 
-        if inh_rectify == "neg":
-            Conv2dInh = Conv2dNegative
-        elif inh_rectify == "pos":
+        if exc_rectify:
             Conv2dInh = Conv2dPositive
-        elif inh_rectify is None:
+        else:
             Conv2dInh = nn.Conv2d
 
         # Initialize excitatory convolutional layers
@@ -320,8 +315,8 @@ class Conv2dEIRNNCell(nn.Module):
         self,
         input: torch.Tensor,
         h_pyr: torch.Tensor,
-        h_inter: torch.Tensor,
-        fb: torch.Tensor = None,
+        h_inter: Optional[torch.Tensor] = None,
+        fb: Optional[torch.Tensor] = None,
     ):
         """
         Performs forward pass of the cRNN_EI model.
@@ -390,39 +385,37 @@ class Conv2dEIRNNCell(nn.Module):
                 inhs[i] = self.pre_inh_activation(conv(exc_inters[i]))
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
-        # Computer candidate neural memory (cnm) states
-        # TODO: Figure out if relu is necessary/desirable
         if self.num_compartments == 1:
             cnm_pyr = self.post_inh_activation(
                 exc_pyr_basal
                 + exc_pyr_apical
-                - inh_pyr_soma
-                - inh_pyr_basal
-                - inh_pyr_apical
+                + inh_pyr_soma
+                + inh_pyr_basal
+                + inh_pyr_apical
             )
         elif self.num_compartments == 3:
-            pyr_basal = self.post_inh_activation(exc_pyr_basal - inh_pyr_basal)
+            pyr_basal = self.post_inh_activation(exc_pyr_basal + inh_pyr_basal)
             if isinstance(exc_pyr_apical, torch.Tensor) or isinstance(
                 exc_pyr_apical, torch.Tensor
             ):
-                pyr_apical = self.post_inh_activation(exc_pyr_apical - inh_pyr_apical)
+                pyr_apical = self.post_inh_activation(exc_pyr_apical + inh_pyr_apical)
             else:
                 pyr_apical = 0
-            cnm_pyr = self.post_inh_activation(pyr_apical + pyr_basal - inh_pyr_soma)
+            cnm_pyr = self.post_inh_activation(pyr_apical + pyr_basal + inh_pyr_soma)
         else:
             raise ValueError("num_compartments must be 1 or 3.")
 
         if self.h_inter_dims:
-            cnm_inter = exc_inter - inh_inter
+            cnm_inter = exc_inter + inh_inter
             if len(self.h_inter_dims) >= 3:
                 # Add excitations and inhibitions to interneuron 2
                 start = sum(self.h_inter_dims[:2])
                 end = start + self.h_inter_dims[2]
-                cnm_inter[:, start:end, ...] = exc_input_inter - inh_inter_2
+                cnm_inter[:, start:end, ...] = exc_input_inter + inh_inter_2
             if len(self.h_inter_dims) == 4:
                 # Add excitations and inhibitions to interneuron 3
                 start = sum(self.h_inter_dims[:3])
-                cnm_inter[:, start:, ...] = exc_fb_inter - inh_inter_3
+                cnm_inter[:, start:, ...] = exc_fb_inter + inh_inter_3
             else:
                 cnm_inter += exc_fb_inter
 
@@ -460,7 +453,6 @@ class Conv2dEIRNN(nn.Module):
         inter_mode: str,
         layer_time_delay: bool,
         exc_rectify: Optional[str],
-        inh_rectify: Optional[str],
         hidden_init_mode: str,
         fb_init_mode: str,
         out_init_mode: str,
@@ -495,7 +487,9 @@ class Conv2dEIRNN(nn.Module):
         """
         super().__init__()
         self.h_pyr_dims = expand_list(h_pyr_dim, num_layers)
-        self.h_inter_dims = expand_list(h_inter_dims, num_layers, depth=1)
+        self.h_inter_dims = expand_list(
+            h_inter_dims, num_layers, depth=0 if h_inter_dims is None else 1
+        )
         self.fb_dims = expand_list(fb_dim, num_layers)
         self.exc_kernel_sizes = expand_list(exc_kernel_size, num_layers, depth=1)
         self.inh_kernel_sizes = expand_list(inh_kernel_size, num_layers, depth=1)
@@ -536,9 +530,9 @@ class Conv2dEIRNN(nn.Module):
             if fb_adjacency.count_nonzero() == 0:
                 raise ValueError("fb_adjacency must be a non-zero tensor if provided.")
 
-            if exc_rectify == "pos":
+            if exc_rectify:
                 Conv2dFb = Conv2dPositive
-            elif exc_rectify is None:
+            else:
                 Conv2dFb = nn.Conv2d
             self.fb_adjacency = []
             self.fb_convs = nn.ModuleDict()
@@ -557,6 +551,11 @@ class Conv2dEIRNN(nn.Module):
                     self.fb_convs[f"fb_conv_{i}_{j}"] = nn.Sequential(
                         upsample, conv_exc
                     )
+        else:
+            if any(self.fb_dims):
+                raise ValueError(
+                    "If fb_adjacency is not provided, fb_dim must not be provided or 0 for all layers."
+                )
         self.use_fb = any(self.receives_fb)
 
         self.layers = nn.ModuleList()
@@ -577,7 +576,6 @@ class Conv2dEIRNN(nn.Module):
                     num_compartments=num_compartments,
                     immediate_inhibition=immediate_inhibition,
                     exc_rectify=exc_rectify,
-                    inh_rectify=inh_rectify,
                     pool_kernel_size=self.pool_kernel_sizes[i],
                     pool_stride=self.pool_strides[i],
                     bias=self.biases[i],
@@ -599,8 +597,11 @@ class Conv2dEIRNN(nn.Module):
 
     def _init_fb(self, batch_size, init_mode="zeros", device=None):
         fbs = []
-        for layer in self.layers:
-            fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
+        for i, layer in enumerate(self.layers):
+            if self.receives_fb[i]:
+                fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
+            else:
+                fb = None
             fbs.append(fb)
         return fbs
 
@@ -623,7 +624,10 @@ class Conv2dEIRNN(nn.Module):
     ):
         h_pyrs = [[None] * num_steps for _ in self.layers]
         h_inters = [[None] * num_steps for _ in self.layers]
-        fbs = [[None] * num_steps for _ in self.layers]
+        fbs = [
+            [0 if self.receives_fb[i] else None] * num_steps
+            for i in range(self.num_layers)
+        ]
         outs = [[None] * num_steps for _ in self.layers]
 
         if h_pyr_0 is None and h_inter_0 is None:
@@ -634,7 +638,7 @@ class Conv2dEIRNN(nn.Module):
             raise ValueError(
                 "If h_pyr_0 is provided, h_inter_0 must also be provided, and vice versa."
             )
-        if fb_0 is None:
+        if self.use_fb and fb_0 is None:
             fb_0 = self._init_fb(batch_size, init_mode=self.fb_init_mode, device=device)
         if out_0 is None:
             out_0 = self._init_out(
@@ -671,7 +675,7 @@ class Conv2dEIRNN(nn.Module):
         return x, num_steps
 
     @staticmethod
-    def _modulation_identity(x, t):
+    def _modulation_identity(x, i, t):
         return x
 
     def _format_modulation_fns(
@@ -681,10 +685,25 @@ class Conv2dEIRNN(nn.Module):
         for i, fn in enumerate(modulation_fns):
             if fn is None:
                 modulation_fns[i] = self._modulation_identity
-            elif not callable(modulation_fns):
-                raise ValueError("modulations must be callable or None.")
+            elif not callable(fn):
+                raise ValueError("modulation_fns must be callable or None.")
 
         return modulation_fns
+
+    def _format_outputs(self, h_pyrs, h_inters, fbs, outs):
+        for i in range(self.num_layers):
+            h_pyrs[i] = torch.stack(h_pyrs[i])
+            h_inters[i] = torch.stack(h_inters[i])
+            if self.use_fb and self.receives_fb[i]:
+                fbs[i] = torch.stack(fbs[i])
+            outs[i] = torch.stack(outs[i])
+            if self.batch_first:
+                h_pyrs[i] = h_pyrs[i].transpose(0, 1)
+                h_inters[i] = h_inters[i].transpose(0, 1)
+                if self.use_fb and self.receives_fb[i]:
+                    fbs[i] = fbs[i].transpose(0, 1)
+                outs[i] = outs[i].transpose(0, 1)
+        return h_pyrs, h_inters, fbs, outs
 
     def forward(
         self,
@@ -708,9 +727,10 @@ class Conv2dEIRNN(nn.Module):
             torch.Tensor: Output tensor after pooling of shape (b, n), where n is the number of classes.
         """
         device = x.device
-        batch_size = x.shape[1]
 
         x, num_steps = self._format_x(x, num_steps)
+
+        batch_size = x.shape[1]
 
         h_pyrs, h_inters, fbs, outs = self._init_state(
             h_pyr_0, h_inter_0, fb_0, out_0, num_steps, batch_size, device=device
@@ -721,12 +741,6 @@ class Conv2dEIRNN(nn.Module):
                 modulation_pyr_fn, modulation_inter_fn, modulation_out_fn
             )
         )
-
-        for i in range(self.num_layers):
-            h_pyrs[i][-1] = h_pyr_0[i]
-            h_inters[i][-1] = h_inter_0[i]
-            fbs[i][-1] = fb_0[i]
-            outs[i][-1] = out_0[i]
 
         for t in range(num_steps):
             for i, layer in enumerate(self.layers):
@@ -748,14 +762,16 @@ class Conv2dEIRNN(nn.Module):
                     ),
                     h_pyr=h_pyrs[i][t - 1],
                     h_inter=h_inters[i][t - 1],
-                    fb=fbs[i][t - 1] if self.receives_fb[i] else None,
+                    fb=fbs[i][t - 1],
                 )
                 # Apply feedback
                 if self.use_fb:
                     for j in self.fb_adjacency[i]:
                         fbs[j][t] += self.fb_convs[f"fb_conv_{i}_{j}"](outs[i][t])
 
+        h_pyrs, h_inters, fbs, outs = self._format_outputs(h_pyrs, h_inters, fbs, outs)
+
         if not return_all_layers_out:
             outs = outs[-1]
 
-        return outs, (h_pyrs, h_inters, fbs)
+        return outs, (h_pyrs, h_inters, fbs if self.use_fb else None)

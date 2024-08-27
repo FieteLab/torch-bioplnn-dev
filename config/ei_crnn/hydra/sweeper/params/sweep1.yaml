@@ -3,4 +3,4 @@ model.pre_inh_activation: choice([tanh],[tanh,relu],[relu],Null)
 model.post_inh_activation: choice([tanh],[relu],[tanh,relu],Null)
 model.modulation_type: ag,lr,conv,attn
 data.mode: color,shape,conjunction
-data.holdout: choice([blue,green],[cube],[cube_blue,cube_green],Null)
+data.holdout: choice([blue,green],[cube],[cube_blue,cube_green],[])

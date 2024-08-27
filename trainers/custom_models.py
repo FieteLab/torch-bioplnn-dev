@@ -3,7 +3,7 @@ from math import prod
 import torch
 from torch import nn
 
-from bioplnn.models import Conv2dEIRNNModulation
+from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import get_activation_class
 
 
@@ -344,7 +344,7 @@ class ModulationWrapper(nn.Module):
 
         self.modulations = modulations
 
-    def __call__(self, x, i, t):
+    def forward(self, x, i, t):
         if t in ("all", self.apply_timestep):
             if self.modulation_timestep == "same":
                 modulation = self.modulations[i][t]
@@ -365,6 +365,7 @@ class ModulationWrapper(nn.Module):
 class Classifier(nn.Module):
     def __init__(
         self,
+        rnn_kwargs,
         modulation_enable=True,
         modulation_type: str = "ag",
         modulation_op: str = "mul",
@@ -381,13 +382,12 @@ class Classifier(nn.Module):
         num_classes=6,
         fc_dim=512,
         dropout=0.2,
-        **kwargs,
     ):
         super().__init__()
 
-        self.rnn = Conv2dEIRNNModulation(batch_first=False, **kwargs)
+        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)
 
-        self.num_layers = kwargs["num_layers"]
+        self.num_layers = rnn_kwargs["num_layers"]
         self.modulation_enable = modulation_enable
         self.modulation_type = modulation_type
         self.modulation_op = modulation_op
@@ -432,13 +432,19 @@ class Classifier(nn.Module):
                     modulation_class = AttentionalGainModulation
                     if modulation_apply_to == "hidden":
                         kwargs_pyr = {
+                            "in_channels": h_pyr_in_dim,
+                            "out_channels": self.rnn.layers[i].h_pyr_dim,
                             "spatial_size": self.rnn.layers[i].input_size,
                         }
                         kwargs_inter = {
+                            "in_channels": h_inter_in_dim,
+                            "out_channels": self.rnn.layers[i].h_inter_dims_sum,
                             "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
                         kwargs_out = {
+                            "in_channels": out_in_dim,
+                            "out_channels": self.rnn.layers[i].out_dim,
                             "spatial_size": self.rnn.layers[i].out_size,
                         }
                 elif modulation_type == "lr":
@@ -495,18 +501,15 @@ class Classifier(nn.Module):
                         kwargs_pyr = kwargs_common | {
                             "in_channels": h_pyr_in_dim,
                             "out_channels": self.rnn.layers[i].h_pyr_dim,
-                            "spatial_size": self.rnn.layers[i].input_size,
                         }
                         kwargs_inter = kwargs_common | {
                             "in_channels": h_inter_in_dim,
                             "out_channels": self.rnn.layers[i].h_inter_dims_sum,
-                            "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
                         kwargs_out = kwargs_common | {
                             "in_channels": out_in_dim,
                             "out_channels": self.rnn.layers[i].out_dim,
-                            "spatial_size": self.rnn.layers[i].out_size,
                         }
                 else:
                     raise ValueError(
@@ -533,16 +536,20 @@ class Classifier(nn.Module):
     def _format_modulation_timestep(
         self, modulation_timestep_cue, modulation_timestep_mix, num_steps
     ):
+        modulation_timesteps = []
         for i, modulation_timestep in enumerate(
-            modulation_timestep_cue, modulation_timestep_mix
+            (modulation_timestep_cue, modulation_timestep_mix)
         ):
-            if modulation_timestep_mix == "first":
-                modulation_timestep_mix = 0
-            elif modulation_timestep_mix == "last":
-                modulation_timestep_mix = num_steps - 1
+            if modulation_timestep == "first":
+                modulation_timestep = 0
+            elif modulation_timestep == "last":
+                modulation_timestep = num_steps - 1
 
-            if -num_steps <= modulation_timestep_mix < num_steps:
-                modulation_timestep = (num_steps + modulation_timestep_mix) % num_steps
+            if (
+                modulation_timestep not in ("all", "same")
+                and -num_steps <= modulation_timestep < num_steps
+            ):
+                modulation_timestep = (num_steps + modulation_timestep) % num_steps
             elif (i == 0 and modulation_timestep != "same") or (
                 i == 1 and modulation_timestep != "all"
             ):
@@ -550,8 +557,9 @@ class Classifier(nn.Module):
                     "modulation_timestep must be 'first', 'last', 'same'(for cue), 'all'(for mix)"
                     "or an integer in the range of (-num_steps, num_steps]."
                 )
+            modulation_timesteps.append(modulation_timestep)
 
-        return modulation_timestep_cue, modulation_timestep_mix
+        return modulation_timesteps
 
     def forward(
         self,
@@ -566,57 +574,58 @@ class Classifier(nn.Module):
             return_all_layers_out=True,
         )
 
+        h_pyr_0, h_inter_0, out_0, fb_0 = None, None, None, None
+        if not self.flush_hidden:
+            h_pyr_0 = [h[-1] for h in h_pyrs]
+            h_inter_0 = [h[-1] for h in h_inters]
+        if not self.flush_out:
+            out_0 = [o[-1] for o in outs]
+        if not self.flush_fb:
+            fb_0 = [f[-1] for f in fbs]
+
+        modulation_pyr_fn, modulation_inter_fn, modulation_out_fn = None, None, None
         if self.modulation_enable:
-            if not self.flush_hidden:
-                h_pyr_0 = [h[-1] for h in h_pyrs]
-                h_inter_0 = [h[-1] for h in h_inters]
-            if not self.flush_out:
-                out_0 = [o[-1] for o in outs]
-            if not self.flush_fb:
-                fb_0 = [f[-1] for f in fbs]
-
-            if self.modulation_enable:
-                num_steps = h_pyrs[0].shape[0]
-                modulation_timestep_cue, modulation_timestep_mix = (
-                    self._format_modulation_timestep(
-                        self.modulation_timestep_cue,
-                        self.modulation_timestep_mix,
-                        num_steps,
-                    )
+            num_steps = h_pyrs[0].shape[0]
+            modulation_timestep_cue, modulation_timestep_mix = (
+                self._format_modulation_timestep(
+                    self.modulation_timestep_cue,
+                    self.modulation_timestep_mix,
+                    num_steps,
                 )
-                if self.modulation_apply_to == "hidden":
-                    modulation_pyr_fn = ModulationWrapper(
-                        modulations=h_pyrs,
-                        modulation_fn=self.modulations,
-                        modulation_timestep=modulation_timestep_cue,
-                        apply_timestep=modulation_timestep_mix,
-                        num_steps=num_steps,
-                        op=self.modulation_op,
-                        modulation_from_all_layers=self.modulation_from_all_layers,
-                    )
+            )
+            if self.modulation_apply_to == "hidden":
+                modulation_pyr_fn = ModulationWrapper(
+                    modulations=h_pyrs,
+                    modulation_modules=self.modulations,
+                    modulation_timestep=modulation_timestep_cue,
+                    apply_timestep=modulation_timestep_mix,
+                    num_steps=num_steps,
+                    op=self.modulation_op,
+                    modulation_from_all_layers=self.modulation_from_all_layers,
+                )
 
-                    modulation_inter_fn = ModulationWrapper(
-                        modulations=h_inters,
-                        modulation_fn=self.modulations_inter,
-                        modulation_timestep=modulation_timestep_cue,
-                        apply_timestep=modulation_timestep_mix,
-                        num_steps=num_steps,
-                        op=self.modulation_op,
-                        modulation_from_all_layers=self.modulation_from_all_layers,
-                    )
-                else:
-                    modulation_out_fn = ModulationWrapper(
-                        modulations=outs,
-                        modulation_fn=self.modulations,
-                        modulation_timestep=modulation_timestep_cue,
-                        apply_timestep=modulation_timestep_mix,
-                        num_steps=num_steps,
-                        op=self.modulation_op,
-                        modulation_from_all_layers=self.modulation_from_all_layers,
-                    )
+                modulation_inter_fn = ModulationWrapper(
+                    modulations=h_inters,
+                    modulation_modules=self.modulations_inter,
+                    modulation_timestep=modulation_timestep_cue,
+                    apply_timestep=modulation_timestep_mix,
+                    num_steps=num_steps,
+                    op=self.modulation_op,
+                    modulation_from_all_layers=self.modulation_from_all_layers,
+                )
+            else:
+                modulation_out_fn = ModulationWrapper(
+                    modulations=outs,
+                    modulation_modules=self.modulations,
+                    modulation_timestep=modulation_timestep_cue,
+                    apply_timestep=modulation_timestep_mix,
+                    num_steps=num_steps,
+                    op=self.modulation_op,
+                    modulation_from_all_layers=self.modulation_from_all_layers,
+                )
 
         outs, _ = self.rnn(
-            x=cue,
+            x=mix,
             num_steps=num_steps,
             h_pyr_0=h_pyr_0,
             h_inter_0=h_inter_0,
@@ -629,6 +638,6 @@ class Classifier(nn.Module):
         )
 
         if loss_all_timesteps:
-            outs = outs[-1]
+            return [self.out_layer(out.flatten(1)) for out in outs]
 
-        return self.out_layer(outs)
+        return self.out_layer(outs[-1].flatten(1))
