@@ -1,0 +1,21 @@
+defaults:
+  - rnn_kwargs: default
+  - _self_
+
+rnn_kwargs:
+  input_size: [32, 32]
+  input_dim: 1
+  exc_kernel_size: 
+  - [3, 3]
+  - [3, 3]
+  - [3, 3]
+  - [3, 3]
+  inh_kernel_size: 
+  - [3, 3]
+  - [3, 3]
+  - [3, 3]
+  - [3, 3]
+
+num_classes: 10
+fc_dim: 512
+dropout: 0.2

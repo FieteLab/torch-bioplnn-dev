@@ -1,0 +1,32 @@
+defaults:
+  - rnn_kwargs: default
+  - _self_
+
+rnn_kwargs:
+  input_size: [128, 128]
+  input_dim: 3
+  exc_kernel_size: 
+  - [5, 5]
+  - [5, 5]
+  - [3, 3]
+  - [3, 3]
+  inh_kernel_size: 
+  - [5, 5]
+  - [5, 5]
+  - [3, 3]
+  - [3, 3]
+
+
+modulation_enable: true
+modulation_type: conv
+modulation_op: mul
+modulation_activation: relu
+modulation_apply_to: layer_output
+modulation_timestep_cue: same
+modulation_timestep_mix: all
+flush_hidden: true
+flush_out: true
+flush_fb: true
+num_classes: 6
+fc_dim: 512
+dropout: 0.2

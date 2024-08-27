@@ -1,0 +1,10 @@
+root: data/qclevr
+cue_assets_root: null # data/CLEVR_v1.0/cues
+train_batch_size: 256
+val_batch_size: 64
+mode: every
+holdout: [] # [blue,green,cube,cube_blue,cube_green]
+primitive: true
+shape_cue_color: orange
+use_cache: true
+num_workers: 8

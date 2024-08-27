@@ -1,0 +1,40 @@
+optimizer: 
+  fn: adamw
+  lr: 0.0004
+  momentum: 0.9
+  beta1: 0.9
+  beta2: 0.999
+scheduler:
+  fn: one_cycle
+  pct_start: 0.3
+criterion: 
+  fn: ce
+  all_timesteps: false
+compile:
+  disable: true
+  fullgraph: true
+  dynamic: null
+  backend: inductor
+  mode: reduce-overhead
+train:
+  num_steps: 5
+  epochs: 100
+  log_freq: 5
+  grad_clip:
+    enable: false
+    type: norm
+    value: 1.0
+checkpoint:
+  load: false
+  root: checkpoints/ei
+  run: test
+  epoch: null
+seed: null
+tqdm: true
+wandb:
+  project: EI RNN
+  mode: disabled
+  group: null
+foreach: true
+matmul_precision: high
+debug_level: 2

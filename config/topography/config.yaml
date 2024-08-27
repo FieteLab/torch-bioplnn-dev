@@ -1,7 +1,3 @@
-defaults:
-  - model: random_rnn
-  - _self_
-
 data:
   dataset: cifar10_v1
   root: data
@@ -17,7 +13,9 @@ optimizer:
 scheduler:
   fn: one_cycle
   pct_start: 0.3
-criterion: cross_entropy
+criterion: 
+  fn: ce
+  loss_all_timesteps: false
 visualize:
   enable: false
   save_dir: visualizations

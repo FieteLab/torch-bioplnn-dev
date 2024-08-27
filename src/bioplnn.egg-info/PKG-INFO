@@ -1,0 +1,58 @@
+Metadata-Version: 2.1
+Name: bioplnn
+Version: 0.0.1
+Summary: A biologically plausible neural network package
+Author-email: Valmiki Kothare <valmiki.kothare.vk@gmail.com>
+Project-URL: Homepage, https://github.com/hpvok13/bioplnn
+Project-URL: Issues, https://github.com/hpvok13/bioplnn/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: tqdm
+Requires-Dist: torch
+Requires-Dist: torchvision
+Requires-Dist: torch-scatter
+Requires-Dist: torch-sparse
+Requires-Dist: opencv-python
+Requires-Dist: scipy
+Requires-Dist: tabulate
+Requires-Dist: scikit-learn
+Requires-Dist: pandas
+Requires-Dist: matplotlib
+Requires-Dist: accelerate
+Requires-Dist: lightning
+Requires-Dist: hydra-core
+Requires-Dist: hydra-submitit-launcher
+Requires-Dist: addict
+
+# Biologically Plausible Neural Network Package
+
+This package is a biologically plausible neural network implementation that extends PyTorch. It provides several biologically plausible neurons and layers for building neural networks with a focus on biological realism.
+
+## Features:
+- Biologically plausible neurons: Implementations of various biologically inspired neuron models, such as spiking neurons, integrate-and-fire neurons, and adaptive exponential integrate-and-fire neurons.
+- Biologically plausible layers: Layers that incorporate biologically plausible mechanisms, such as lateral inhibition, synaptic plasticity, and homeostatic regulation.
+- Integration with PyTorch: The package seamlessly integrates with PyTorch, allowing users to leverage the extensive functionality and ecosystem of PyTorch while incorporating biologically plausible components.
+
+## Installation:
+To install the package, use the following command:
+pip install bioplnn
+
+## Usage:
+1. Import the package:
+import bioplnn
+
+2. Create a biologically plausible neural network:
+model = bioplnn.BioPlNN()
+
+3. Add biologically plausible layers and neurons to the network:
+model.add_layer(bioplnn.SpikingLayer())
+model.add_layer(bioplnn.AdaptiveExponentialLayer())
+
+4. Train and evaluate the network using PyTorch's training and evaluation APIs.
+
+For more details and examples, please refer to the documentation and examples provided with the package.

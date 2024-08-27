@@ -289,7 +289,11 @@ class Conv2dEIRNNCell(nn.Module):
             func = torch.randn
         else:
             raise ValueError("Invalid init_mode. Must be 'zeros' or 'normal'.")
-        return func(batch_size, self.fb_dim, *self.input_size, device=device)
+        return (
+            func(batch_size, self.fb_dim, *self.input_size, device=device)
+            if self.use_fb
+            else None
+        )
 
     def init_out(self, batch_size, init_mode="zeros", device=None):
         """
@@ -597,11 +601,8 @@ class Conv2dEIRNN(nn.Module):
 
     def _init_fb(self, batch_size, init_mode="zeros", device=None):
         fbs = []
-        for i, layer in enumerate(self.layers):
-            if self.receives_fb[i]:
-                fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
-            else:
-                fb = None
+        for layer in self.layers:
+            fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
             fbs.append(fb)
         return fbs
 
@@ -647,7 +648,8 @@ class Conv2dEIRNN(nn.Module):
         for i in range(self.num_layers):
             h_pyrs[i][-1] = h_pyr_0[i]
             h_inters[i][-1] = h_inter_0[i]
-            fbs[i][-1] = fb_0[i]
+            if self.use_fb:
+                fbs[i][-1] = fb_0[i]
             outs[i][-1] = out_0[i]
 
         return h_pyrs, h_inters, fbs, outs
@@ -693,13 +695,15 @@ class Conv2dEIRNN(nn.Module):
     def _format_outputs(self, h_pyrs, h_inters, fbs, outs):
         for i in range(self.num_layers):
             h_pyrs[i] = torch.stack(h_pyrs[i])
-            h_inters[i] = torch.stack(h_inters[i])
+            if self.h_inter_dims[i]:
+                h_inters[i] = torch.stack(h_inters[i])
             if self.use_fb and self.receives_fb[i]:
                 fbs[i] = torch.stack(fbs[i])
             outs[i] = torch.stack(outs[i])
             if self.batch_first:
                 h_pyrs[i] = h_pyrs[i].transpose(0, 1)
-                h_inters[i] = h_inters[i].transpose(0, 1)
+                if self.h_inter_dims[i]:
+                    h_inters[i] = h_inters[i].transpose(0, 1)
                 if self.use_fb and self.receives_fb[i]:
                     fbs[i] = fbs[i].transpose(0, 1)
                 outs[i] = outs[i].transpose(0, 1)

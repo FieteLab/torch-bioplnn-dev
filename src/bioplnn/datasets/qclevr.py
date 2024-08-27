@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
 
 
-class qCLEVRDataset(Dataset):
+class QCLEVRDataset(Dataset):
     def __init__(
         self,
         root: str,

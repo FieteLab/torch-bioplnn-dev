@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-from bioplnn.datasets import qCLEVRDataset
+from bioplnn.datasets import QCLEVRDataset
 from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import rescale
 
@@ -140,7 +140,7 @@ def test(config: DictConfig) -> None:
                 transforms.Resize(config.model.input_size),
             ]
         )
-        val_dataset = qCLEVRDataset(
+        val_dataset = QCLEVRDataset(
             data_root=config.data.root,
             assets_path=config.data.assets_path,
             clevr_transforms=clevr_transforms,
@@ -177,9 +177,9 @@ def test(config: DictConfig) -> None:
                     cue, mixture, return_layer_outputs=True
                 )
                 for t in range(len(outs_cue)):
-                    for l in range(len(outs_cue[t])):
-                        outs_cue[t][l] = outs_cue[t][l].detach().cpu()
-                        outs_mixture[t][l] = outs_mixture[t][l].detach().cpu()
+                    for i in range(len(outs_cue[t])):
+                        outs_cue[t][i] = outs_cue[t][i].detach().cpu()
+                        outs_mixture[t][i] = outs_mixture[t][i].detach().cpu()
 
                 cues.append(batch[0])
                 mixtures.append(batch[1])

@@ -55,12 +55,12 @@ class TopographicalRNNBase(nn.Module):
         self.batch_first = batch_first
         self.out_nonlinearity = get_activation_class(out_nonlinearity)()
 
-        if connectivity_hh is None != connectivity_ih is None:
+        if connectivity_ih is None != connectivity_hh is None:
             raise ValueError(
                 "Both connectivity matrices must be provided if one is provided"
             )
         use_random = synapse_std is not None and synapses_per_neuron is not None
-        use_connectivity = connectivity_hh is not None and connectivity_ih is not None
+        use_connectivity = connectivity_ih is not None and connectivity_hh is not None
 
         if use_connectivity:
             if use_random:
@@ -68,8 +68,8 @@ class TopographicalRNNBase(nn.Module):
                     "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
                 )
                 use_random = False
-            if not isinstance(connectivity_hh, torch.Tensor) and not isinstance(
-                connectivity_ih, torch.Tensor
+            if not isinstance(connectivity_ih, torch.Tensor) and not isinstance(
+                connectivity_hh, torch.Tensor
             ):
                 self.connectivity_hh = torch.load(connectivity_hh)
                 self.connectivity_ih = torch.load(connectivity_ih)
@@ -121,7 +121,7 @@ class TopographicalRNNBase(nn.Module):
         )
 
         # Create output block
-        self.out_block = nn.Sequential(
+        self.out_layer = nn.Sequential(
             nn.Linear(num_out_neurons, 64),
             self.out_nonlinearity,
             nn.Linear(64, num_classes),
@@ -224,6 +224,7 @@ class TopographicalRNNBase(nn.Module):
         self,
         x,
         num_steps=None,
+        loss_all_timesteps=False,
     ):
         """
         Forward pass of the TopographicalCorticalRNN.
@@ -270,16 +271,16 @@ class TopographicalRNNBase(nn.Module):
         x, h = self.rnn(x, num_steps)
 
         if self.batch_first:
-            x = x[:, -1]
-        else:
-            x = x[-1]
+            x = x.transpose(0, 1)
 
         # Select output indices if provided
         if self.output_indices is not None:
-            x = x[:, self.output_indices]
+            x = x[..., self.output_indices]
 
-        # Return classification from out_block
-        return self.out_block(x), h
+        if loss_all_timesteps:
+            return [self.out_layer(out) for out in x]
+
+        return self.out_layer(x), h
 
 
 class TopographicalRNN(TopographicalRNNBase):

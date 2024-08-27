@@ -362,10 +362,10 @@ class ModulationWrapper(nn.Module):
         return x
 
 
-class Classifier(nn.Module):
+class QCLEVRClassifier(nn.Module):
     def __init__(
         self,
-        rnn_kwargs,
+        rnn_kwargs: dict,
         modulation_enable=True,
         modulation_type: str = "ag",
         modulation_op: str = "mul",
@@ -634,6 +634,48 @@ class Classifier(nn.Module):
             modulation_pyr_fn=modulation_pyr_fn,
             modulation_inter_fn=modulation_inter_fn,
             modulation_out_fn=modulation_out_fn,
+            return_all_layers_out=False,
+        )
+
+        if loss_all_timesteps:
+            return [self.out_layer(out.flatten(1)) for out in outs]
+
+        return self.out_layer(outs[-1].flatten(1))
+
+
+class ImageClassifier(nn.Module):
+    def __init__(
+        self,
+        rnn_kwargs,
+        num_classes=6,
+        fc_dim=512,
+        dropout=0.2,
+    ):
+        super().__init__()
+
+        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)
+
+        self.num_layers = rnn_kwargs["num_layers"]
+        self.out_layer = nn.Sequential(
+            nn.Flatten(1),
+            nn.Linear(
+                self.rnn.layers[-1].out_dim * prod(self.rnn.layers[-1].out_size),
+                fc_dim,
+            ),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_dim, num_classes),
+        )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        num_steps: int = None,
+        loss_all_timesteps: bool = False,
+    ):
+        outs, _ = self.rnn(
+            x,
+            num_steps=num_steps,
             return_all_layers_out=False,
         )
 

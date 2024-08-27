@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 from traceback import print_exc
@@ -6,23 +5,75 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
+import yaml
 from addict import Dict as AttrDict
-from custom_models import Classifier  # type: ignore
+from classifiers import ImageClassifier
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import wandb
-from bioplnn.loss import EDLLoss
-from bioplnn.utils import get_qclevr_dataloaders, manual_seed, pass_fn
+from bioplnn.utils import get_image_classification_dataloaders, manual_seed, pass_fn
 
-log = logging.getLogger(__name__)
+
+def initialize_optimizer(
+    model_parameters, fn, lr, momentum=0.9, beta1=0.9, beta2=0.9, **kwargs
+) -> torch.optim.Optimizer:
+    if fn == "sgd":
+        optimizer = torch.optim.SGD(
+            model_parameters,
+            lr=lr,
+            momentum=momentum,
+            **kwargs,
+        )
+    elif fn == "adam":
+        optimizer = torch.optim.Adam(
+            model_parameters,
+            lr=lr,
+            betas=(beta1, beta2),
+            **kwargs,
+        )
+    elif fn == "adamw":
+        optimizer = torch.optim.AdamW(
+            model_parameters,
+            lr=lr,
+            betas=(beta1, beta2),
+            **kwargs,
+        )
+    else:
+        raise NotImplementedError(f"Optimizer {fn} not implemented")
+
+    return optimizer
+
+
+def initialize_scheduler(optimizer, fn, max_lr, total_steps):
+    if fn is None:
+        scheduler = None
+    if fn == "one_cycle":
+        scheduler = OneCycleLR(
+            optimizer,
+            max_lr=max_lr,
+            total_steps=total_steps,
+        )
+    else:
+        raise NotImplementedError(f"Scheduler {fn} not implemented")
+
+    return scheduler
+
+
+def initialize_criterion(fn: str) -> torch.nn.Module:
+    if fn == "ce":
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        raise NotImplementedError(f"Criterion {fn} not implemented")
+
+    return criterion
 
 
 def train_epoch(
     config: AttrDict,
-    model: Classifier,
+    model: ImageClassifier,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
@@ -36,7 +87,7 @@ def train_epoch(
 
     Args:
         config (AttrDict): Configuration parameters.
-        model (Conv2dEIRNNModulatoryClassifier): The model to be trained.
+        model (Conv2dEIRNNModulatoryImageClassifier): The model to be trained.
         optimizer (torch.optim.Optimizer): The optimizer used for training.
         criterion (torch.nn.Module): The loss function.
         train_loader (torch.utils.data.DataLoader): The training data loader.
@@ -70,16 +121,14 @@ def train_epoch(
         desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-    for i, (cue, mix, labels) in enumerate(iterable=bar):
-        cue = cue.to(device)
-        mix = mix.to(device)
+    for i, (image, labels) in enumerate(iterable=bar):
+        image = image.to(device)
         labels = labels.to(device)
 
         # Forward pass
         outputs = model(
-            cue,
-            mix,
-            config.train.num_steps,
+            x=image,
+            num_steps=config.train.num_steps,
             loss_all_timesteps=config.criterion.all_timesteps,
         )
         if config.criterion.all_timesteps:
@@ -140,17 +189,16 @@ def train_epoch(
 
 def val_epoch(
     config: AttrDict,
-    model: Classifier,
+    model: ImageClassifier,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
-    epoch: int,
     device: torch.device,
 ) -> tuple[float, float]:
     """
     Perform a single evaluation iteration.
 
     Args:
-        model (Conv2dEIRNNModulatoryClassifier): The model to be evaluated.
+        model (Conv2dEIRNNModulatoryImageClassifier): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
         val_loader (torch.utils.data.DataLoader): The val data loader.
         epoch (int): The current epoch number.
@@ -165,17 +213,15 @@ def val_epoch(
     val_total = 0
 
     with torch.no_grad():
-        for cue, mix, labels in val_loader:
-            cue = cue.to(device)
-            mix = mix.to(device)
+        for image, labels in val_loader:
+            image = image.to(device)
             labels = labels.to(device)
 
             # Forward pass
             outputs = model(
-                cue,
-                mix,
-                config.train.num_steps,
-                all_timesteps=config.criterion.all_timesteps,
+                x=image,
+                num_steps=config.train.num_steps,
+                loss_all_timesteps=config.criterion.all_timesteps,
             )
             if config.criterion.all_timesteps:
                 losses = []
@@ -209,7 +255,7 @@ def train(config: DictConfig) -> None:
     """
 
     config = OmegaConf.to_container(config, resolve=True)
-    # print(yaml.dump(config))
+    print(yaml.dump(config))
     config = AttrDict(config)
 
     # Initialize Weights & Biases
@@ -237,58 +283,31 @@ def train(config: DictConfig) -> None:
 
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Classifier(**config.model).to(device)
+    model = ImageClassifier(**config.model).to(device)
 
     # Compile the model if requested
     model = torch.compile(model, **config.compile)
 
     # Initialize the optimizer
-    if config.optimizer.fn == "sgd":
-        optimizer = torch.optim.SGD(
-            model.parameters(),
-            lr=config.optimizer.lr,
-            momentum=config.optimizer.momentum,
-        )
-    elif config.optimizer.fn == "adam":
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=config.optimizer.lr,
-            betas=(config.optimizer.beta1, config.optimizer.beta2),
-        )
-    elif config.optimizer.fn == "adamw":
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=config.optimizer.lr,
-            betas=(config.optimizer.beta1, config.optimizer.beta2),
-        )
-    else:
-        raise NotImplementedError(f"Optimizer {config.optimizer.fn} not implemented")
+    optimizer = initialize_optimizer(model.parameters(), **config.optimizer)
 
     # Initialize the loss function
-    if config.criterion.fn == "ce":
-        criterion = torch.nn.CrossEntropyLoss()
-    elif config.criterion.fn == "edl":
-        criterion = EDLLoss(num_classes=config.model.num_classes)
-    else:
-        raise NotImplementedError(f"Criterion {config.criterion.fn} not implemented")
+    criterion = initialize_criterion(config.criterion.fn)
 
     # Get the data loaders
-    train_loader, val_loader = get_qclevr_dataloaders(
+    train_loader, val_loader = get_image_classification_dataloaders(
         **config.data,
+        resolution=config.model.rnn_kwargs.input_size,
         seed=config.seed,
     )
 
     # Initialize the learning rate scheduler
-    if config.scheduler.fn is None:
-        scheduler = None
-    if config.scheduler.fn == "one_cycle":
-        scheduler = OneCycleLR(
-            optimizer,
-            max_lr=config.optimizer.lr,
-            total_steps=config.train.epochs * len(train_loader),
-        )
-    else:
-        raise NotImplementedError(f"Scheduler {config.scheduler.fn} not implemented")
+    scheduler = initialize_scheduler(
+        optimizer,
+        fn=config.scheduler.fn,
+        max_lr=config.optimizer.lr,
+        total_steps=len(train_loader) * config.train.epochs,
+    )
 
     for epoch in range(config.train.epochs):
         wandb.log(dict(epoch=epoch), step=global_step)
@@ -342,7 +361,7 @@ def train(config: DictConfig) -> None:
 @hydra.main(
     version_base=None,
     config_path="/om2/user/valmiki/bioplnn/config/ei_crnn",
-    config_name="config",
+    config_name="image_classification",
 )
 def main(config: DictConfig):
     try:

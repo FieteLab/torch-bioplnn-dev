@@ -6,90 +6,40 @@ from typing import Optional
 import hydra
 import torch
 import wandb
-import yaml
 from addict import Dict as AttrDict
+from classifiers import QCLEVRClassifier
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-from bioplnn.models.topography import (
-    TopographicalRChebyKAN,
-    TopographicalRKAN,
-    TopographicalRNN,
-)
-from bioplnn.optimizers import SparseSGD
-from bioplnn.utils import (
-    get_v1_dataloaders,
-    manual_seed,
-    manual_seed_deterministic,
-    pass_fn,
-    without_keys,
-)
-
-
-def initialize_model(
-    cls: str, exclude_keys: list[str], config: AttrDict
-) -> torch.nn.Module:
-    if cls == "topographical_rnn":
-        model = TopographicalRNN(**without_keys(config, exclude_keys))
-    elif cls == "topographical_rkan":
-        model = TopographicalRKAN(**without_keys(config, exclude_keys))
-    elif cls == "topographical_rchebykan":
-        model = TopographicalRChebyKAN(**without_keys(config, exclude_keys))
-    else:
-        raise NotImplementedError(f"Model {cls} not implemented")
-
-    return model
+from bioplnn.loss import EDLLoss
+from bioplnn.utils import get_qclevr_dataloaders, manual_seed, pass_fn
 
 
 def initialize_optimizer(
-    model_parameters,
-    fn,
-    sparse_format,
-    mm_function,
-    lr,
-    momentum=0.9,
-    beta1=0.9,
-    beta2=0.9,
+    model_parameters, fn, lr, momentum=0.9, beta1=0.9, beta2=0.9, **kwargs
 ) -> torch.optim.Optimizer:
     if fn == "sgd":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "sgd is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.SGD(
             model_parameters,
             lr=lr,
             momentum=momentum,
+            **kwargs,
         )
     elif fn == "adam":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "adam is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.Adam(
             model_parameters,
             lr=lr,
             betas=(beta1, beta2),
+            **kwargs,
         )
     elif fn == "adamw":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "adam is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.AdamW(
             model_parameters,
             lr=lr,
             betas=(beta1, beta2),
-        )
-    elif fn == "sparse_sgd":
-        if mm_function == "torch_sparse":
-            raise ValueError("sparse_sgd is not supported with torch_sparse")
-        optimizer = SparseSGD(
-            model_parameters,
-            lr=lr,
-            momentum=momentum,
+            **kwargs,
         )
     else:
         raise NotImplementedError(f"Optimizer {fn} not implemented")
@@ -112,9 +62,11 @@ def initialize_scheduler(optimizer, fn, max_lr, total_steps):
     return scheduler
 
 
-def initialize_criterion(fn: str) -> torch.nn.Module:
+def initialize_criterion(fn: str, num_classes=None) -> torch.nn.Module:
     if fn == "ce":
         criterion = torch.nn.CrossEntropyLoss()
+    elif fn == "edl":
+        criterion = EDLLoss(num_classes=num_classes)
     else:
         raise NotImplementedError(f"Criterion {fn} not implemented")
 
@@ -123,9 +75,9 @@ def initialize_criterion(fn: str) -> torch.nn.Module:
 
 def train_epoch(
     config: AttrDict,
-    model: TopographicalRNN,
+    model: QCLEVRClassifier,
     optimizer: torch.optim.Optimizer,
-    scheduler: Optional[torch.optim.lr_scheduler._LRScheduler],
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
     train_loader: torch.utils.data.DataLoader,
     epoch: int,
@@ -137,7 +89,7 @@ def train_epoch(
 
     Args:
         config (AttrDict): Configuration parameters.
-        model (TopographicalRNN): The model to be trained.
+        model (Conv2dEIRNNModulatoryQCLEVRClassifier): The model to be trained.
         optimizer (torch.optim.Optimizer): The optimizer used for training.
         criterion (torch.nn.Module): The loss function.
         train_loader (torch.utils.data.DataLoader): The training data loader.
@@ -145,16 +97,8 @@ def train_epoch(
         device (torch.device): The device to perform computations on.
 
     Returns:
-        tuple: A tuple containing the training loss and accuracy.
+        tuple[float, float]: A tuple containing the training loss and accuracy.
     """
-    model.train()
-    train_loss = 0.0
-    train_correct = 0
-    train_total = 0
-    running_loss = 0.0
-    running_correct = 0
-    running_total = 0
-
     if not config.train.grad_clip.enable:
         clip_grad_ = pass_fn
     elif config.train.grad_clip.type == "norm":
@@ -166,22 +110,30 @@ def train_epoch(
             f"Gradient clipping type {config.train.grad_clip.type} not implemented"
         )
 
+    model.train()
+    train_loss = 0.0
+    train_correct = 0
+    train_total = 0
+    running_loss = 0.0
+    running_correct = 0
+    running_total = 0
+
     bar = tqdm(
         train_loader,
         desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-
-    # torch.set_anomaly_enabled(True)
-
-    for i, (images, labels) in enumerate(bar):
-        images = images.to(device)
+    for i, (cue, mix, labels) in enumerate(iterable=bar):
+        cue = cue.to(device)
+        mix = mix.to(device)
         labels = labels.to(device)
 
         # Forward pass
-        outputs, _ = model(
-            images,
+        outputs = model(
+            cue=cue,
+            mix=mix,
             num_steps=config.train.num_steps,
+            loss_all_timesteps=config.criterion.all_timesteps,
         )
         if config.criterion.all_timesteps:
             losses = []
@@ -191,8 +143,6 @@ def train_epoch(
             outputs = outputs[-1]
         else:
             loss = criterion(outputs, labels)
-
-        loss = criterion(outputs, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -238,21 +188,22 @@ def train_epoch(
     train_loss /= len(train_loader)
     train_acc = train_correct / train_total
 
-    return train_loss, train_acc, global_step
+    return train_loss, train_acc
 
 
 def val_epoch(
     config: AttrDict,
-    model: TopographicalRNN,
+    model: QCLEVRClassifier,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
+    epoch: int,
     device: torch.device,
 ) -> tuple[float, float]:
     """
     Perform a single evaluation iteration.
 
     Args:
-        model (TopographicalRNN): The model to be evaluated.
+        model (Conv2dEIRNNModulatoryQCLEVRClassifier): The model to be evaluated.
         criterion (torch.nn.Module): The loss function.
         val_loader (torch.utils.data.DataLoader): The val data loader.
         epoch (int): The current epoch number.
@@ -267,13 +218,26 @@ def val_epoch(
     val_total = 0
 
     with torch.no_grad():
-        for images, labels in val_loader:
-            images = images.to(device)
+        for cue, mix, labels in val_loader:
+            cue = cue.to(device)
+            mix = mix.to(device)
             labels = labels.to(device)
 
             # Forward pass
-            outputs, _ = model(images, num_steps=config.train.num_steps)
-            loss = criterion(outputs, labels)
+            outputs = model(
+                cue=cue,
+                mix=mix,
+                num_steps=config.train.num_steps,
+                loss_all_timesteps=config.criterion.all_timesteps,
+            )
+            if config.criterion.all_timesteps:
+                losses = []
+                for output in outputs:
+                    losses.append(criterion(output, labels))
+                loss = sum(losses) / len(losses)
+                outputs = outputs[-1]
+            else:
+                loss = criterion(outputs, labels)
 
             # Update statistics
             val_loss += loss.item()
@@ -294,20 +258,12 @@ def train(config: DictConfig) -> None:
     Train the model using the provided configuration.
 
     Args:
-        config (AttrDict): Configuration parameters.
+        config (dict): Configuration parameters.
     """
-    config = OmegaConf.to_container(config, resolve=True)
-    print(yaml.dump(config))
-    config = AttrDict(config)
 
-    if config.seed is not None:
-        if config.deterministic:
-            manual_seed_deterministic(config.seed)
-        else:
-            manual_seed(config.seed)
-    else:
-        if config.deterministic:
-            raise ValueError("Seed must be provided for deterministic training")
+    config = OmegaConf.to_container(config, resolve=True)
+    # print(yaml.dump(config))
+    config = AttrDict(config)
 
     # Initialize Weights & Biases
     wandb.require("core")
@@ -318,29 +274,38 @@ def train(config: DictConfig) -> None:
     )
     global_step = 0
 
-    if config.wandb.mode == "disabled":
-        checkpoint_dir = os.path.join(config.checkpoint.root, config.checkpoint.run)
-    else:
+    if config.wandb.mode != "disabled":
         checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
+    else:
+        checkpoint_dir = os.path.join(config.checkpoint.root, config.checkpoint.run)
+
     os.makedirs(checkpoint_dir, exist_ok=True)
 
+    # Set the random seed
+    if config.seed is not None:
+        manual_seed(config.seed)
+
+    # Set the matmul precision
+    torch.set_float32_matmul_precision(config.matmul_precision)
+
+    # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = QCLEVRClassifier(**config.model).to(device)
 
-    model = initialize_model(
-        cls=config.model.cls, exclude_keys="cls", config=config.model
-    ).to(device)
+    # Compile the model if requested
+    model = torch.compile(model, **config.compile)
 
-    optimizer = initialize_optimizer(
-        model_parameters=model.parameters(),
-        **config.optimizer,
-        sparse_format=config.model.sparse_format,
-        mm_function=config.model.mm_function,
-    )
+    # Initialize the optimizer
+    optimizer = initialize_optimizer(model.parameters(), **config.optimizer)
 
-    criterion = initialize_criterion(config.criterion.fn)
+    # Initialize the loss function
+    criterion = initialize_criterion(config.criterion.fn, config.data.num_classes)
 
     # Get the data loaders
-    train_loader, val_loader = get_v1_dataloaders(**config.data, seed=config.seed)
+    train_loader, val_loader = get_qclevr_dataloaders(
+        **config.data,
+        seed=config.seed,
+    )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(
@@ -352,7 +317,7 @@ def train(config: DictConfig) -> None:
 
     for epoch in range(config.train.epochs):
         wandb.log(dict(epoch=epoch), step=global_step)
-        # Train model
+        # Train the model
         train_loss, train_acc, global_step = train_epoch(
             config,
             model,
@@ -366,22 +331,13 @@ def train(config: DictConfig) -> None:
         )
         wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
 
-        # Evaluate model on the val set
-        val_loss, val_acc = val_epoch(config, model, criterion, val_loader, device)
+        # Evaluate the model on the validation set
+        val_loss, val_acc = val_epoch(
+            config, model, criterion, val_loader, epoch, device
+        )
+        wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 
-        wandb.log(dict(val_loss=val_loss, val_acc=val_acc), step=global_step)
-
-        if config.visualize.enable:
-            images, _ = next(iter(val_loader))
-            images = images.to(device)
-            if config.visualize.save_dir is not None:
-                save_dir = os.path.join(config.visualize.save_dir, wandb.run.name)
-                os.makedirs(save_dir, exist_ok=True)
-                save_path = os.path.join(save_dir, f"epoch_{epoch}")
-            _, activations = model(images, return_activations=True)
-            model.visualize(activations, save_path)
-
-        # Print epoch statistics
+        # Print the epoch statistics
         print(
             f"Epoch [{epoch}/{config.train.epochs}] | "
             f"Train Loss: {train_loss:.4f} | "
@@ -390,7 +346,7 @@ def train(config: DictConfig) -> None:
             f"Test Accuracy: {val_acc:.2%}"
         )
 
-        # Save Model
+        # Save the model
         file_path = os.path.abspath(
             os.path.join(checkpoint_dir, f"checkpoint_{epoch}.pt")
         )
@@ -410,8 +366,8 @@ def train(config: DictConfig) -> None:
 
 @hydra.main(
     version_base=None,
-    config_path="/om2/user/valmiki/bioplnn/config/topography",
-    config_name="config",
+    config_path="/om2/user/valmiki/bioplnn/config/ei_crnn",
+    config_name="qclevr_classification",
 )
 def main(config: DictConfig):
     try:

@@ -1,14 +1,17 @@
-sheet_size: Null
-connectivity_std: Null
-synapses_per_neuron: Null
-num_timesteps: 100
-bias: True
-num_classes: 10
-mm_function: torch_sparse
+cls: topographical_rnn
+sheet_size: null
+synapse_std: null
+synapses_per_neuron: null
+self_recurrence: true
+connectivity_hh: # fill with something 
+connectivity_ih: # fill with something
 sparse_format: torch_sparse
-batch_first: True
-adjacency_matrix_path: Null
-self_recurrence: True
+mm_function: torch_sparse
+num_classes: 10
+batch_first: true
 input_indices: null
-output_indices: connection/V4_indices_flat.pt
-activation: relu
+output_indices: connectivity/V4_indices_flat.pt
+rnn_nonlinearity: relu
+out_nonlinearity: relu
+use_layernorm: true
+bias: true

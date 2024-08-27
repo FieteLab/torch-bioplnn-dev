@@ -11,7 +11,9 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 from torchvision.transforms import transforms
 
-from bioplnn.datasets.qclevr import qCLEVRDataset
+
+def pass_fn(*args, **kwargs):
+    pass
 
 
 def without_keys(d, keys):
@@ -59,10 +61,6 @@ def get_activation_class(activation):
         return nn.SiLU
     else:
         raise ValueError(f"Activation function {activation} not supported.")
-
-
-def pass_fn(*args, **kwargs):
-    pass
 
 
 def idx_1D_to_2D(x, m, n):
@@ -168,6 +166,8 @@ def get_qclevr_dataloaders(
     num_workers: int = 0,
     seed: Optional[int] = None,
 ):
+    from bioplnn.datasets.qclevr import QCLEVRDataset
+
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
@@ -175,7 +175,7 @@ def get_qclevr_dataloaders(
             transforms.Resize(resolution),
         ]
     )
-    train_dataset = qCLEVRDataset(
+    train_dataset = QCLEVRDataset(
         root=root,
         cue_assets_root=cue_assets_root,
         transform=transform,
@@ -187,7 +187,7 @@ def get_qclevr_dataloaders(
         use_cache=use_cache,
         num_workers=num_workers,
     )
-    val_dataset = qCLEVRDataset(
+    val_dataset = QCLEVRDataset(
         root=root,
         cue_assets_root=cue_assets_root,
         transform=transform,
@@ -220,65 +220,66 @@ def get_qclevr_dataloaders(
     return train_dataloader, val_dataloader
 
 
-def get_benchmark_dataloaders(
-    dataset="mnist",
-    root="data",
+def _image_classification_dataloaders(
+    dataset,
+    root,
+    resolution=None,
+    v1=False,
     retina_path=None,
     batch_size=16,
     num_workers=0,
     seed=None,
 ):
-    from bioplnn.datasets import CIFAR10_V1, CIFAR100_V1, MNIST_V1
+    from bioplnn.datasets.v1 import CIFAR10_V1, CIFAR100_V1, MNIST_V1
 
-    if dataset in ["mnist", "mnist_v1"]:
+    resize = [transforms.Resize(resolution)] if resolution is not None else []
+
+    if dataset == "mnist":
         transform = T.Compose(
             [
                 T.ToTensor(),
                 T.Normalize((0.1307,), (0.3081,)),
+                *resize,
             ]
         )
-        if dataset == "mnist":
-            dataset_cls = MNIST
-        else:
+        if v1:
             dataset_cls = MNIST_V1
-    elif dataset in ["cifar10", "cifar10_v1"]:
+        else:
+            dataset_cls = MNIST
+    elif dataset == "cifar10":
         transform = T.Compose(
             [
                 T.ToTensor(),
                 T.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+                *resize,
             ]
         )
-        if dataset == "cifar10":
-            dataset_cls = CIFAR10
-        else:
+        if v1:
             dataset_cls = CIFAR10_V1
-    elif dataset in ["cifar100", "cifar100_v1"]:
+        else:
+            dataset_cls = CIFAR10
+    elif dataset == "cifar100":
         transform = T.Compose(
             [
                 T.ToTensor(),
                 T.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+                *resize,
             ]
         )
-        if dataset == "cifar100":
-            dataset_cls = CIFAR100
-        else:
+        if v1:
             dataset_cls = CIFAR100_V1
+        else:
+            dataset_cls = CIFAR100
     else:
         raise NotImplementedError(f"Dataset {dataset} not implemented")
 
-    if dataset.endswith("_v1"):
-        kwargs = {
-            "root": root,
-            "download": True,
-            "transform": transform,
-            "retina_path": retina_path,
-        }
-    else:
-        kwargs = {
-            "root": root,
-            "download": True,
-            "transform": transform,
-        }
+    kwargs = {
+        "root": root,
+        "download": True,
+        "transform": transform,
+    }
+    if v1:
+        kwargs = kwargs | {"retina_path": retina_path}
 
     train_set = dataset_cls(train=True, **kwargs)
     test_set = dataset_cls(train=False, **kwargs)
@@ -306,91 +307,155 @@ def get_benchmark_dataloaders(
     return train_loader, test_loader
 
 
-def get_mnist_dataloaders(
+def get_image_classification_dataloaders(
+    dataset="mnist",
     root="data",
+    resolution=None,
+    batch_size=16,
+    num_workers=0,
+    seed=None,
+):
+    return _image_classification_dataloaders(
+        dataset=dataset,
+        root=root,
+        resolution=resolution,
+        v1=False,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        seed=seed,
+    )
+
+
+def get_v1_dataloaders(
+    dataset="mnist",
+    root="data",
+    resolution=None,
     retina_path=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
-        dataset="mnist",
+    return _image_classification_dataloaders(
+        dataset=dataset,
         root=root,
+        resolution=resolution,
+        v1=True,
         retina_path=retina_path,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
+    )
+
+
+def get_mnist_dataloaders(
+    root="data",
+    resolution=None,
+    batch_size=16,
+    num_workers=0,
+    seed=None,
+):
+    return _image_classification_dataloaders(
+        dataset="mnist",
+        root=root,
+        resolution=resolution,
+        v1=False,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        seed=seed,
     )
 
 
 def get_cifar10_dataloaders(
     root="data",
-    retina_path=None,
+    resolution=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
+    return _image_classification_dataloaders(
         dataset="cifar10",
         root=root,
-        retina_path=retina_path,
+        resolution=resolution,
+        v1=False,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
     )
 
 
 def get_cifar100_dataloaders(
     root="data",
-    retina_path=None,
+    resolution=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
+    return _image_classification_dataloaders(
         dataset="cifar100",
         root=root,
-        retina_path=retina_path,
+        resolution=resolution,
+        v1=False,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
     )
 
 
 def get_mnist_v1_dataloaders(
     root="data",
+    resolution=None,
     retina_path=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
-        dataset="mnist_v1",
+    return _image_classification_dataloaders(
+        dataset="mnist",
         root=root,
+        resolution=resolution,
         retina_path=retina_path,
+        v1=True,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
     )
 
 
 def get_cifar10_v1_dataloaders(
     root="data",
+    resolution=None,
     retina_path=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
-        dataset="cifar10_v1",
+    return _image_classification_dataloaders(
+        dataset="cifar10",
         root=root,
+        resolution=resolution,
+        v1=True,
         retina_path=retina_path,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
     )
 
 
 def get_cifar100_v1_dataloaders(
     root="data",
+    resolution=None,
     retina_path=None,
     batch_size=16,
     num_workers=0,
+    seed=None,
 ):
-    return get_benchmark_dataloaders(
-        dataset="cifar100_v1",
+    return _image_classification_dataloaders(
+        dataset="cifar100",
         root=root,
+        resolution=resolution,
+        v1=True,
         retina_path=retina_path,
         batch_size=batch_size,
         num_workers=num_workers,
+        seed=seed,
     )

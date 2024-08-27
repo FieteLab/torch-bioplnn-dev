@@ -1,7 +1,7 @@
 .vscode/
 .empty/
 __pycache__/
-data/
+/data/
 wandb/
 *.out
 checkpoints/
