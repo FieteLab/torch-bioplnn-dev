@@ -5,8 +5,6 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
-import yaml
 from addict import Dict as AttrDict
 from classifiers import ImageClassifier
 from omegaconf import DictConfig, OmegaConf
@@ -14,6 +12,7 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
+import wandb
 from bioplnn.utils import get_image_classification_dataloaders, manual_seed, pass_fn
 
 
@@ -184,7 +183,7 @@ def train_epoch(
     train_loss /= len(train_loader)
     train_acc = train_correct / train_total
 
-    return train_loss, train_acc
+    return train_loss, train_acc, global_step
 
 
 def val_epoch(
@@ -255,7 +254,7 @@ def train(config: DictConfig) -> None:
     """
 
     config = OmegaConf.to_container(config, resolve=True)
-    print(yaml.dump(config))
+    # print(yaml.dump(config))
     config = AttrDict(config)
 
     # Initialize Weights & Biases
@@ -326,9 +325,7 @@ def train(config: DictConfig) -> None:
         wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
 
         # Evaluate the model on the validation set
-        val_loss, val_acc = val_epoch(
-            config, model, criterion, val_loader, epoch, device
-        )
+        val_loss, val_acc = val_epoch(config, model, criterion, val_loader, device)
         wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 
         # Print the epoch statistics
@@ -361,7 +358,7 @@ def train(config: DictConfig) -> None:
 @hydra.main(
     version_base=None,
     config_path="/om2/user/valmiki/bioplnn/config/ei_crnn",
-    config_name="image_classification",
+    config_name="config",
 )
 def main(config: DictConfig):
     try:

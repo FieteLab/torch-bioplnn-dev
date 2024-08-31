@@ -1,0 +1,11 @@
+# @package _global_
+defaults:
+  - override /model: image_classifier
+  - override /data: image_classification
+
+model:
+  rnn_kwargs:
+    input_dim: 3
+  num_classes: 10
+data:
+  dataset: mnist

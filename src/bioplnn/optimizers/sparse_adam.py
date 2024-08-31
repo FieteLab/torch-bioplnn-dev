@@ -2,8 +2,9 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
-from torch.utils._foreach_utils import _get_fused_kernels_supported_devices
 from torch.optim.optimizer import (
+    Optimizer,
+    ParamsT,
     _capturable_doc,
     _default_to_fused_or_foreach,
     _differentiable_doc,
@@ -16,14 +17,13 @@ from torch.optim.optimizer import (
     _stack_if_compiling,
     _use_grad_for_differentiable,
     _view_as_real,
-    Optimizer,
-    ParamsT,
 )
+from torch.utils._foreach_utils import _get_fused_kernels_supported_devices
 
-__all__ = ["AdamW", "adamw"]
+__all__ = ["SparseAdamW", "adamw"]
 
 
-class AdamW(Optimizer):
+class SparseAdamW(Optimizer):
     def __init__(
         self,
         params: ParamsT,
@@ -75,12 +75,9 @@ class AdamW(Optimizer):
             # Suppor AMP with FP16/BF16 model params which would need
             # higher prec copy of params to do update math in higher prec to
             # alleviate the loss of information.
-            fused_supported_devices = (
-                _get_fused_kernels_supported_devices() + ["cpu"]
-            )
+            fused_supported_devices = _get_fused_kernels_supported_devices() + ["cpu"]
             if not all(
-                p.device.type in fused_supported_devices
-                and torch.is_floating_point(p)
+                p.device.type in fused_supported_devices and torch.is_floating_point(p)
                 for pg in self.param_groups
                 for p in pg["params"]
             ):
@@ -89,9 +86,7 @@ class AdamW(Optimizer):
                     f"supported devices: {fused_supported_devices}."
                 )
             if foreach:
-                raise RuntimeError(
-                    "`fused` and `foreach` cannot be `True` together."
-                )
+                raise RuntimeError("`fused` and `foreach` cannot be `True` together.")
 
     def __setstate__(self, state):
         super().__setstate__(state)
@@ -251,7 +246,7 @@ class AdamW(Optimizer):
         return loss
 
 
-AdamW.__doc__ = (
+SparseAdamW.__doc__ = (
     r"""Implements AdamW algorithm.
 
     .. math::
@@ -373,13 +368,9 @@ def adamw(
         foreach = False
 
     if foreach and torch.jit.is_scripting():
-        raise RuntimeError(
-            "torch.jit.script not supported with foreach optimizers"
-        )
+        raise RuntimeError("torch.jit.script not supported with foreach optimizers")
     if fused and torch.jit.is_scripting():
-        raise RuntimeError(
-            "torch.jit.script not supported with fused optimizers"
-        )
+        raise RuntimeError("torch.jit.script not supported with fused optimizers")
 
     if fused and not torch.jit.is_scripting():
         func = _fused_adamw
@@ -487,16 +478,13 @@ def _single_tensor_adamw(
                 else:
                     max_exp_avg_sq = max_exp_avg_sqs[i]
 
-                max_exp_avg_sqs[i].copy_(
-                    torch.maximum(max_exp_avg_sq, exp_avg_sq)
-                )
+                max_exp_avg_sqs[i].copy_(torch.maximum(max_exp_avg_sq, exp_avg_sq))
 
                 # Uses the max. for normalizing running avg. of gradient
                 # Folds in (admittedly ugly) 1-elem step_size math here to avoid extra param-set-sized read+write
                 # (can't fold it into addcdiv_ below because addcdiv_ requires value is a Number, not a Tensor)
                 denom = (
-                    max_exp_avg_sqs[i].sqrt()
-                    / (bias_correction2_sqrt * step_size_neg)
+                    max_exp_avg_sqs[i].sqrt() / (bias_correction2_sqrt * step_size_neg)
                 ).add_(eps / step_size_neg)
             else:
                 denom = (
@@ -516,14 +504,10 @@ def _single_tensor_adamw(
 
             if amsgrad:
                 # Maintains the maximum of all 2nd moment running avg. till now
-                torch.maximum(
-                    max_exp_avg_sqs[i], exp_avg_sq, out=max_exp_avg_sqs[i]
-                )
+                torch.maximum(max_exp_avg_sqs[i], exp_avg_sq, out=max_exp_avg_sqs[i])
 
                 # Use the max. for normalizing running avg. of gradient
-                denom = (
-                    max_exp_avg_sqs[i].sqrt() / bias_correction2_sqrt
-                ).add_(eps)
+                denom = (max_exp_avg_sqs[i].sqrt() / bias_correction2_sqrt).add_(eps)
             else:
                 denom = (exp_avg_sq.sqrt() / bias_correction2_sqrt).add_(eps)
 
@@ -653,9 +637,7 @@ def _multi_tensor_adamw(
 
             if amsgrad:
                 # Maintains the maximum of all 2nd moment running avg. till now
-                torch._foreach_maximum_(
-                    device_max_exp_avg_sqs, device_exp_avg_sqs
-                )
+                torch._foreach_maximum_(device_max_exp_avg_sqs, device_exp_avg_sqs)
 
                 # Use the max. for normalizing running avg. of gradient
                 exp_avg_sq_sqrt = torch._foreach_sqrt(device_max_exp_avg_sqs)
@@ -667,9 +649,7 @@ def _multi_tensor_adamw(
             torch._foreach_div_(exp_avg_sq_sqrt, step_size)
 
             # at this point, exp_avg_sq_sqrt = - (1 - beta^t) * [sqrt(exp_avg_sq / (1 - beta2^t)) + eps] / lr
-            torch._foreach_addcdiv_(
-                device_params, device_exp_avgs, exp_avg_sq_sqrt
-            )
+            torch._foreach_addcdiv_(device_params, device_exp_avgs, exp_avg_sq_sqrt)
         else:
             bias_correction1 = [
                 1 - beta1 ** _get_value(step) for step in device_state_steps
@@ -678,19 +658,13 @@ def _multi_tensor_adamw(
                 1 - beta2 ** _get_value(step) for step in device_state_steps
             ]
 
-            step_size = _stack_if_compiling(
-                [(lr / bc) * -1 for bc in bias_correction1]
-            )
+            step_size = _stack_if_compiling([(lr / bc) * -1 for bc in bias_correction1])
 
-            bias_correction2_sqrt = [
-                _dispatch_sqrt(bc) for bc in bias_correction2
-            ]
+            bias_correction2_sqrt = [_dispatch_sqrt(bc) for bc in bias_correction2]
 
             if amsgrad:
                 # Maintains the maximum of all 2nd moment running avg. till now
-                torch._foreach_maximum_(
-                    device_max_exp_avg_sqs, device_exp_avg_sqs
-                )
+                torch._foreach_maximum_(device_max_exp_avg_sqs, device_exp_avg_sqs)
 
                 # Use the max. for normalizing running avg. of gradient
                 exp_avg_sq_sqrt = torch._foreach_sqrt(device_max_exp_avg_sqs)
@@ -728,23 +702,17 @@ def _fused_adamw(
     if not params:
         return
     if differentiable:
-        raise RuntimeError(
-            "Adam with fused=True does not support differentiable=True"
-        )
+        raise RuntimeError("Adam with fused=True does not support differentiable=True")
 
     grad_scale_dict = (
         {grad_scale.device: grad_scale} if grad_scale is not None else None
     )
-    found_inf_dict = (
-        {found_inf.device: found_inf} if found_inf is not None else None
-    )
+    found_inf_dict = {found_inf.device: found_inf} if found_inf is not None else None
 
     # We only shuffle around the lr when it is a Tensor and on CUDA, otherwise, we prefer
     # treating it as a scalar.
     lr_dict = (
-        {lr.device: lr}
-        if isinstance(lr, Tensor) and str(lr.device) != "cpu"
-        else None
+        {lr.device: lr} if isinstance(lr, Tensor) and str(lr.device) != "cpu" else None
     )
 
     grouped_tensors = Optimizer._group_tensors_by_device_and_dtype(
@@ -764,15 +732,11 @@ def _fused_adamw(
         device_grad_scale, device_found_inf = None, None
         if grad_scale is not None:
             if device not in grad_scale_dict:
-                grad_scale_dict[device] = grad_scale.to(
-                    device, non_blocking=True
-                )
+                grad_scale_dict[device] = grad_scale.to(device, non_blocking=True)
             device_grad_scale = grad_scale_dict[device]
         if found_inf is not None:
             if found_inf not in found_inf_dict:
-                found_inf_dict[device] = found_inf.to(
-                    device, non_blocking=True
-                )
+                found_inf_dict[device] = found_inf.to(device, non_blocking=True)
             device_found_inf = found_inf_dict[device]
         if lr_dict is not None and device not in lr_dict:
             lr_dict[device] = lr.to(device=device, non_blocking=True)

@@ -12,7 +12,7 @@ from torch.optim.optimizer import (
     _use_grad_for_differentiable,
 )
 
-__all__ = ["SGD", "sgd"]
+__all__ = ["SparseSGD", "sgd"]
 
 
 def is_csr(tensor: Tensor) -> bool:

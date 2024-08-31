@@ -1,4 +1,0 @@
-defaults:
-  - common
-  - model: image_classifier
-  - data: image_classification

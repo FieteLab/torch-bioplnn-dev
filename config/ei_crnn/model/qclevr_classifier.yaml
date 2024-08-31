@@ -1,6 +1,5 @@
 defaults:
   - rnn_kwargs: default
-  - _self_
 
 rnn_kwargs:
   input_size: [128, 128]
@@ -15,8 +14,6 @@ rnn_kwargs:
   - [5, 5]
   - [3, 3]
   - [3, 3]
-
-
 modulation_enable: true
 modulation_type: conv
 modulation_op: mul

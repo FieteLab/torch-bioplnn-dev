@@ -68,11 +68,11 @@ class TopographicalRNNBase(nn.Module):
                     "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
                 )
                 use_random = False
-            if not isinstance(connectivity_ih, torch.Tensor) and not isinstance(
-                connectivity_hh, torch.Tensor
-            ):
+            try:
                 self.connectivity_hh = torch.load(connectivity_hh)
                 self.connectivity_ih = torch.load(connectivity_ih)
+            except AttributeError:
+                pass
         elif use_random:
             self.connectivity_ih, self.connectivity_hh = self.random_connectivity(
                 sheet_size, synapse_std, synapses_per_neuron, self_recurrence
@@ -98,13 +98,17 @@ class TopographicalRNNBase(nn.Module):
         self.num_neurons = self.connectivity_ih.shape[0]
 
         if input_indices is not None:
-            if not isinstance(input_indices, torch.Tensor):
+            try:
                 input_indices = torch.load(input_indices)
+            except AttributeError:
+                pass
             if input_indices.dim() > 1:
                 raise ValueError("Input indices must be a 1D tensor")
         if output_indices is not None:
-            if not isinstance(output_indices, torch.Tensor):
+            try:
                 output_indices = torch.load(output_indices)
+            except AttributeError:
+                pass
             if output_indices.dim() > 1:
                 raise ValueError("Output indices must be a 1D tensor")
 

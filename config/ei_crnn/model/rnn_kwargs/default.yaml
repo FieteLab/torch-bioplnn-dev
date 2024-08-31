@@ -1,8 +1,12 @@
 input_size: [32, 32]
 input_dim: 3
-h_pyr_dim: [16, 32, 64, 64]
-h_inter_dims: null
-fb_dim: null
+h_pyr_dim: [16, 32, 64, 128]
+h_inter_dims: 
+- [4]
+- [8]
+- [16]
+- [32]
+fb_dim: [16, 32, 64, 128]
 exc_kernel_size: 
 - [3, 3]
 - [3, 3]
@@ -13,16 +17,21 @@ inh_kernel_size:
 - [3, 3]
 - [3, 3]
 - [3, 3]
-num_compartments: 1
-immediate_inhibition: true
+use_three_compartments: false
+immediate_inhibition: false
 num_layers: 4
 inter_mode: half
 layer_time_delay: false
 exc_rectify: false
+inh_rectify: true
 hidden_init_mode: zeros
 fb_init_mode: zeros
 out_init_mode: zeros
-fb_adjacency: null
+fb_adjacency:
+- [0, 0, 0, 0]
+- [1, 0, 0, 0]
+- [0, 1, 0, 0]
+- [0, 0, 1, 0]
 pool_kernel_size: [5, 5]
 pool_stride: [2, 2]
 bias: true

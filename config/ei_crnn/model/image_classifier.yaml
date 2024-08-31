@@ -1,6 +1,5 @@
 defaults:
   - rnn_kwargs: default
-  - _self_
 
 rnn_kwargs:
   input_size: [32, 32]
@@ -15,7 +14,6 @@ rnn_kwargs:
   - [3, 3]
   - [3, 3]
   - [3, 3]
-
 num_classes: 10
 fc_dim: 512
 dropout: 0.2

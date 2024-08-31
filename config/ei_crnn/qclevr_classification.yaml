@@ -1,4 +1,0 @@
-defaults:
-  - common
-  - model: qclevr_classifier
-  - data: qclevr

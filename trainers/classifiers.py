@@ -7,6 +7,48 @@ from bioplnn.models import Conv2dEIRNN
 from bioplnn.utils import get_activation_class
 
 
+class ImageClassifier(nn.Module):
+    def __init__(
+        self,
+        rnn_kwargs,
+        num_classes=6,
+        fc_dim=512,
+        dropout=0.2,
+    ):
+        super().__init__()
+
+        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)
+
+        self.num_layers = rnn_kwargs["num_layers"]
+        self.out_layer = nn.Sequential(
+            nn.Flatten(1),
+            nn.Linear(
+                self.rnn.layers[-1].out_dim * prod(self.rnn.layers[-1].out_size),
+                fc_dim,
+            ),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_dim, num_classes),
+        )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        num_steps: int = None,
+        loss_all_timesteps: bool = False,
+    ):
+        outs, _ = self.rnn(
+            x,
+            num_steps=num_steps,
+            return_all_layers_out=False,
+        )
+
+        if loss_all_timesteps:
+            return [self.out_layer(out.flatten(1)) for out in outs]
+
+        return self.out_layer(outs[-1].flatten(1))
+
+
 class AttentionalGainModulation(nn.Module):
     def __init__(self, in_channels, out_channels, spatial_size: tuple[int, int]):
         """
@@ -574,16 +616,17 @@ class QCLEVRClassifier(nn.Module):
             return_all_layers_out=True,
         )
 
-        h_pyr_0, h_inter_0, out_0, fb_0 = None, None, None, None
-        if not self.flush_hidden:
-            h_pyr_0 = [h[-1] for h in h_pyrs]
-            h_inter_0 = [h[-1] for h in h_inters]
+        out_0, h_pyr_0, h_inter_0, fb_0 = None, None, None, None
         if not self.flush_out:
             out_0 = [o[-1] for o in outs]
-        if not self.flush_fb:
-            fb_0 = [f[-1] for f in fbs]
+        if not self.flush_hidden:
+            h_pyr_0 = [h[-1] for h in h_pyrs]
+            if h_inters is not None:
+                h_inter_0 = [h[-1] if h is not None else None for h in h_inters]
+        if not self.flush_fb and fbs is not None:
+            fb_0 = [f[-1] if f is not None else None for f in fbs]
 
-        modulation_pyr_fn, modulation_inter_fn, modulation_out_fn = None, None, None
+        modulation_out_fn, modulation_pyr_fn, modulation_inter_fn = None, None, None
         if self.modulation_enable:
             num_steps = h_pyrs[0].shape[0]
             modulation_timestep_cue, modulation_timestep_mix = (
@@ -604,15 +647,16 @@ class QCLEVRClassifier(nn.Module):
                     modulation_from_all_layers=self.modulation_from_all_layers,
                 )
 
-                modulation_inter_fn = ModulationWrapper(
-                    modulations=h_inters,
-                    modulation_modules=self.modulations_inter,
-                    modulation_timestep=modulation_timestep_cue,
-                    apply_timestep=modulation_timestep_mix,
-                    num_steps=num_steps,
-                    op=self.modulation_op,
-                    modulation_from_all_layers=self.modulation_from_all_layers,
-                )
+                if h_inters is not None:
+                    modulation_inter_fn = ModulationWrapper(
+                        modulations=h_inters,
+                        modulation_modules=self.modulations_inter,
+                        modulation_timestep=modulation_timestep_cue,
+                        apply_timestep=modulation_timestep_mix,
+                        num_steps=num_steps,
+                        op=self.modulation_op,
+                        modulation_from_all_layers=self.modulation_from_all_layers,
+                    )
             else:
                 modulation_out_fn = ModulationWrapper(
                     modulations=outs,
@@ -626,56 +670,14 @@ class QCLEVRClassifier(nn.Module):
 
         outs, _ = self.rnn(
             x=mix,
+            out_0=out_0,
             num_steps=num_steps,
             h_pyr_0=h_pyr_0,
             h_inter_0=h_inter_0,
             fb_0=fb_0,
-            out_0=out_0,
+            modulation_out_fn=modulation_out_fn,
             modulation_pyr_fn=modulation_pyr_fn,
             modulation_inter_fn=modulation_inter_fn,
-            modulation_out_fn=modulation_out_fn,
-            return_all_layers_out=False,
-        )
-
-        if loss_all_timesteps:
-            return [self.out_layer(out.flatten(1)) for out in outs]
-
-        return self.out_layer(outs[-1].flatten(1))
-
-
-class ImageClassifier(nn.Module):
-    def __init__(
-        self,
-        rnn_kwargs,
-        num_classes=6,
-        fc_dim=512,
-        dropout=0.2,
-    ):
-        super().__init__()
-
-        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)
-
-        self.num_layers = rnn_kwargs["num_layers"]
-        self.out_layer = nn.Sequential(
-            nn.Flatten(1),
-            nn.Linear(
-                self.rnn.layers[-1].out_dim * prod(self.rnn.layers[-1].out_size),
-                fc_dim,
-            ),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(fc_dim, num_classes),
-        )
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        num_steps: int = None,
-        loss_all_timesteps: bool = False,
-    ):
-        outs, _ = self.rnn(
-            x,
-            num_steps=num_steps,
             return_all_layers_out=False,
         )
 

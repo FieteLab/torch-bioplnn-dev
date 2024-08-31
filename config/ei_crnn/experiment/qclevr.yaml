@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  rnn_kwargs:
+    input_dim: 3
+  num_classes: 6

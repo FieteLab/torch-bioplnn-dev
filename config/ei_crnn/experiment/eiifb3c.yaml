@@ -1,0 +1,25 @@
+# @package _global_
+defaults:
+  - override /model: image_classifier
+  - override /data: image_classification
+  - _self_
+
+model:
+  rnn_kwargs:
+    h_pyr_dim: [16, 32, 64, 128]
+    h_inter_dims: 
+    - [4, 4, 4, 4]
+    - [8, 8, 8, 8]
+    - [16, 16, 16, 16]
+    - [32, 32, 32, 32]
+    fb_dim: [16, 32, 64, 128]
+    fb_adjacency: 
+    - [0, 0, 0, 0]
+    - [1, 0, 0, 0]
+    - [0, 1, 0, 0]
+    - [0, 0, 1, 0]
+    input_dim: 3
+    use_three_compartments: true
+  num_classes: 10
+data:
+  dataset: cifar10
