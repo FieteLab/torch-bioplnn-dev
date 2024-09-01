@@ -1,11 +1,11 @@
 input_size: [32, 32]
 input_dim: 3
 h_pyr_dim: [16, 32, 64, 128]
-h_inter_dims: 
-- [4]
-- [8]
+h_inter_dims:
 - [16]
 - [32]
+- [64]
+- [128]
 fb_dim: [16, 32, 64, 128]
 exc_kernel_size: 
 - [3, 3]
@@ -23,7 +23,7 @@ num_layers: 4
 inter_mode: half
 layer_time_delay: false
 exc_rectify: false
-inh_rectify: true
+inh_rectify: false
 hidden_init_mode: zeros
 fb_init_mode: zeros
 out_init_mode: zeros
@@ -35,5 +35,6 @@ fb_adjacency:
 pool_kernel_size: [5, 5]
 pool_stride: [2, 2]
 bias: true
-pre_inh_activation: tanh
-post_inh_activation: null
+pre_inh_activation: relu
+post_inh_activation: tanh
+post_integration_activation: null

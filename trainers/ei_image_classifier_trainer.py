@@ -6,13 +6,13 @@ from typing import Optional
 import hydra
 import torch
 from addict import Dict as AttrDict
-from classifiers import ImageClassifier
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
 import wandb
+from bioplnn.models.classifiers import ImageClassifier
 from bioplnn.utils import get_image_classification_dataloaders, manual_seed, pass_fn
 
 
@@ -121,6 +121,8 @@ def train_epoch(
         disable=not config.tqdm,
     )
     for i, (image, labels) in enumerate(iterable=bar):
+        if config.debug_forward and i == 20:
+            break
         image = image.to(device)
         labels = labels.to(device)
 
@@ -212,7 +214,9 @@ def val_epoch(
     val_total = 0
 
     with torch.no_grad():
-        for image, labels in val_loader:
+        for i, (image, labels) in enumerate(val_loader):
+            if config.debug_forward and i == 20:
+                break
             image = image.to(device)
             labels = labels.to(device)
 
@@ -256,6 +260,9 @@ def train(config: DictConfig) -> None:
     config = OmegaConf.to_container(config, resolve=True)
     # print(yaml.dump(config))
     config = AttrDict(config)
+
+    if config.debug_level > 1:
+        torch.autograd.set_detect_anomaly(True)
 
     # Initialize Weights & Biases
     wandb.require("core")
@@ -309,6 +316,8 @@ def train(config: DictConfig) -> None:
     )
 
     for epoch in range(config.train.epochs):
+        if config.debug_forward and epoch == 1:
+            break
         wandb.log(dict(epoch=epoch), step=global_step)
         # Train the model
         train_loss, train_acc, global_step = train_epoch(
@@ -364,7 +373,7 @@ def main(config: DictConfig):
     try:
         train(config)
     except Exception as e:
-        if config.debug_level > 1:
+        if config.debug_level > 0:
             print_exc(file=sys.stderr)
         else:
             print(e, file=sys.stderr)

@@ -1,5 +1,6 @@
 defaults:
   - rnn_kwargs: default
+  - _self_
 
 rnn_kwargs:
   input_size: [128, 128]

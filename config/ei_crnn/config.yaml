@@ -1,10 +1,11 @@
 defaults:
   - model: null
   - data: null
+  - _self_
 
 optimizer: 
   fn: adamw
-  lr: 0.0004
+  lr: 0.001
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
@@ -21,7 +22,7 @@ compile:
   backend: inductor
   mode: reduce-overhead
 train:
-  num_steps: 5
+  num_steps: 10
   epochs: 100
   log_freq: 5
   grad_clip:
@@ -33,12 +34,13 @@ checkpoint:
   root: checkpoints/ei
   run: test
   epoch: null
-seed: null
-tqdm: true
 wandb:
   project: EI RNN
-  mode: disabled
+  mode: online
   group: null
+seed: null
+tqdm: true
 foreach: true
 matmul_precision: high
-debug_level: 2
+debug_level: 0
+debug_forward: false

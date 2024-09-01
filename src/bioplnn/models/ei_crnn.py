@@ -80,8 +80,10 @@ class Conv2dEIRNNCell(nn.Module):
         bias: bool = True,
         pre_inh_activation: Optional[str] = "tanh",
         post_inh_activation: Optional[str] = None,
+        post_integration_activation: Optional[str] = None,
     ):
         super().__init__()
+        # Save the parameters
         self.input_size = input_size
         if inter_mode == "half":
             self.inter_size = (ceil(input_size[0] / 2), ceil(input_size[1] / 2))
@@ -89,18 +91,57 @@ class Conv2dEIRNNCell(nn.Module):
             self.inter_size = input_size
         else:
             raise ValueError("inter_mode must be 'half' or 'same'.")
-
+        self.out_size = (
+            ceil(input_size[0] / pool_stride[0]),
+            ceil(input_size[1] / pool_stride[1]),
+        )
         self.input_dim = input_dim
         self.h_pyr_dim = h_pyr_dim
-        h_inter_dims = h_inter_dims if h_inter_dims is not None else []
-        if len(h_inter_dims) not in (0, 1, 2, 4):
-            raise ValueError(
-                "h_inter_dims must be None or a list/tuple of length 0, 1, 2, or 4."
-                f"Got length {len(h_inter_dims) if h_inter_dims is not None else None}."
-            )
+        self.out_dim = h_pyr_dim
+        self.h_inter_dims = h_inter_dims if h_inter_dims is not None else []
+        self.use_h_inter = self.h_inter_dims and not immediate_inhibition
         self.fb_dim = fb_dim
         self.use_fb = fb_dim > 0
-        if len(h_inter_dims) == 4:
+        self.immediate_inhibition = immediate_inhibition
+        self.use_three_compartments = use_three_compartments
+        self.pool_stride = pool_stride
+        try:
+            self.pre_inh_activation = get_activation_class(pre_inh_activation)()
+        except ValueError:
+            self.pre_inh_activation = nn.Sequential(
+                *(
+                    get_activation_class(activation)()
+                    for activation in pre_inh_activation
+                )
+            )
+        try:
+            self.post_inh_activation = get_activation_class(post_inh_activation)()
+        except ValueError:
+            self.post_inh_activation = nn.Sequential(
+                *(
+                    get_activation_class(activation)()
+                    for activation in post_inh_activation
+                )
+            )
+        try:
+            self.post_integration_activation = get_activation_class(
+                post_integration_activation
+            )()
+        except Exception:
+            self.post_integration_activation = nn.Sequential(
+                *(
+                    get_activation_class(activation)()
+                    for activation in post_integration_activation
+                )
+            )
+
+        # Value check
+        if len(self.h_inter_dims) not in (0, 1, 2, 4):
+            raise ValueError(
+                "h_inter_dims must be None or a list/tuple of length 0, 1, 2, or 4."
+                f"Got length {len(self.h_inter_dims)}."
+            )
+        if len(self.h_inter_dims) == 4:
             if not self.use_fb:
                 warnings.warn(
                     """
@@ -108,60 +149,35 @@ class Conv2dEIRNNCell(nn.Module):
                     Disabling interneuron types 2 and 3.
                     """
                 )
-                h_inter_dims = h_inter_dims[:2]
+                self.h_inter_dims = self.h_inter_dims[:2]
             if not use_three_compartments:
                 raise ValueError(
                     "If h_inter_dims has length 4, use_three_compartments must be True."
                 )
-        self.h_inter_dims = h_inter_dims
 
-        self.immediate_inhibition = immediate_inhibition
+        self.h_inter_dims_sum = sum(self.h_inter_dims)
 
-        self.use_three_compartments = use_three_compartments
-
-        self.h_inter_dims_sum = sum(h_inter_dims)
-        self.pool_stride = pool_stride
-        try:
-            self.pre_inh_activation = get_activation_class(pre_inh_activation)()
-        except Exception:
-            self.pre_inh_activation = nn.Sequential(
-                *(
-                    get_activation_class(activation)()
-                    for activation in pre_inh_activation
-                )
+        if self.immediate_inhibition and len(self.h_inter_dims) not in (0, 1):
+            raise ValueError(
+                "If immediate_inhibition is True, h_inter_dims must be None or a list/tuple of length 0 or 1."
             )
-
-        try:
-            self.post_inh_activation = get_activation_class(post_inh_activation)()
-        except Exception:
-            self.post_inh_activation = nn.Sequential(
-                *(
-                    get_activation_class(activation)()
-                    for activation in post_inh_activation
-                )
-            )
-
-        self.out_dim = h_pyr_dim
-        self.out_size = (
-            ceil(input_size[0] / pool_stride[0]),
-            ceil(input_size[1] / pool_stride[1]),
-        )
 
         # Learnable membrane time constants for excitatory and inhibitory cell populations
         self.tau_pyr = nn.Parameter(torch.randn((1, h_pyr_dim, *input_size)))
-        if h_inter_dims:
+        if self.use_h_inter:
             self.tau_inter = nn.Parameter(
                 torch.randn((1, self.h_inter_dims_sum, *self.inter_size))
             )
 
+        # Rectify the weights and biases if specified
         if exc_rectify:
             Conv2dExc = Conv2dPositive
         else:
             Conv2dExc = nn.Conv2d
 
         # Initialize excitatory convolutional layers
-        in_channels = h_pyr_dim
         if use_three_compartments:
+            conv_exc_pyr_dim = h_pyr_dim
             self.conv_exc_pyr_input = Conv2dExc(
                 in_channels=input_dim,
                 out_channels=h_pyr_dim,
@@ -181,20 +197,20 @@ class Conv2dEIRNNCell(nn.Module):
                     bias=bias,
                 )
         else:
-            in_channels += input_dim + fb_dim
+            conv_exc_pyr_dim = h_pyr_dim + input_dim + fb_dim
         self.conv_exc_pyr = Conv2dExc(
-            in_channels=in_channels,
+            in_channels=conv_exc_pyr_dim,
             out_channels=h_pyr_dim,
             kernel_size=exc_kernel_size,
             padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
             bias=bias,
         )
 
-        if h_inter_dims:
-            if len(h_inter_dims) == 4:
+        if self.h_inter_dims:
+            if len(self.h_inter_dims) == 4:
                 self.conv_exc_input_inter = Conv2dExc(
                     in_channels=input_dim,
-                    out_channels=h_inter_dims[2],
+                    out_channels=self.h_inter_dims[2],
                     kernel_size=exc_kernel_size,
                     stride=2 if inter_mode == "half" else 1,
                     padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
@@ -202,7 +218,7 @@ class Conv2dEIRNNCell(nn.Module):
                 )
                 self.conv_exc_inter_fb = Conv2dExc(
                     in_channels=fb_dim,
-                    out_channels=h_inter_dims[3],
+                    out_channels=self.h_inter_dims[3],
                     kernel_size=exc_kernel_size,
                     stride=2 if inter_mode == "half" else 1,
                     padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
@@ -230,7 +246,7 @@ class Conv2dEIRNNCell(nn.Module):
                 h_pyr_dim,
                 h_pyr_dim,
             ]
-            for i, h_inter_dim in enumerate(h_inter_dims):
+            for i, h_inter_dim in enumerate(self.h_inter_dims):
                 conv = Conv2dInh(
                     in_channels=h_inter_dim,
                     out_channels=self.inh_out_dims[i],
@@ -245,7 +261,7 @@ class Conv2dEIRNNCell(nn.Module):
                 if i in (2, 3):
                     conv2 = Conv2dInh(
                         in_channels=h_inter_dim,
-                        out_channels=(h_inter_dims[3 if i == 2 else 2]),
+                        out_channels=(self.h_inter_dims[3 if i == 2 else 2]),
                         kernel_size=inh_kernel_size,
                         padding=(inh_kernel_size[0] // 2, inh_kernel_size[1] // 2),
                         bias=bias,
@@ -292,7 +308,7 @@ class Conv2dEIRNNCell(nn.Module):
                     *self.inter_size,
                     device=device,
                 )
-                if len(self.h_inter_dims) > 0 and not self.immediate_inhibition
+                if self.use_h_inter
                 else None
             ),
         )
@@ -379,7 +395,10 @@ class Conv2dEIRNNCell(nn.Module):
         inhs = [0] * 4
         if self.h_inter_dims:
             # Compute the excitations for interneurons
-            exc_inter = self.pre_inh_activation(self.conv_exc_inter(h_pyr))
+            inter_activation = (
+                nn.Tanh() if self.immediate_inhibition else self.pre_inh_activation
+            )
+            exc_inter = inter_activation(self.conv_exc_inter(h_pyr))
             if len(self.h_inter_dims) == 4:
                 exc_input_inter = self.pre_inh_activation(
                     self.conv_exc_input_inter(input)
@@ -387,20 +406,20 @@ class Conv2dEIRNNCell(nn.Module):
                 exc_fb_inter = self.pre_inh_activation(self.conv_exc_inter_fb(fb))
 
             # Compute the inhibitions for all neurons
-
-            if h_inter is not None:
-                if self.immediate_inhibition or len(self.h_inter_dims) == 0:
+            h_inters = h_inter
+            if self.immediate_inhibition:
+                if h_inter is not None:
                     raise ValueError(
-                        "If h_inter is provided, immediate_inhibition must be False and h_inter_dims must not be provided"
+                        "If h_inter_dims is provided and immediate_inhibition is True, h_inter must not be provided."
                     )
-                exc_inter = h_inter
-            elif not self.immediate_inhibition or len(self.h_inter_dims) > 0:
+                h_inters = exc_inter
+            elif h_inter is None:
                 raise ValueError(
-                    "If h_inter is not provided, immediate_inhibition must be True and h_inter_dims must be provided"
+                    "If h_inter_dims is provided and immediate_inhibition is False, h_inter must be provided."
                 )
 
-            exc_inters = torch.split(
-                exc_inter,
+            h_inters = torch.split(
+                h_inters,
                 self.h_inter_dims,
                 dim=1,
             )
@@ -410,13 +429,13 @@ class Conv2dEIRNNCell(nn.Module):
                 if i in (2, 3):
                     conv, conv2 = conv.conv1, conv.conv2
                     if i == 2:
-                        inh_inter_3 = self.pre_inh_activation(conv2(exc_inters[i]))
+                        inh_inter_3 = self.pre_inh_activation(conv2(h_inters[i]))
                     else:
-                        inh_inter_2 = self.pre_inh_activation(conv2(exc_inters[i]))
-                inhs[i] = self.pre_inh_activation(conv(exc_inters[i]))
+                        inh_inter_2 = self.pre_inh_activation(conv2(h_inters[i]))
+                inhs[i] = self.pre_inh_activation(conv(h_inters[i]))
         inh_pyr_soma, inh_inter, inh_pyr_basal, inh_pyr_apical = inhs
 
-        # Compute the candidate hidden state
+        # Compute the new pyramidal cell hidden state
         pyr_soma = self.post_inh_activation(exc_pyr_soma - inh_pyr_soma)
         if self.use_three_compartments:
             pyr_basal = self.post_inh_activation(exc_pyr_basal - inh_pyr_basal)
@@ -425,27 +444,35 @@ class Conv2dEIRNNCell(nn.Module):
                 if self.use_fb
                 else 0
             )
-            pyr_soma += pyr_apical + pyr_basal
-        h_pyr_new = self.post_inh_activation(pyr_soma)
+            pyr_soma = pyr_soma + pyr_apical + pyr_basal
+            pyr_soma /= 3
+        h_pyr_new = self.post_integration_activation(pyr_soma)
 
-        h_inter_new = exc_inter - inh_inter
-        if len(self.h_inter_dims) == 4:
-            # Add excitations and inhibitions to interneuron 2
-            start = sum(self.h_inter_dims[:2])
-            end = start + self.h_inter_dims[2]
-            h_inter_new[:, start:end, ...] += exc_input_inter - inh_inter_2
-            # Add excitations and inhibitions to interneuron 3
-            start = sum(self.h_inter_dims[:3])
-            h_inter_new[:, start:, ...] += exc_fb_inter - inh_inter_3
-        h_new_inter = self.post_inh_activation(h_inter_new)
-
-        # Euler update for the cell state
+        # Compute the Euler update for the pyramidal cell hidden state
         tau_pyr = torch.sigmoid(self.tau_pyr)
         h_pyr = (1 - tau_pyr) * h_pyr + tau_pyr * h_pyr_new
 
-        if h_inter is not None:
+        # Compute the new interneuron cell hidden state
+        if self.use_h_inter:
+            h_inter_new = exc_inter - inh_inter
+            if len(self.h_inter_dims) == 4:
+                # Add excitations and inhibitions to interneuron 2
+                start = sum(self.h_inter_dims[:2])
+                end = start + self.h_inter_dims[2]
+                h_inter_new[:, start:end, ...] = (
+                    h_inter_new[:, start:end, ...] + exc_input_inter - inh_inter_2
+                )
+                # Add excitations and inhibitions to interneuron 3
+                start = sum(self.h_inter_dims[:3])
+                h_inter_new[:, start:, ...] = (
+                    h_inter_new[:, start:, ...] + exc_fb_inter - inh_inter_3
+                )
+            h_inter_new = self.post_integration_activation(
+                self.post_inh_activation(h_inter_new)
+            )
+            # Compute the Euler update for the interneuron cell hidden state
             tau_inter = torch.sigmoid(self.tau_inter)
-            h_inter = (1 - tau_inter) * h_inter + tau_inter * h_new_inter
+            h_inter = (1 - tau_inter) * h_inter + tau_inter * h_inter_new
 
         # Pool the output
         out = self.out_pool(h_pyr)
@@ -479,6 +506,7 @@ class Conv2dEIRNN(nn.Module):
         bias: bool | list[bool],
         pre_inh_activation: Optional[str],
         post_inh_activation: Optional[str],
+        post_integration_activation: Optional[str],
         batch_first: bool,
     ):
         """
@@ -603,6 +631,7 @@ class Conv2dEIRNN(nn.Module):
                     bias=self.biases[i],
                     pre_inh_activation=pre_inh_activation,
                     post_inh_activation=post_inh_activation,
+                    post_integration_activation=post_integration_activation,
                 )
             )
 
@@ -721,10 +750,10 @@ class Conv2dEIRNN(nn.Module):
         for i in range(self.num_layers):
             outs[i] = torch.stack(outs[i])
             h_pyrs[i] = torch.stack(h_pyrs[i])
-            if (len(self.h_inter_dims[i]) > 0) and not self.immediate_inhibition:
+            if self.h_inter_dims[i] and not self.immediate_inhibition:
                 h_inters[i] = torch.stack(h_inters[i])  # TODO: Check if this is correct
             else:
-                assert (len(self.h_inter_dims[i]) == 0) != self.immediate_inhibition
+                assert not self.h_inter_dims[i] or self.immediate_inhibition
                 assert all(x is None for x in h_inters[i])
                 h_inters[i] = None
             if self.receives_fb[i]:
@@ -735,7 +764,7 @@ class Conv2dEIRNN(nn.Module):
             if self.batch_first:
                 outs[i] = outs[i].transpose(0, 1)
                 h_pyrs[i] = h_pyrs[i].transpose(0, 1)
-                if self.h_inter_dims[i] > 0 and not self.immediate_inhibition:
+                if self.h_inter_dims[i] and not self.immediate_inhibition:
                     h_inters[i] = h_inters[i].transpose(0, 1)
                 if self.receives_fb[i]:
                     fbs[i] = fbs[i].transpose(0, 1)
@@ -816,4 +845,4 @@ class Conv2dEIRNN(nn.Module):
         if not return_all_layers_out:
             outs = outs[-1]
 
-        return outs, (h_pyrs, h_inters, fbs)
+        return outs, h_pyrs, h_inters, fbs

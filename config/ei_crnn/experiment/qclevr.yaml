@@ -1,4 +1,9 @@
-# @package _global_
+# @package _global_# @package _global_
+defaults:
+  - override /model: qclevr
+  - override /data: qclevr
+  - _self_
+
 model:
   rnn_kwargs:
     input_dim: 3

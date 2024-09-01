@@ -39,7 +39,7 @@ def manual_seed_deterministic(seed):
 def get_activation_class(activation):
     if activation is None or activation == "identity":
         return nn.Identity
-    if activation == "relu":
+    elif activation == "relu":
         return nn.ReLU
     elif activation == "tanh":
         return nn.Tanh

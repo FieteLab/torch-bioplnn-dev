@@ -3,7 +3,7 @@ from math import prod
 import torch
 from torch import nn
 
-from bioplnn.models import Conv2dEIRNN
+from bioplnn.models.ei_crnn import Conv2dEIRNN
 from bioplnn.utils import get_activation_class
 
 
@@ -37,7 +37,7 @@ class ImageClassifier(nn.Module):
         num_steps: int = None,
         loss_all_timesteps: bool = False,
     ):
-        outs, _ = self.rnn(
+        outs, _, _, _ = self.rnn(
             x,
             num_steps=num_steps,
             return_all_layers_out=False,
@@ -610,7 +610,7 @@ class QCLEVRClassifier(nn.Module):
         num_steps: int = None,
         loss_all_timesteps: bool = False,
     ):
-        outs, (h_pyrs, h_inters, fbs) = self.rnn(
+        outs, h_pyrs, h_inters, fbs = self.rnn(
             x=cue,
             num_steps=num_steps,
             return_all_layers_out=True,
@@ -668,7 +668,7 @@ class QCLEVRClassifier(nn.Module):
                     modulation_from_all_layers=self.modulation_from_all_layers,
                 )
 
-        outs, _ = self.rnn(
+        outs, _, _, _ = self.rnn(
             x=mix,
             out_0=out_0,
             num_steps=num_steps,

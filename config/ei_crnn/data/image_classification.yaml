@@ -1,4 +1,4 @@
-dataset: mnist
+dataset: cifar100
 root: data
 batch_size: 256
 num_workers: 8
