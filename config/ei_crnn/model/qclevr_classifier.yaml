@@ -4,7 +4,7 @@ defaults:
 
 rnn_kwargs:
   input_size: [128, 128]
-  input_dim: 3
+  in_channels: 3
   exc_kernel_size: 
   - [5, 5]
   - [5, 5]

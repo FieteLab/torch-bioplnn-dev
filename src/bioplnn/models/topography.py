@@ -12,6 +12,26 @@ from bioplnn.utils import get_activation_class, idx_1D_to_2D, idx_2D_to_1D
 
 
 class TopographicalRNNBase(nn.Module):
+    """
+    Base class for Topographical Recurrent Neural Networks (TRNNs).
+
+    TRNNs are a type of recurrent neural network designed to model spatial dependencies on a sheet-like topology.
+    This base class provides common functionalities for all TRNN variants.
+
+    Args:
+        sheet_size (tuple[int, int]): Size of the sheet-like topology (height, width).
+        synapse_std (float): Standard deviation for random synapse initialization.
+        synapses_per_neuron (int): Number of synapses per neuron.
+        self_recurrence (bool): Whether to include self-recurrent connections.
+        connectivity_hh (Optional[str | torch.Tensor]): Path to a file containing the hidden-to-hidden connectivity matrix or the matrix itself.
+        connectivity_ih (Optional[str | torch.Tensor]): Path to a file containing the input-to-hidden connectivity matrix or the matrix itself.
+        num_classes (int): Number of output classes.
+        batch_first (bool): Whether the input is in (batch_size, seq_len, input_size) format.
+        input_indices (Optional[str | torch.Tensor]): Path to a file containing the input indices or the tensor itself (specifying which neurons receive input).
+        output_indices (Optional[str | torch.Tensor]): Path to a file containing the output indices or the tensor itself (specifying which neurons contribute to the output).
+        out_nonlinearity (str): Nonlinearity applied to the output layer.
+    """
+
     def __init__(
         self,
         sheet_size: tuple[int, int] = (150, 300),
@@ -26,39 +46,19 @@ class TopographicalRNNBase(nn.Module):
         output_indices: Optional[str | torch.Tensor] = None,
         out_nonlinearity: str = "relu",
     ):
-        """
-        Initialize the TopographicalCorticalRNN object.
-
-        Args:
-            sheet_size (tuple[int, int], optional): The size of the cortical sheet (number of rows, number of columns). Defaults to (256, 256).
-            connectivity_std (float, optional): The standard deviation of the connectivity weights. Defaults to 10.
-            synapses_per_neuron (int, optional): The number of synapses per neuron. Defaults to 32.
-            bias (bool, optional): Whether to include bias in the cortical sheet. Defaults to True.
-            mm_function (str, optional): The sparse matrix multiplication function to use in the cortical sheet.
-                Possible values are "native", "torch_sparse", and "tsgu". Defaults to "torch_sparse".
-            sparse_format (str, optional): The sparse format to use in the cortical sheet.
-                Possible values are "coo", "csr", and "torch_sparse". Defaults to "torch_sparse".
-            batch_first (bool, optional): Whether the batch dimension is the first dimension in the cortical sheet. Defaults to True.
-            adjacency_matrix_path (str, optional): The path to the adjacency matrix file. Defaults to None.
-            self_recurrence (bool, optional): Whether to include self-recurrence in the cortical sheet. Defaults to False.
-            num_timesteps (int, optional): The number of timesteps for the recurrent processing. Defaults to 100.
-            input_indices (str | torch.Tensor, optional): The input indices for the cortical sheet.
-                Can be a path to a .npy or .pt file or a torch.Tensor. Defaults to None.
-            output_indices (str | torch.Tensor, optional): The output indices for the cortical sheet.
-                Can be a path to a .npy or .pt file or a torch.Tensor. Defaults to None.
-            activation (str, optional): The activation function to use. Possible values are "relu" and "gelu". Defaults to "relu".
-            initialization (str, optional): The initialization method for the cortical sheet. Defaults to "identity".
-        """
         super().__init__()
 
         self.sheet_size = sheet_size
         self.batch_first = batch_first
         self.out_nonlinearity = get_activation_class(out_nonlinearity)()
 
-        if connectivity_ih is None != connectivity_hh is None:
+        # Check for consistency in connectivity matrix usage
+        if (connectivity_ih is None) != (connectivity_hh is None):
             raise ValueError(
                 "Both connectivity matrices must be provided if one is provided"
             )
+
+        # Initialize connectivity or randomize based on arguments
         use_random = synapse_std is not None and synapses_per_neuron is not None
         use_connectivity = connectivity_ih is not None and connectivity_hh is not None
 
@@ -67,7 +67,6 @@ class TopographicalRNNBase(nn.Module):
                 warn(
                     "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
                 )
-                use_random = False
             try:
                 self.connectivity_hh = torch.load(connectivity_hh)
                 self.connectivity_ih = torch.load(connectivity_ih)
@@ -82,6 +81,7 @@ class TopographicalRNNBase(nn.Module):
                 "Either connectivity or random initialization must be provided"
             )
 
+        # Validate connectivity matrix format
         if (
             self.connectivity_ih.layout != torch.sparse_coo
             or self.connectivity_hh.layout != torch.sparse_coo
@@ -97,31 +97,29 @@ class TopographicalRNNBase(nn.Module):
 
         self.num_neurons = self.connectivity_ih.shape[0]
 
+        # Handle input and output indices
         if input_indices is not None:
             try:
-                input_indices = torch.load(input_indices)
+                self.input_indices = torch.load(input_indices)
             except AttributeError:
                 pass
-            if input_indices.dim() > 1:
+            if self.input_indices.dim() > 1:
                 raise ValueError("Input indices must be a 1D tensor")
         if output_indices is not None:
             try:
-                output_indices = torch.load(output_indices)
+                self.output_indices = torch.load(output_indices).squeeze()
             except AttributeError:
                 pass
-            if output_indices.dim() > 1:
+            if self.output_indices.dim() > 1:
                 raise ValueError("Output indices must be a 1D tensor")
 
-        if (input_indices is not None and input_indices.dim() > 1) or (
-            output_indices is not None and output_indices.dim() > 1
+        if (input_indices is not None and self.input_indices.dim() > 1) or (
+            output_indices is not None and self.output_indices.dim() > 1
         ):
             raise ValueError("Input and output indices must be 1D tensors")
 
-        self.input_indices = input_indices
-        self.output_indices = output_indices
-
         num_out_neurons = (
-            self.num_neurons if output_indices is None else output_indices.shape[0]
+            self.num_neurons if output_indices is None else self.output_indices.shape[0]
         )
 
         # Create output block
@@ -134,6 +132,18 @@ class TopographicalRNNBase(nn.Module):
     def random_connectivity(
         self, sheet_size, synapse_std, synapses_per_neuron, self_recurrence
     ):
+        """
+        Generates random connectivity matrices for the TRNN.
+
+        Args:
+            sheet_size (tuple[int, int]): Size of the sheet-like topology.
+            synapse_std (float): Standard deviation for random synapse initialization.
+            synapses_per_neuron (int): Number of synapses per neuron.
+            self_recurrence (bool): Whether to include self-recurrent connections.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
+        """
         num_neurons = sheet_size[0] * sheet_size[1]
 
         idx_1d = torch.arange(num_neurons)
@@ -180,13 +190,13 @@ class TopographicalRNNBase(nn.Module):
 
     def visualize(self, activations, save_path=None, fps=4, frames=None):
         """
-        Visualize the forward pass of the TopographicalCorticalRNN.
+        Visualizes the activations of the TopographicalRNN as an animation.
 
         Args:
-            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_channels, num_neurons).
-
-        Returns:
-            torch.Tensor: Output tensor.
+            activations (torch.Tensor): Tensor of activations.
+            save_path (str, optional): Path to save the animation. Defaults to None.
+            fps (int, optional): Frames per second for the animation. Defaults to 4.
+            frames (tuple[int, int], optional): Range of frames to visualize. Defaults to None.
         """
         if frames is not None:
             activations = activations[frames[0] : frames[1]]
@@ -231,13 +241,15 @@ class TopographicalRNNBase(nn.Module):
         loss_all_timesteps=False,
     ):
         """
-        Forward pass of the TopographicalCorticalRNN.
+        Forward pass of the TopographicalRNNBase.
 
         Args:
-            x (torch.Tensor): Input tensor of size (batch_size, num_neurons) or (batch_size, num_steps, num_neurons) or (num_steps, batch_size, num_neurons).
+            x (torch.Tensor): Input tensor.
+            num_steps (int, optional): Number of time steps. Defaults to None.
+            loss_all_timesteps (bool, optional): Whether to calculate loss for all timesteps or only the last one. Defaults to False.
 
         Returns:
-            torch.Tensor: Output tensor.
+            tuple[torch.Tensor, torch.Tensor]: Output tensor and hidden state.
         """
         # TODO: Add sparse-dense hybrid functionality for channels
         if self.batch_first:
@@ -284,10 +296,32 @@ class TopographicalRNNBase(nn.Module):
         if loss_all_timesteps:
             return [self.out_layer(out) for out in x]
 
-        return self.out_layer(x), h
+        return self.out_layer(x[-1]), h
 
 
 class TopographicalRNN(TopographicalRNNBase):
+    """
+    Topographical Recurrent Neural Network (TRNN) using SparseRNN.
+
+    Extends the TopographicalRNNBase class.
+
+    Args:
+        sheet_size (tuple[int, int], optional): Size of the sheet-like topology. Defaults to (150, 300).
+        synapse_std (float, optional): Standard deviation for random synapse initialization. Defaults to 10.
+        synapses_per_neuron (int, optional): Number of synapses per neuron. Defaults to 32.
+        self_recurrence (bool, optional): Whether to include self-recurrent connections. Defaults to True.
+        connectivity_hh (Optional[str | torch.Tensor], optional): Path to a file containing the hidden-to-hidden connectivity matrix or the matrix itself. Defaults to None.
+        connectivity_ih (Optional[str | torch.Tensor], optional): Path to a file containing the input-to-hidden connectivity matrix or the matrix itself. Defaults to None.
+        num_classes (int, optional): Number of output classes. Defaults to 10.
+        batch_first (bool, optional): Whether the input is in (batch_size, seq_len, input_size) format. Defaults to True.
+        input_indices (Optional[str | torch.Tensor], optional): Path to a file containing the input indices or the tensor itself (specifying which neurons receive input). Defaults to None.
+        output_indices (Optional[str | torch.Tensor], optional): Path to a file containing the output indices or the tensor itself (specifying which neurons contribute to the output). Defaults to None.
+        out_nonlinearity (str, optional): Nonlinearity applied to the output layer. Defaults to "relu".
+        rnn_nonlinearity (str, optional): Nonlinearity used in the SparseRNN. Defaults to "relu".
+        use_layernorm (bool, optional): Whether to use layer normalization in the SparseRNN. Defaults to False.
+        bias (bool, optional): Whether to use bias in the SparseRNN. Defaults to True.
+    """
+
     def __init__(
         self,
         sheet_size: tuple[int, int] = (150, 300),

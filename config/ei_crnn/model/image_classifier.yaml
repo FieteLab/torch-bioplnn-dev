@@ -4,7 +4,7 @@ defaults:
 
 rnn_kwargs:
   input_size: [32, 32]
-  input_dim: 3
+  in_channels: 3
   exc_kernel_size: 
   - [3, 3]
   - [3, 3]
@@ -16,5 +16,5 @@ rnn_kwargs:
   - [3, 3]
   - [3, 3]
 num_classes: 100
-fc_dim: 512
+fc_channels: 512
 dropout: 0.2

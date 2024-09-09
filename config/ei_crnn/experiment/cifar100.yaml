@@ -5,7 +5,7 @@ defaults:
 
 model:
   rnn_kwargs:
-    input_dim: 3
+    in_channels: 3
   num_classes: 100
 data:
   dataset: cifar100

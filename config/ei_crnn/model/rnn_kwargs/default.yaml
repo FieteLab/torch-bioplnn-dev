@@ -1,5 +1,5 @@
 input_size: [32, 32]
-input_dim: 3
+in_channels: 3
 h_pyr_dim: [16, 32, 64, 128]
 h_inter_dims:
 - [16]

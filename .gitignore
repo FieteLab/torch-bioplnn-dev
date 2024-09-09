@@ -9,3 +9,4 @@ outputs/
 multirun/
 .DS_Store
 visualizations/
+ruff.toml

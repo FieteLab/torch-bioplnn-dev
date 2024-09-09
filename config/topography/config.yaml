@@ -1,8 +1,12 @@
+defaults:
+  - model: null
+  - _self_
+
 data:
   dataset: cifar10
   root: data
   retina_path: connectivity/V1_indices.pt
-  batch_size: 16
+  batch_size: 128
   num_workers: 8
 optimizer: 
   fn: adamw

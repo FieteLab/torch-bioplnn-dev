@@ -6,7 +6,7 @@ defaults:
 
 model:
   rnn_kwargs:
-    input_dim: 3
+    in_channels: 3
   num_classes: 10
 data:
   dataset: mnist
