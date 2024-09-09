@@ -10,3 +10,4 @@ multirun/
 .DS_Store
 visualizations/
 ruff.toml
+slurm_scripts/

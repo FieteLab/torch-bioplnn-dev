@@ -7,11 +7,12 @@ import hydra
 import pandas as pd
 import torch
 from addict import Dict as AttrDict
-from bioplnn.models import TopographicalRNN
-from bioplnn.sparse_sgd import SparseSGD
-from bioplnn.utils import dict_flatten, get_benchmark_dataloaders, seed
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
+
+from bioplnn.models import TopographicalRNN
+from bioplnn.optimizers import SparseSGD
+from bioplnn.utils import dict_flatten, get_benchmark_dataloaders, seed
 
 
 def test(config: DictConfig):
