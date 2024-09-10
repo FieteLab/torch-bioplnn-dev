@@ -324,6 +324,7 @@ class TopographicalRNN(TopographicalRNNBase):
 
     def __init__(
         self,
+        num_classes: int,
         sheet_size: tuple[int, int] = (150, 300),
         synapse_std: float = 10,
         synapses_per_neuron: int = 32,
@@ -332,7 +333,6 @@ class TopographicalRNN(TopographicalRNNBase):
         connectivity_ih: Optional[str | torch.Tensor] = None,
         sparse_format: str = "torch_sparse",
         mm_function: str = "torch_sparse",
-        num_classes: int = 10,
         batch_first: bool = True,
         input_indices: Optional[str | torch.Tensor] = None,
         output_indices: Optional[str | torch.Tensor] = None,
