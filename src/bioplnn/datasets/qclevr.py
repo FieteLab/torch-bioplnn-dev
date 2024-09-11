@@ -315,4 +315,4 @@ class QCLEVRDataset(Dataset):
                 cue_str,
             )
         else:
-            return self.transform(cue), self.transform(img), label
+            return (self.transform(cue), self.transform(img)), label

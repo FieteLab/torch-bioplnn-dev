@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 from torchvision.transforms import transforms
 
+from bioplnn.datasets.cabc import CABCDataset
+
 
 def pass_fn(*args, **kwargs):
     pass
@@ -211,6 +213,50 @@ def get_qclevr_dataloaders(
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=val_batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+    )
+    return train_dataloader, val_dataloader
+
+
+def get_cabc_dataloaders(
+    root: str,
+    resolution: tuple[int, int] = (128, 128),
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+):
+    transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Resize(resolution),
+        ]
+    )
+    train_dataset = CABCDataset(
+        root=root,
+        transform=transform,
+        train=True,
+    )
+    val_dataset = CABCDataset(
+        root=root,
+        transform=transform,
+        train=False,
+    )
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),

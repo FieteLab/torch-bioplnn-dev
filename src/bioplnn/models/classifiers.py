@@ -23,7 +23,7 @@ class ImageClassifier(nn.Module):
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.layers[-1].out_dim * prod(self.rnn.layers[-1].out_size),
+                self.rnn.layers[-1].out_channels * prod(self.rnn.layers[-1].out_size),
                 fc_dim,
             ),
             nn.ReLU(),
@@ -454,39 +454,45 @@ class QCLEVRClassifier(nn.Module):
             for i in range(self.num_layers):
                 if modulation_from_all_layers:
                     h_pyr_in_dim = sum(
-                        [self.rnn.layers[j].h_pyr_dim for j in range(self.num_layers)]
+                        [
+                            self.rnn.layers[j].h_pyr_channels
+                            for j in range(self.num_layers)
+                        ]
                     )
                     h_inter_in_dim = sum(
                         [
-                            self.rnn.layers[j].h_inter_dims_sum
+                            self.rnn.layers[j].h_inter_channels_sum
                             for j in range(self.num_layers)
                         ]
                     )
                     out_in_dim = sum(
-                        [self.rnn.layers[j].out_dim for j in range(self.num_layers)]
+                        [
+                            self.rnn.layers[j].out_channels
+                            for j in range(self.num_layers)
+                        ]
                     )
                 else:
-                    h_pyr_in_dim = self.rnn.layers[i].h_pyr_dim
-                    h_inter_in_dim = self.rnn.layers[i].h_inter_dims_sum
-                    out_in_dim = self.rnn.layers[i].out_dim
+                    h_pyr_in_dim = self.rnn.layers[i].h_pyr_channels
+                    h_inter_in_dim = self.rnn.layers[i].h_inter_channels_sum
+                    out_in_dim = self.rnn.layers[i].out_channels
 
                 if modulation_type == "ag":
                     modulation_class = AttentionalGainModulation
                     if modulation_apply_to == "hidden":
                         kwargs_pyr = {
                             "in_channels": h_pyr_in_dim,
-                            "out_channels": self.rnn.layers[i].h_pyr_dim,
+                            "out_channels": self.rnn.layers[i].h_pyr_channels,
                             "spatial_size": self.rnn.layers[i].input_size,
                         }
                         kwargs_inter = {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_dims_sum,
+                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
                             "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
                         kwargs_out = {
                             "in_channels": out_in_dim,
-                            "out_channels": self.rnn.layers[i].out_dim,
+                            "out_channels": self.rnn.layers[i].out_channels,
                             "spatial_size": self.rnn.layers[i].out_size,
                         }
                 elif modulation_type == "lr":
@@ -517,18 +523,18 @@ class QCLEVRClassifier(nn.Module):
                     if modulation_apply_to == "hidden":
                         kwargs_pyr = kwargs_common | {
                             "in_channels": h_pyr_in_dim,
-                            "out_channels": self.rnn.layers[i].h_pyr_dim,
+                            "out_channels": self.rnn.layers[i].h_pyr_channels,
                             "spatial_size": self.rnn.layers[i].input_size,
                         }
                         kwargs_inter = kwargs_common | {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_dims_sum,
+                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
                             "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
                         kwargs_out = kwargs_common | {
                             "in_channels": out_in_dim,
-                            "out_channels": self.rnn.layers[i].out_dim,
+                            "out_channels": self.rnn.layers[i].out_channels,
                             "spatial_size": self.rnn.layers[i].out_size,
                         }
 
@@ -542,16 +548,16 @@ class QCLEVRClassifier(nn.Module):
                     if modulation_apply_to == "hidden":
                         kwargs_pyr = kwargs_common | {
                             "in_channels": h_pyr_in_dim,
-                            "out_channels": self.rnn.layers[i].h_pyr_dim,
+                            "out_channels": self.rnn.layers[i].h_pyr_channels,
                         }
                         kwargs_inter = kwargs_common | {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_dims_sum,
+                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
                         }
                     else:
                         kwargs_out = kwargs_common | {
                             "in_channels": out_in_dim,
-                            "out_channels": self.rnn.layers[i].out_dim,
+                            "out_channels": self.rnn.layers[i].out_channels,
                         }
                 else:
                     raise ValueError(
@@ -567,7 +573,7 @@ class QCLEVRClassifier(nn.Module):
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.layers[-1].out_dim * prod(self.rnn.layers[-1].out_size),
+                self.rnn.layers[-1].out_channels * prod(self.rnn.layers[-1].out_size),
                 fc_dim,
             ),
             nn.ReLU(),
@@ -605,11 +611,11 @@ class QCLEVRClassifier(nn.Module):
 
     def forward(
         self,
-        cue: torch.Tensor,
-        mix: torch.Tensor,
+        x,
         num_steps: int = None,
         loss_all_timesteps: bool = False,
     ):
+        cue, mix = x
         outs, h_pyrs, h_inters, fbs = self.rnn(
             x=cue,
             num_steps=num_steps,

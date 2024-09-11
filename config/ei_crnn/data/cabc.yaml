@@ -1,0 +1,21 @@
+# @package _global_
+data:
+  dataset: cabc
+  root: data/cabc/easy
+  batch_size: 128
+  num_workers: 8
+model:
+  rnn_kwargs:
+    in_size: [128, 128]
+    in_channels: 1
+    exc_kernel_size: 
+      - [5, 5]
+      - [5, 5]
+      - [3, 3]
+      - [3, 3]
+    inh_kernel_size: 
+      - [5, 5]
+      - [5, 5]
+      - [3, 3]
+      - [3, 3]
+  num_classes: 2

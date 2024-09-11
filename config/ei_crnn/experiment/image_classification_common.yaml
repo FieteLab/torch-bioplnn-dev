@@ -1,4 +1,0 @@
-# @package _global_
-defaults:
-  - override /model: image_classifier
-  - override /data: image_classification

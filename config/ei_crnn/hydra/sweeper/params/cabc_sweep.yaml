@@ -1,0 +1,6 @@
+experiment/activation: choice(tanh_none, relu_tanh, none_tanh)
+experiment/rectify: choice(baseline, both, neither)
+model: choice(ei, eifb, eiffb)
+
+# python examples/ei_trainer.py -m wandb.mode=disabled data=cabc +hydra/sweeper/params=cabc_sweep
+# python examples/ei_trainer.py -m hydra/launcher=slurm +hydra/sweeper/params=cabc_sweep wandb.mode=online wandb.group=cabc_0 data=cabc

@@ -1,6 +1,8 @@
 defaults:
   - model: null
   - data: null
+  - experiment/activation: null
+  - experiment/rectify: null
   - _self_
 
 optimizer: 
@@ -23,7 +25,7 @@ compile:
   mode: reduce-overhead
 train:
   num_steps: 10
-  epochs: 100
+  epochs: 30
   log_freq: 5
   grad_clip:
     enable: false

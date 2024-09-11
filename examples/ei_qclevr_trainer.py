@@ -5,15 +5,15 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 from addict import Dict as AttrDict
-from classifiers import QCLEVRClassifier
 from omegaconf import DictConfig, OmegaConf
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import wandb
 from bioplnn.loss import EDLLoss
+from bioplnn.models.classifiers import QCLEVRClassifier
 from bioplnn.utils import get_qclevr_dataloaders, manual_seed, pass_fn
 
 

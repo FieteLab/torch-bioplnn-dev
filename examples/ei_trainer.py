@@ -5,15 +5,25 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
+import yaml
 from addict import Dict as AttrDict
 from omegaconf import DictConfig, OmegaConf
+from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import wandb
-from bioplnn.models.classifiers import ImageClassifier
-from bioplnn.utils import get_image_classification_dataloaders, manual_seed, pass_fn
+from bioplnn.loss import EDLLoss
+from bioplnn.models.classifiers import ImageClassifier, QCLEVRClassifier
+from bioplnn.utils import (
+    get_cabc_dataloaders,
+    get_image_classification_dataloaders,
+    get_qclevr_dataloaders,
+    manual_seed,
+    pass_fn,
+    without_keys,
+)
 
 
 def initialize_optimizer(
@@ -61,9 +71,11 @@ def initialize_scheduler(optimizer, fn, max_lr, total_steps):
     return scheduler
 
 
-def initialize_criterion(fn: str) -> torch.nn.Module:
+def initialize_criterion(fn: str, num_classes=None) -> torch.nn.Module:
     if fn == "ce":
         criterion = torch.nn.CrossEntropyLoss()
+    elif fn == "edl":
+        criterion = EDLLoss(num_classes=num_classes)
     else:
         raise NotImplementedError(f"Criterion {fn} not implemented")
 
@@ -72,7 +84,7 @@ def initialize_criterion(fn: str) -> torch.nn.Module:
 
 def train_epoch(
     config: AttrDict,
-    model: ImageClassifier,
+    model: nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
@@ -120,15 +132,18 @@ def train_epoch(
         desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-    for i, (image, labels) in enumerate(iterable=bar):
+    for i, (x, labels) in enumerate(iterable=bar):
         if config.debug_forward and i == 20:
             break
-        image = image.to(device)
+        try:
+            x = x.to(device)
+        except AttributeError:
+            x = [t.to(device) for t in x]
         labels = labels.to(device)
 
         # Forward pass
         outputs = model(
-            x=image,
+            x=x,
             num_steps=config.train.num_steps,
             loss_all_timesteps=config.criterion.all_timesteps,
         )
@@ -190,7 +205,7 @@ def train_epoch(
 
 def val_epoch(
     config: AttrDict,
-    model: ImageClassifier,
+    model: nn.Module,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
     device: torch.device,
@@ -213,8 +228,14 @@ def val_epoch(
     val_correct = 0
     val_total = 0
 
+    bar = tqdm(
+        val_loader,
+        desc="Validation",
+        disable=not config.tqdm,
+    )
+
     with torch.no_grad():
-        for i, (image, labels) in enumerate(val_loader):
+        for i, (image, labels) in enumerate(bar):
             if config.debug_forward and i == 20:
                 break
             image = image.to(device)
@@ -258,7 +279,8 @@ def train(config: DictConfig) -> None:
     """
 
     config = OmegaConf.to_container(config, resolve=True)
-    # print(yaml.dump(config))
+    if config["debug_level"] > 0:
+        print(yaml.dump(config))
     config = AttrDict(config)
 
     if config.debug_level > 1:
@@ -289,7 +311,10 @@ def train(config: DictConfig) -> None:
 
     # Get device and initialize the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ImageClassifier(**config.model).to(device)
+    if config.data.dataset == "qclevr":
+        model = QCLEVRClassifier(**config.model).to(device)
+    else:
+        model = ImageClassifier(**config.model).to(device)
 
     # Compile the model if requested
     model = torch.compile(model, **config.compile)
@@ -301,11 +326,24 @@ def train(config: DictConfig) -> None:
     criterion = initialize_criterion(config.criterion.fn)
 
     # Get the data loaders
-    train_loader, val_loader = get_image_classification_dataloaders(
-        **config.data,
-        resolution=config.model.rnn_kwargs.input_size,
-        seed=config.seed,
-    )
+    if config.data.dataset == "cabc":
+        train_loader, val_loader = get_cabc_dataloaders(
+            **without_keys(config.data, "dataset"),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    elif config.data.dataset == "qclevr":
+        train_loader, val_loader = get_qclevr_dataloaders(
+            **without_keys(config.data, "dataset"),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    else:
+        train_loader, val_loader = get_image_classification_dataloaders(
+            **config.data,
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(
@@ -318,6 +356,7 @@ def train(config: DictConfig) -> None:
     for epoch in range(config.train.epochs):
         if config.debug_forward and epoch == 1:
             break
+        print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log(dict(epoch=epoch), step=global_step)
         # Train the model
         train_loss, train_acc, global_step = train_epoch(

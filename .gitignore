@@ -11,3 +11,4 @@ multirun/
 visualizations/
 ruff.toml
 slurm_scripts/
+test.ipynb
