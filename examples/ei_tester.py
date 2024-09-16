@@ -12,7 +12,14 @@ from tqdm import tqdm
 
 from bioplnn.datasets import QCLEVRDataset
 from bioplnn.models import Conv2dEIRNN
-from bioplnn.utils import rescale
+from bioplnn.models.classifiers import ImageClassifier, QCLEVRClassifier
+from bioplnn.utils import (
+    get_cabc_dataloaders,
+    get_image_classification_dataloaders,
+    get_qclevr_dataloaders,
+    rescale,
+    without_keys,
+)
 
 
 @hydra.main(
@@ -104,6 +111,29 @@ def test(config: DictConfig) -> None:
         ),
     )
     checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    if config.data.dataset == "qclevr":
+        model = QCLEVRClassifier(**config.model).to(device)
+    else:
+        model = ImageClassifier(**config.model).to(device)
+    if config.data.dataset == "cabc":
+        test_loader, _ = get_cabc_dataloaders(
+            **without_keys(config.data, "dataset"),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    elif config.data.dataset == "qclevr":
+        test_loader, _ = get_qclevr_dataloaders(
+            **without_keys(config.data, "dataset"),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    else:
+        test_loader, _ = get_image_classification_dataloaders(
+            **config.data,
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
     model = Conv2dEIRNN(**config.model).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.eval()
