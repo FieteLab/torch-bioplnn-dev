@@ -233,17 +233,18 @@ def val_epoch(
         desc="Validation",
         disable=not config.tqdm,
     )
-
     with torch.no_grad():
-        for i, (image, labels) in enumerate(bar):
-            if config.debug_forward and i == 20:
+        for i, (x, labels) in enumerate(bar):
+            if config.debug_forward and i >= 20:
                 break
-            image = image.to(device)
+            try:
+                x = x.to(device)
+            except AttributeError:
+                x = [t.to(device) for t in x]
             labels = labels.to(device)
-
             # Forward pass
             outputs = model(
-                x=image,
+                x=x,
                 num_steps=config.train.num_steps,
                 loss_all_timesteps=config.criterion.all_timesteps,
             )
@@ -328,13 +329,13 @@ def train(config: DictConfig) -> None:
     # Get the data loaders
     if config.data.dataset == "cabc":
         train_loader, val_loader = get_cabc_dataloaders(
-            **without_keys(config.data, "dataset"),
+            **without_keys(config.data, ["dataset"]),
             resolution=config.model.rnn_kwargs.in_size,
             seed=config.seed,
         )
     elif config.data.dataset == "qclevr":
-        train_loader, val_loader = get_qclevr_dataloaders(
-            **without_keys(config.data, "dataset"),
+        train_loader, val_loader, _ = get_qclevr_dataloaders(
+            **without_keys(config.data, ["dataset"]),
             resolution=config.model.rnn_kwargs.in_size,
             seed=config.seed,
         )

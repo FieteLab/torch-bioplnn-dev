@@ -29,7 +29,7 @@ from bioplnn.utils import (
 
 
 def initialize_model(
-    cls: str, exclude_keys: list[str], config: AttrDict
+    cls: str, config: AttrDict, exclude_keys: list[str]
 ) -> torch.nn.Module:
     if cls == "topographical_rnn":
         model = TopographicalRNN(**without_keys(config, exclude_keys))
@@ -327,7 +327,7 @@ def train(config: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = initialize_model(
-        cls=config.model.cls, exclude_keys="cls", config=config.model
+        cls=config.model.cls, exclude_keys=["cls"], config=config.model
     ).to(device)
 
     optimizer = initialize_optimizer(

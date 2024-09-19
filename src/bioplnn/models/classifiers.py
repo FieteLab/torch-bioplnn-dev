@@ -609,12 +609,7 @@ class QCLEVRClassifier(nn.Module):
 
         return modulation_timesteps
 
-    def forward(
-        self,
-        x,
-        num_steps: int = None,
-        loss_all_timesteps: bool = False,
-    ):
+    def forward(self, x, num_steps: int = None, loss_all_timesteps: bool = False):
         cue, mix = x
         outs, h_pyrs, h_inters, fbs = self.rnn(
             x=cue,

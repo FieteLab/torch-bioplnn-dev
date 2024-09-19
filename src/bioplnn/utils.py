@@ -201,6 +201,18 @@ def get_qclevr_dataloaders(
         use_cache=use_cache,
         num_workers=num_workers,
     )
+    test_dataset = QCLEVRDataset(
+        root=root,
+        cue_assets_root=cue_assets_root,
+        transform=transform,
+        split="test",
+        mode=mode,
+        holdout=holdout,
+        primitive=primitive,
+        shape_cue_color=shape_cue_color,
+        use_cache=use_cache,
+        num_workers=num_workers,
+    )
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=train_batch_size,
@@ -219,7 +231,16 @@ def get_qclevr_dataloaders(
         worker_init_fn=manual_seed if seed is not None else None,
         generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
-    return train_dataloader, val_dataloader
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=val_batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+    )
+    return train_dataloader, val_dataloader, test_dataloader
 
 
 def get_cabc_dataloaders(
