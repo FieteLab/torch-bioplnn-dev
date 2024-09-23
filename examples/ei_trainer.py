@@ -5,7 +5,6 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from addict import Dict as AttrDict
 from omegaconf import DictConfig, OmegaConf
@@ -14,6 +13,7 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
+import wandb
 from bioplnn.loss import EDLLoss
 from bioplnn.models.classifiers import ImageClassifier, QCLEVRClassifier
 from bioplnn.utils import (
@@ -159,9 +159,7 @@ def train_epoch(
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
-        clip_grad_(
-            model.parameters(), config.train.grad_clip.value, foreach=config.foreach
-        )
+        clip_grad_(model.parameters(), config.train.grad_clip.value)
         optimizer.step()
         if scheduler is not None:
             scheduler.step()
@@ -203,7 +201,7 @@ def train_epoch(
     return train_loss, train_acc, global_step
 
 
-def val_epoch(
+def validate(
     config: AttrDict,
     model: nn.Module,
     criterion: torch.nn.Module,
@@ -324,7 +322,9 @@ def train(config: DictConfig) -> None:
     optimizer = initialize_optimizer(model.parameters(), **config.optimizer)
 
     # Initialize the loss function
-    criterion = initialize_criterion(config.criterion.fn)
+    criterion = initialize_criterion(
+        config.criterion.fn, num_classes=config.model.num_classes
+    )
 
     # Get the data loaders
     if config.data.dataset == "cabc":
@@ -374,7 +374,7 @@ def train(config: DictConfig) -> None:
         wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
 
         # Evaluate the model on the validation set
-        val_loss, val_acc = val_epoch(config, model, criterion, val_loader, device)
+        val_loss, val_acc = validate(config, model, criterion, val_loader, device)
         wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 
         # Print the epoch statistics

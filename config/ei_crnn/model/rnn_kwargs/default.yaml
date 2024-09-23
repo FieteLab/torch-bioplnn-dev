@@ -22,7 +22,7 @@ immediate_inhibition: false
 num_layers: 4
 inter_mode: half
 layer_time_delay: false
-exc_rectify: true
+exc_rectify: false
 inh_rectify: true
 hidden_init_mode: zeros
 fb_init_mode: zeros

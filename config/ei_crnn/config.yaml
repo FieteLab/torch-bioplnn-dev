@@ -3,6 +3,7 @@ defaults:
   - data: null
   - experiment/activation: null
   - experiment/rectify: null
+  - experiment/test_run: null
   - _self_
 
 optimizer: 
@@ -34,7 +35,7 @@ train:
 checkpoint:
   load: false
   root: checkpoints/ei
-  run: test
+  run: snowy-sponge-3180
   epoch: null
 wandb:
   project: EI RNN
@@ -42,7 +43,6 @@ wandb:
   group: null
 seed: null
 tqdm: true
-foreach: true
 matmul_precision: high
-debug_level: 0
+debug_level: 1
 debug_forward: false
