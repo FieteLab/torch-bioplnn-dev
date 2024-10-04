@@ -25,8 +25,13 @@ model:
     - [5, 5]
     - [3, 3]
     - [3, 3]
+    fb_kernel_size: 
+    - [5, 5]
+    - [5, 5]
+    - [3, 3]
+    - [3, 3]
   modulation_enable: true
-  modulation_type: conv
+  modulation_type: ag
   modulation_op: mul
   modulation_activation: relu
   modulation_apply_to: layer_output
@@ -37,4 +42,9 @@ model:
   flush_fb: true
   num_classes: 6
   fc_dim: 512
-  dropout: 0.2
+  dropout: 0.5
+train:
+  num_steps: 5
+  epochs: 100
+optimizer:
+  lr: 0.0004

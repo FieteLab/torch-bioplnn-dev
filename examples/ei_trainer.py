@@ -82,7 +82,29 @@ def initialize_criterion(fn: str, num_classes=None) -> torch.nn.Module:
     return criterion
 
 
-def train_epoch(
+def initialize_dataloader(config, resolution, seed):
+    if config.data.dataset == "qclevr":
+        train_loader, val_loader = get_qclevr_dataloaders(
+            **without_keys(config.data, ["dataset"]),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    elif config.data.dataset == "cabc":
+        train_loader, val_loader = get_cabc_dataloaders(
+            **without_keys(config.data, ["dataset"]),
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    else:
+        train_loader, val_loader = get_image_classification_dataloaders(
+            **config.data,
+            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    return train_loader, val_loader
+
+
+def _train(
     config: AttrDict,
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -146,15 +168,16 @@ def train_epoch(
             x=x,
             num_steps=config.train.num_steps,
             loss_all_timesteps=config.criterion.all_timesteps,
+            return_activations=False,
         )
         if config.criterion.all_timesteps:
-            losses = []
-            for output in outputs:
-                losses.append(criterion(output, labels))
-            loss = sum(losses) / len(losses)
-            outputs = outputs[-1]
+            logits = outputs.permute(1, 2, 0)
+            labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
         else:
-            loss = criterion(outputs, labels)
+            logits = outputs
+
+        # Compute the loss
+        loss = criterion(logits, labels)
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -167,8 +190,10 @@ def train_epoch(
         # Update statistics
         train_loss += loss.item()
         running_loss += loss.item()
-
-        predicted = outputs.argmax(-1)
+        if config.criterion.all_timesteps:
+            predicted = outputs[-1].argmax(-1)
+        else:
+            predicted = outputs.argmax(-1)
         correct = (predicted == labels).sum().item()
         train_correct += correct
         running_correct += correct
@@ -201,7 +226,7 @@ def train_epoch(
     return train_loss, train_acc, global_step
 
 
-def validate(
+def _validate(
     config: AttrDict,
     model: nn.Module,
     criterion: torch.nn.Module,
@@ -245,19 +270,23 @@ def validate(
                 x=x,
                 num_steps=config.train.num_steps,
                 loss_all_timesteps=config.criterion.all_timesteps,
+                return_activations=False,
             )
             if config.criterion.all_timesteps:
-                losses = []
-                for output in outputs:
-                    losses.append(criterion(output, labels))
-                loss = sum(losses) / len(losses)
-                outputs = outputs[-1]
+                logits = outputs.permute(1, 2, 0)
+                labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
-                loss = criterion(outputs, labels)
+                logits = outputs
+
+            # Compute the loss
+            loss = criterion(logits, labels)
 
             # Update statistics
             val_loss += loss.item()
-            predicted = outputs.argmax(-1)
+            if config.criterion.all_timesteps:
+                predicted = outputs[-1].argmax(-1)
+            else:
+                predicted = outputs.argmax(-1)
             correct = (predicted == labels).sum().item()
             val_correct += correct
             val_total += len(labels)
@@ -327,24 +356,9 @@ def train(config: DictConfig) -> None:
     )
 
     # Get the data loaders
-    if config.data.dataset == "cabc":
-        train_loader, val_loader = get_cabc_dataloaders(
-            **without_keys(config.data, ["dataset"]),
-            resolution=config.model.rnn_kwargs.in_size,
-            seed=config.seed,
-        )
-    elif config.data.dataset == "qclevr":
-        train_loader, val_loader, _ = get_qclevr_dataloaders(
-            **without_keys(config.data, ["dataset"]),
-            resolution=config.model.rnn_kwargs.in_size,
-            seed=config.seed,
-        )
-    else:
-        train_loader, val_loader = get_image_classification_dataloaders(
-            **config.data,
-            resolution=config.model.rnn_kwargs.in_size,
-            seed=config.seed,
-        )
+    train_loader, val_loader = initialize_dataloader(
+        config, config.model.rnn_kwargs.in_size, config.seed
+    )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(
@@ -360,7 +374,7 @@ def train(config: DictConfig) -> None:
         print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log(dict(epoch=epoch), step=global_step)
         # Train the model
-        train_loss, train_acc, global_step = train_epoch(
+        train_loss, train_acc, global_step = _train(
             config,
             model,
             optimizer,
@@ -374,7 +388,7 @@ def train(config: DictConfig) -> None:
         wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
 
         # Evaluate the model on the validation set
-        val_loss, val_acc = validate(config, model, criterion, val_loader, device)
+        val_loss, val_acc = _validate(config, model, criterion, val_loader, device)
         wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 
         # Print the epoch statistics

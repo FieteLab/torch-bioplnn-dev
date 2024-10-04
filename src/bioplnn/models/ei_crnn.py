@@ -584,26 +584,27 @@ class Conv2dEIRNN(nn.Module):
         self,
         in_size: tuple[int, int],
         in_channels: int,
-        h_pyr_channels: int | list[int] = 16,
-        h_inter_channels: list[int] | list[list[int]] = [16],
-        fb_channels: Optional[int | list[int]] = None,
+        h_pyr_channels: int | tuple[int] = 16,
+        h_inter_channels: tuple[int] | tuple[tuple[int]] = (16,),
+        fb_channels: Optional[int | tuple[int]] = None,
         inter_mode: str = "half",
         use_three_compartments: bool = False,
         immediate_inhibition: bool = False,
         exc_rectify: bool = False,
         inh_rectify: bool = False,
-        exc_kernel_size: tuple[int, int] | list[tuple[int, int]] = (5, 5),
-        inh_kernel_size: tuple[int, int] | list[tuple[int, int]] = (5, 5),
-        pool_kernel_size: list[int, int] | list[list[int, int]] = [(5, 5)],
-        pool_stride: list[int, int] | list[list[int, int]] = [(2, 2)],
+        exc_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
+        inh_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
+        fb_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
+        pool_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
+        pool_stride: tuple[int, int] | tuple[tuple[int, int]] = (2, 2),
         pre_inh_activation: Optional[str] = "tanh",
         post_inh_activation: Optional[str] = None,
         post_integration_activation: Optional[str] = None,
         fb_activation: Optional[str] = None,
-        bias: bool | list[bool] = True,
+        bias: bool | tuple[bool] = True,
         num_layers: int = 1,
         layer_time_delay: bool = False,
-        fb_adjacency: Optional[list[list[int | bool]] | torch.Tensor] = None,
+        fb_adjacency: Optional[tuple[tuple[int | bool]] | torch.Tensor] = None,
         hidden_init_mode: str = "zeros",
         fb_init_mode: str = "zeros",
         out_init_mode: str = "zeros",
@@ -622,6 +623,7 @@ class Conv2dEIRNN(nn.Module):
         self.fb_channels = expand_list(fb_channels, self.num_layers)
         self.exc_kernel_sizes = expand_list(exc_kernel_size, self.num_layers, depth=1)
         self.inh_kernel_sizes = expand_list(inh_kernel_size, self.num_layers, depth=1)
+        self.fb_kernel_sizes = expand_list(fb_kernel_size, self.num_layers, depth=1)
         self.pool_kernel_sizes = expand_list(pool_kernel_size, self.num_layers, depth=1)
         self.pool_strides = expand_list(pool_stride, self.num_layers, depth=1)
         self.biases = expand_list(bias, self.num_layers)
@@ -689,7 +691,11 @@ class Conv2dEIRNN(nn.Module):
                         Conv2dFb(
                             in_channels=self.h_pyr_channels[i],
                             out_channels=self.fb_channels[j],
-                            kernel_size=1,
+                            kernel_size=self.fb_kernel_sizes[j],
+                            padding=(
+                                self.fb_kernel_sizes[j][0] // 2,
+                                self.fb_kernel_sizes[j][1] // 2,
+                            ),
                             bias=self.biases[j],
                         ),
                         fb_activation_class(),

@@ -44,8 +44,8 @@ def initialize_criterion(fn: str, num_classes=None) -> torch.nn.Module:
 
 def initialize_dataloader(config, resolution, seed):
     if config.dataset == "qclevr":
-        _, _, test_loader = get_qclevr_dataloaders(
-            **without_keys(config, ["dataset", ""]),
+        _, test_loader = get_qclevr_dataloaders(
+            **without_keys(config, ["dataset"]),
             resolution=resolution,
             seed=seed,
         )
@@ -91,7 +91,7 @@ def _test(
 
     bar = tqdm(
         test_loader,
-        desc="Validation",
+        desc="Test",
         disable=not config.tqdm,
     )
     with torch.no_grad():
@@ -108,19 +108,23 @@ def _test(
                 x=x,
                 num_steps=config.train.num_steps,
                 loss_all_timesteps=config.criterion.all_timesteps,
+                return_activations=False,
             )
             if config.criterion.all_timesteps:
-                losses = []
-                for output in outputs:
-                    losses.append(criterion(output, labels))
-                loss = sum(losses) / len(losses)
-                outputs = outputs[-1]
+                logits = outputs.permute(1, 2, 0)
+                labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
-                loss = criterion(outputs, labels)
+                logits = outputs
+
+            # Compute the loss
+            loss = criterion(logits, labels)
 
             # Update statistics
             val_loss += loss.item()
-            predicted = outputs.argmax(-1)
+            if config.criterion.all_timesteps:
+                predicted = outputs[-1].argmax(-1)
+            else:
+                predicted = outputs.argmax(-1)
             correct = (predicted == labels).sum().item()
             val_correct += correct
             val_total += len(labels)
@@ -180,81 +184,6 @@ def test(config: DictConfig) -> None:
     # Record results
     print(f"Loss: {loss}, Acc: {acc}")
     wandb.log(dict(loss=loss, acc=acc))
-
-    # for batch in tqdm(test_loader):
-    #     cue = batch[0].to(device)
-    #     mixture = batch[1].to(device)
-    #     label = batch[2]
-
-    #     # get the model preds
-    #     out, (outs_cue, outs_mixture) = model(cue, mixture, return_layer_outputs=True)
-    #     for t in range(len(outs_cue)):
-    #         for i in range(len(outs_cue[t])):
-    #             outs_cue[t][i] = outs_cue[t][i].detach().cpu()
-    #             outs_mixture[t][i] = outs_mixture[t][i].detach().cpu()
-
-    #     cues.append(batch[0])
-    #     mixtures.append(batch[1])
-    #     outs_cues.append(outs_cue)
-    #     outs_mixtures.append(outs_mixture)
-    #     i += 1
-    #     if i == 50:
-    #         break
-
-    # save_path = os.path.join(
-    #     config.save_activations_root,
-    #     f"{config.checkpoint.run}_{config.data.mode}.json",
-    # )
-    # torch.save(
-    #     {
-    #         "cues": cues,
-    #         "mixtures": mixture,
-    #         "outs_cue": outs_cues,
-    #         "outs_mixture": outs_mixtures,
-    #     },
-    #     save_path,
-    # )
-    # if config.get_accuracy or config.save_results:
-    #     accs = []
-    #     labels = []
-    #     preds = []
-    #     image_paths = []
-    #     modes = []
-    #     cues = []
-    #     for batch in tqdm(val_dataloader):
-    #         cue = batch[0].to(device)
-    #         mixture = batch[1].to(device)
-    #         label = batch[2]
-
-    #         # get the model preds
-    #         out = model(cue, mixture)
-    #         pred = torch.argmax(out, axis=-1).cpu()
-    #         preds.extend(pred.numpy().tolist())
-    #         labels.extend(label.numpy().tolist())
-    #         accs.extend((pred == label).long().numpy().tolist())
-    #         if config.save_results:
-    #             image_paths.extend(batch[3])
-    #             modes.extend(batch[4])
-    #             cues.extend(batch[5])
-
-    #     if config.save_results:
-    #         os.makedirs(config.save_results_root, exist_ok=True)
-    #         save_path = os.path.join(
-    #             config.save_results_root,
-    #             f"{config.checkpoint.run}_{dist}.json",
-    #         )
-    #         with open(save_path, "w") as f:
-    #             json.dump(
-    #                 {
-    #                     "preds": preds,
-    #                     "labels": labels,
-    #                     "accs": accs,
-    #                     "image_paths": image_paths,
-    #                     "modes": modes,
-    #                     "cues": cues,
-    #                 },
-    #                 f,
-    #             )
 
 
 @hydra.main(

@@ -13,9 +13,9 @@ class CABCDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.root_dir = root
+        self.root = root
         self.transform = transform
-        self.metadata = np.load(os.path.join(self.root_dir, "metadata", "combined.npy"))
+        self.metadata = np.load(os.path.join(self.root, "metadata", "combined.npy"))
 
         if train:
             self.metadata = self.metadata[: int(len(self.metadata) * 0.8)]
@@ -30,9 +30,7 @@ class CABCDataset(Dataset):
         return self.metadata.shape[0]
 
     def __getitem__(self, idx):
-        img_path = os.path.join(
-            self.root_dir, self.image_dirs[idx], self.image_names[idx]
-        )
+        img_path = os.path.join(self.root, self.image_dirs[idx], self.image_names[idx])
         image = Image.open(img_path)
 
         label = self.labels[idx]

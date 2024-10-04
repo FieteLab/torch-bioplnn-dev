@@ -375,10 +375,12 @@ class QCLEVRDataset(Dataset):
 
         if self.return_image_metadata:
             if mode == "conjunction":
-                cue_str = "f{cue_str[0]}_{cue_str[1]}"
+                cue_str = f"{cue_str[0]}_{cue_str[1]}"
             return (
-                self.transform(cue),
-                self.transform(img),
+                (
+                    self.transform(cue),
+                    self.transform(img),
+                ),
                 label,
                 image_path,
                 mode,

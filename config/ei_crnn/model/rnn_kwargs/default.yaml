@@ -17,6 +17,11 @@ inh_kernel_size:
 - [3, 3]
 - [3, 3]
 - [3, 3]
+fb_kernel_size: 
+- [3, 3]
+- [3, 3]
+- [3, 3]
+- [3, 3]
 use_three_compartments: false
 immediate_inhibition: false
 num_layers: 4

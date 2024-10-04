@@ -1,4 +1,5 @@
 from math import prod
+from typing import Optional
 
 import torch
 from torch import nn
@@ -17,7 +18,7 @@ class ImageClassifier(nn.Module):
     ):
         super().__init__()
 
-        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)
+        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)  # type: ignore
 
         self.num_layers = rnn_kwargs["num_layers"]
         self.out_layer = nn.Sequential(
@@ -34,19 +35,25 @@ class ImageClassifier(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        num_steps: int = None,
+        num_steps: Optional[int] = None,
         loss_all_timesteps: bool = False,
+        return_activations: bool = False,
     ):
-        outs, _, _, _ = self.rnn(
+        outs, h_pyrs, h_inters, fbs = self.rnn(
             x,
             num_steps=num_steps,
-            return_all_layers_out=False,
+            return_all_layers_out=True,
         )
 
         if loss_all_timesteps:
-            return [self.out_layer(out.flatten(1)) for out in outs]
+            pred = torch.stack([self.out_layer(out.flatten(2)) for out in outs[-1]])
+        else:
+            pred = self.out_layer(outs[-1][-1].flatten(1))
 
-        return self.out_layer(outs[-1].flatten(1))
+        if return_activations:
+            return pred, outs, h_pyrs, h_inters, fbs
+        else:
+            return pred
 
 
 class AttentionalGainModulation(nn.Module):
@@ -609,9 +616,15 @@ class QCLEVRClassifier(nn.Module):
 
         return modulation_timesteps
 
-    def forward(self, x, num_steps: int = None, loss_all_timesteps: bool = False):
+    def forward(
+        self,
+        x,
+        num_steps: int = None,
+        loss_all_timesteps: bool = False,
+        return_activations: bool = False,
+    ):
         cue, mix = x
-        outs, h_pyrs, h_inters, fbs = self.rnn(
+        outs_cue, h_pyrs_cue, h_inters_cue, fbs_cue = self.rnn(
             x=cue,
             num_steps=num_steps,
             return_all_layers_out=True,
@@ -619,17 +632,17 @@ class QCLEVRClassifier(nn.Module):
 
         out_0, h_pyr_0, h_inter_0, fb_0 = None, None, None, None
         if not self.flush_out:
-            out_0 = [o[-1] for o in outs]
+            out_0 = [o[-1] for o in outs_cue]
         if not self.flush_hidden:
-            h_pyr_0 = [h[-1] for h in h_pyrs]
-            if h_inters is not None:
-                h_inter_0 = [h[-1] if h is not None else None for h in h_inters]
-        if not self.flush_fb and fbs is not None:
-            fb_0 = [f[-1] if f is not None else None for f in fbs]
+            h_pyr_0 = [h[-1] for h in h_pyrs_cue]
+            if h_inters_cue is not None:
+                h_inter_0 = [h[-1] if h is not None else None for h in h_inters_cue]
+        if not self.flush_fb and fbs_cue is not None:
+            fb_0 = [f[-1] if f is not None else None for f in fbs_cue]
 
         modulation_out_fn, modulation_pyr_fn, modulation_inter_fn = None, None, None
         if self.modulation_enable:
-            num_steps = h_pyrs[0].shape[0]
+            num_steps = h_pyrs_cue[0].shape[0]
             modulation_timestep_cue, modulation_timestep_mix = (
                 self._format_modulation_timestep(
                     self.modulation_timestep_cue,
@@ -639,7 +652,7 @@ class QCLEVRClassifier(nn.Module):
             )
             if self.modulation_apply_to == "hidden":
                 modulation_pyr_fn = ModulationWrapper(
-                    modulations=h_pyrs,
+                    modulations=h_pyrs_cue,
                     modulation_modules=self.modulations,
                     modulation_timestep=modulation_timestep_cue,
                     apply_timestep=modulation_timestep_mix,
@@ -648,9 +661,9 @@ class QCLEVRClassifier(nn.Module):
                     modulation_from_all_layers=self.modulation_from_all_layers,
                 )
 
-                if h_inters is not None:
+                if h_inters_cue is not None:
                     modulation_inter_fn = ModulationWrapper(
-                        modulations=h_inters,
+                        modulations=h_inters_cue,
                         modulation_modules=self.modulations_inter,
                         modulation_timestep=modulation_timestep_cue,
                         apply_timestep=modulation_timestep_mix,
@@ -660,7 +673,7 @@ class QCLEVRClassifier(nn.Module):
                     )
             else:
                 modulation_out_fn = ModulationWrapper(
-                    modulations=outs,
+                    modulations=outs_cue,
                     modulation_modules=self.modulations,
                     modulation_timestep=modulation_timestep_cue,
                     apply_timestep=modulation_timestep_mix,
@@ -669,7 +682,7 @@ class QCLEVRClassifier(nn.Module):
                     modulation_from_all_layers=self.modulation_from_all_layers,
                 )
 
-        outs, _, _, _ = self.rnn(
+        outs_mix, h_pyrs_mix, h_inters_mix, fbs_mix = self.rnn(
             x=mix,
             out_0=out_0,
             num_steps=num_steps,
@@ -679,10 +692,25 @@ class QCLEVRClassifier(nn.Module):
             modulation_out_fn=modulation_out_fn,
             modulation_pyr_fn=modulation_pyr_fn,
             modulation_inter_fn=modulation_inter_fn,
-            return_all_layers_out=False,
+            return_all_layers_out=True,
         )
 
         if loss_all_timesteps:
-            return [self.out_layer(out.flatten(1)) for out in outs]
+            pred = torch.stack([self.out_layer(out.flatten(2)) for out in outs_mix[-1]])
+        else:
+            pred = self.out_layer(outs_mix[-1][-1].flatten(1))
 
-        return self.out_layer(outs[-1].flatten(1))
+        if return_activations:
+            return (
+                pred,
+                outs_cue,
+                h_pyrs_cue,
+                h_inters_cue,
+                fbs_cue,
+                outs_mix,
+                h_pyrs_mix,
+                h_inters_mix,
+                fbs_mix,
+            )
+        else:
+            return pred

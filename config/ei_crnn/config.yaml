@@ -8,7 +8,7 @@ defaults:
 
 optimizer: 
   fn: adamw
-  lr: 0.001
+  lr: 0.0005
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
@@ -35,12 +35,16 @@ train:
 checkpoint:
   load: false
   root: checkpoints/ei
-  run: snowy-sponge-3180
+  run: easy-lake-3210
   epoch: null
 wandb:
   project: EI RNN
   mode: online
   group: null
+activations:
+  save_root: activations/ei
+  save_activations: false
+  num_samples: 50
 seed: null
 tqdm: true
 matmul_precision: high
