@@ -94,7 +94,7 @@ class Conv2dEIRNNCell(nn.Module):
         in_size: tuple[int, int],
         in_channels: int,
         h_pyr_channels: int = 16,
-        h_inter_channels: list[int] = [16],
+        h_inter_channels: Optional[list[int]] = [16],
         fb_channels: Optional[int] = None,
         inter_mode: str = "half",
         use_three_compartments: bool = False,
@@ -103,11 +103,12 @@ class Conv2dEIRNNCell(nn.Module):
         inh_rectify: bool = False,
         exc_kernel_size: tuple[int, int] = (3, 3),
         inh_kernel_size: tuple[int, int] = (3, 3),
-        pool_kernel_size: tuple[int, int] = (3, 3),
-        pool_stride: tuple[int, int] = (2, 2),
-        pre_inh_activation: str | list[str] = "relu",
-        post_inh_activation: str | list[str] = "tanh",
-        post_integration_activation: str | list[str] = None,
+        pool_kernel_size: Optional[tuple[int, int]] = (3, 3),
+        pool_stride: Optional[tuple[int, int]] = (2, 2),
+        pool_global: bool = False,
+        pre_inh_activation: Optional[str | list[str]] = "relu",
+        post_inh_activation: Optional[str | list[str]] = "tanh",
+        post_integration_activation: Optional[str | list[str]] = None,
         bias: bool = True,
     ):
         super().__init__()
@@ -122,10 +123,23 @@ class Conv2dEIRNNCell(nn.Module):
             raise ValueError("inter_mode must be 'half' or 'same'.")
 
         # Calculate output size based on pooling
-        self.out_size = (
-            ceil(in_size[0] / pool_stride[0]),
-            ceil(in_size[1] / pool_stride[1]),
-        )
+        if pool_kernel_size is None != pool_stride is None:
+            raise ValueError(
+                "pool_kernel_size and pool_stride must both be None or both be provided."
+            )
+        if pool_kernel_size is not None and pool_global:
+            raise ValueError(
+                "If pool_global is provided, pool_kernel_size and pool_stride must be None, and vice versa."
+            )
+        if pool_stride is None and not pool_global:
+            self.out_size = self.in_size
+        elif pool_global:
+            self.out_size = (1, 1)
+        else:
+            self.out_size = (
+                ceil(in_size[0] / pool_stride[0]),
+                ceil(in_size[1] / pool_stride[1]),
+            )
 
         # Store necessary parameters
         self.in_channels = in_channels
@@ -214,7 +228,7 @@ class Conv2dEIRNNCell(nn.Module):
             Conv2dExc = nn.Conv2d
 
         if self.use_three_compartments:
-            conv_exc_pyr_channels = self.h_pyr_channels
+            conv_exc_channels = self.h_pyr_channels
             self.conv_exc_pyr_input = Conv2dExc(
                 in_channels=self.in_channels,
                 out_channels=self.h_pyr_channels,
@@ -231,11 +245,12 @@ class Conv2dEIRNNCell(nn.Module):
                     bias=bias,
                 )
         else:
-            conv_exc_pyr_channels = (
+            conv_exc_channels = (
                 self.h_pyr_channels + self.in_channels + self.fb_channels
             )
+
         self.conv_exc_pyr = Conv2dExc(
-            in_channels=conv_exc_pyr_channels,
+            in_channels=conv_exc_channels,
             out_channels=self.h_pyr_channels,
             kernel_size=exc_kernel_size,
             padding=(exc_kernel_size[0] // 2, exc_kernel_size[1] // 2),
@@ -263,7 +278,7 @@ class Conv2dEIRNNCell(nn.Module):
                 )
 
             self.conv_exc_inter = Conv2dExc(
-                in_channels=self.h_pyr_channels,
+                in_channels=conv_exc_channels,
                 out_channels=self.h_inter_channels_sum,
                 kernel_size=exc_kernel_size,
                 stride=2 if inter_mode == "half" else 1,
@@ -310,11 +325,16 @@ class Conv2dEIRNNCell(nn.Module):
                 self.convs_inh.append(conv)
 
         # Initialize output pooling layer
-        self.out_pool = nn.AvgPool2d(
-            kernel_size=pool_kernel_size,
-            stride=pool_stride,
-            padding=(pool_kernel_size[0] // 2, pool_kernel_size[1] // 2),
-        )
+        if pool_stride is None and not pool_global:
+            self.out_pool = nn.Identity()
+        elif pool_global:
+            self.out_pool = nn.AdaptiveAvgPool2d((1, 1))
+        else:
+            self.out_pool = nn.AvgPool2d(
+                kernel_size=pool_kernel_size,
+                stride=pool_stride,
+                padding=(pool_kernel_size[0] // 2, pool_kernel_size[1] // 2),
+            )
 
     def init_hidden(
         self,
@@ -430,29 +450,28 @@ class Conv2dEIRNNCell(nn.Module):
             raise ValueError("If use_fb is True, fb must be provided.")
 
         # Compute excitations for pyramidal cells
+        exc_cat = torch.cat(
+            [h_pyr, input, fb] if self.use_fb else [h_pyr, input], dim=1
+        )
         if self.use_three_compartments:
             exc_pyr_soma = self.pre_inh_activation(self.conv_exc_pyr(h_pyr))
             exc_pyr_basal = self.pre_inh_activation(self.conv_exc_pyr_input(input))
             if self.use_fb:
                 exc_pyr_apical = self.pre_inh_activation(self.conv_exc_pyr_fb(fb))
         else:
-            exc_cat = [h_pyr, input, fb] if self.use_fb else [h_pyr, input]
-            exc_pyr_soma = self.pre_inh_activation(
-                self.conv_exc_pyr(torch.cat(exc_cat, dim=1))
-            )
+            exc_pyr_soma = self.pre_inh_activation(self.conv_exc_pyr(exc_cat))
 
         inhs = [0] * 4
         if self.h_inter_channels:
             # Compute excitations for interneurons
-            inter_activation = (
-                nn.Tanh() if self.immediate_inhibition else self.pre_inh_activation
-            )
-            exc_inter = inter_activation(self.conv_exc_inter(h_pyr))
             if len(self.h_inter_channels) == 4:
+                exc_inter = self.pre_inh_activation(self.conv_exc_inter(h_pyr))
                 exc_input_inter = self.pre_inh_activation(
                     self.conv_exc_input_inter(input)
                 )
                 exc_fb_inter = self.pre_inh_activation(self.conv_exc_inter_fb(fb))
+            else:
+                exc_inter = self.pre_inh_activation(self.conv_exc_inter(exc_cat))
 
             # Compute inhibitions for all neurons
             h_inters = h_inter
@@ -597,6 +616,7 @@ class Conv2dEIRNN(nn.Module):
         fb_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
         pool_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
         pool_stride: tuple[int, int] | tuple[tuple[int, int]] = (2, 2),
+        pool_global: bool | tuple[bool] = False,
         pre_inh_activation: Optional[str] = "tanh",
         post_inh_activation: Optional[str] = None,
         post_integration_activation: Optional[str] = None,
@@ -626,6 +646,7 @@ class Conv2dEIRNN(nn.Module):
         self.fb_kernel_sizes = expand_list(fb_kernel_size, self.num_layers, depth=1)
         self.pool_kernel_sizes = expand_list(pool_kernel_size, self.num_layers, depth=1)
         self.pool_strides = expand_list(pool_stride, self.num_layers, depth=1)
+        self.pool_globals = expand_list(pool_global, self.num_layers)
         self.biases = expand_list(bias, self.num_layers)
 
         # Save layer agnostic parameters
@@ -726,6 +747,7 @@ class Conv2dEIRNN(nn.Module):
                     inh_rectify=inh_rectify,
                     pool_kernel_size=self.pool_kernel_sizes[i],
                     pool_stride=self.pool_strides[i],
+                    pool_global=self.pool_globals[i],
                     bias=self.biases[i],
                     pre_inh_activation=pre_inh_activation,
                     post_inh_activation=post_inh_activation,

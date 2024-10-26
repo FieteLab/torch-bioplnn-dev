@@ -17,3 +17,9 @@ rnn_kwargs:
   - [0, 0, 1, 0]
   use_three_compartments: true
   immediate_inhibition: false
+flush_hidden: true
+flush_out: true
+flush_fb: true
+num_classes: 6
+fc_dim: 256
+dropout: 0.5

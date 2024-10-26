@@ -1,0 +1,16 @@
+defaults:
+  - default
+  - _self_
+
+rnn_kwargs:
+  h_pyr_channels: 32
+  h_inter_channels: [32]
+  fb_channels: null
+  exc_kernel_size: [3, 3]
+  inh_kernel_size: [3, 3]
+  fb_kernel_size: null
+  fb_adjacency: null
+  num_layers: 1
+  pool_kernel_size: null
+  pool_stride: null
+  pool_global: true

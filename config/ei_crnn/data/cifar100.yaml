@@ -2,6 +2,7 @@
 data:
   dataset: cifar100
   root: data
+  resolution: [32, 32]
   batch_size: 256
   num_workers: 8
 model:

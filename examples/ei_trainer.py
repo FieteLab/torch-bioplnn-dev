@@ -19,6 +19,7 @@ from bioplnn.models.classifiers import ImageClassifier, QCLEVRClassifier
 from bioplnn.utils import (
     get_cabc_dataloaders,
     get_image_classification_dataloaders,
+    get_mazes_dataloaders,
     get_qclevr_dataloaders,
     manual_seed,
     pass_fn,
@@ -86,21 +87,27 @@ def initialize_dataloader(config, resolution, seed):
     if config.data.dataset == "qclevr":
         train_loader, val_loader = get_qclevr_dataloaders(
             **without_keys(config.data, ["dataset"]),
-            resolution=config.model.rnn_kwargs.in_size,
             seed=config.seed,
         )
     elif config.data.dataset == "cabc":
         train_loader, val_loader = get_cabc_dataloaders(
             **without_keys(config.data, ["dataset"]),
-            resolution=config.model.rnn_kwargs.in_size,
+            seed=config.seed,
+        )
+    elif config.data.dataset == "mazes":
+        train_loader, val_loader = get_mazes_dataloaders(
+            **without_keys(config.data, ["dataset"]),
+            seed=config.seed,
+        )
+
+    elif config.data.dataset in ("mnist", "cifar10", "cifar100"):
+        train_loader, val_loader = get_image_classification_dataloaders(
+            **config.data,
             seed=config.seed,
         )
     else:
-        train_loader, val_loader = get_image_classification_dataloaders(
-            **config.data,
-            resolution=config.model.rnn_kwargs.in_size,
-            seed=config.seed,
-        )
+        raise NotImplementedError(f"Dataset {config.data.dataset} not implemented")
+
     return train_loader, val_loader
 
 

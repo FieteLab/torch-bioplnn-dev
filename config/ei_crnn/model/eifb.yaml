@@ -1,5 +1,5 @@
 defaults:
-  - rnn_kwargs: default
+  - default
   - _self_
 
 rnn_kwargs:

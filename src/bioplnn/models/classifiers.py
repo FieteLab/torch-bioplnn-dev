@@ -12,7 +12,7 @@ class ImageClassifier(nn.Module):
     def __init__(
         self,
         rnn_kwargs,
-        num_classes=6,
+        num_classes,
         fc_dim=512,
         dropout=0.2,
     ):
@@ -21,10 +21,13 @@ class ImageClassifier(nn.Module):
         self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)  # type: ignore
 
         self.num_layers = rnn_kwargs["num_layers"]
+
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.layers[-1].out_channels * prod(self.rnn.layers[-1].out_size),
+                self.rnn.layers[-1].out_channels
+                * self.rnn.layers[-1].out_size[0]
+                * self.rnn.layers[-1].out_size[0],
                 fc_dim,
             ),
             nn.ReLU(),
@@ -46,7 +49,7 @@ class ImageClassifier(nn.Module):
         )
 
         if loss_all_timesteps:
-            pred = torch.stack([self.out_layer(out.flatten(2)) for out in outs[-1]])
+            pred = torch.stack([self.out_layer(out.flatten(1)) for out in outs[-1]])
         else:
             pred = self.out_layer(outs[-1][-1].flatten(1))
 

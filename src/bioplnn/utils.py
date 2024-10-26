@@ -13,6 +13,7 @@ from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 from torchvision.transforms import transforms
 
 from bioplnn.datasets.cabc import CABCDataset
+from bioplnn.datasets.mazes import Mazes
 
 
 class AttrDict(Dict):
@@ -113,6 +114,8 @@ def dict_flatten(d, delimiter=".", key=None):
 
 
 def expand_list(param, n, depth=0):
+    if param is None:
+        return [None] * n
     inner = param
     for _ in range(depth):
         if not isinstance(inner, (list, tuple)):
@@ -170,7 +173,7 @@ def get_qclevr_dataloaders(
     holdout: list = [],
     primitive: bool = True,
     shape_cue_color: str = "orange",
-    return_image_metadata: bool = False,
+    return_metadata: bool = False,
     use_cache: bool = False,
     num_workers: int = 0,
     seed: Optional[int] = None,
@@ -193,7 +196,7 @@ def get_qclevr_dataloaders(
         holdout=holdout,
         primitive=primitive,
         shape_cue_color=shape_cue_color,
-        return_image_metadata=return_image_metadata,
+        return_metadata=return_metadata,
         use_cache=use_cache,
         num_workers=num_workers,
     )
@@ -206,7 +209,7 @@ def get_qclevr_dataloaders(
         holdout=holdout,
         primitive=primitive,
         shape_cue_color=shape_cue_color,
-        return_image_metadata=return_image_metadata,
+        return_metadata=return_metadata,
         use_cache=use_cache,
         num_workers=num_workers,
     )
@@ -219,7 +222,7 @@ def get_qclevr_dataloaders(
     #     holdout=holdout,
     #     primitive=primitive,
     #     shape_cue_color=shape_cue_color,
-    #     return_image_metadata=return_image_metadata,
+    #     return_metadata=return_metadata,
     #     use_cache=use_cache,
     #     num_workers=num_workers,
     # )
@@ -294,6 +297,59 @@ def get_cabc_dataloaders(
         worker_init_fn=manual_seed if seed is not None else None,
         generator=torch.Generator().manual_seed(seed) if seed is not None else None,
     )
+    return train_dataloader, val_dataloader
+
+
+def get_mazes_dataloaders(
+    root: str,
+    resolution: Optional[tuple[int, int]] = None,
+    subset: float = 1.0,
+    return_metadata: bool = False,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+):
+    if resolution is not None:
+        transform = transforms.Resize(
+            size=resolution,
+            interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+        )
+    else:
+        transform = nn.Identity()
+
+    train_dataset = Mazes(
+        root=root,
+        train=True,
+        subset=subset,
+        return_metadata=return_metadata,
+        transform=transform,
+    )
+    val_dataset = Mazes(
+        root=root,
+        train=False,
+        subset=subset,
+        return_metadata=return_metadata,
+        transform=transform,
+    )
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+    )
+
     return train_dataloader, val_dataloader
 
 

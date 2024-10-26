@@ -1,7 +1,7 @@
 defaults:
-  - rnn_kwargs: default
+  - default
   - _self_
-  
+
 rnn_kwargs:
   h_pyr_channels: [16, 32, 64, 128]
   h_inter_channels: 

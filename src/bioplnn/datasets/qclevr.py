@@ -4,6 +4,7 @@ import multiprocessing as mp
 import os
 from typing import Callable, Optional
 
+import torch
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
 
@@ -84,7 +85,7 @@ class QCLEVRDataset(Dataset):
         root: str,
         cue_assets_root: Optional[str] = None,
         transform: Callable = None,
-        return_image_metadata: bool = False,
+        return_metadata: bool = False,
         split: str = "train",
         mode: str = "color",
         holdout: list = [],
@@ -96,7 +97,7 @@ class QCLEVRDataset(Dataset):
         super().__init__()
         self.root = root
         self.transform = transform
-        self.return_image_metadata = return_image_metadata
+        self.return_metadata = return_metadata
         self.split = "valid" if split == "val" else split
         self.mode = mode
         self.holdout = sorted(holdout)
@@ -247,67 +248,97 @@ class QCLEVRDataset(Dataset):
         return paths, cues, counts, modes
 
     @staticmethod
-    def draw_shape(
-        image_size, shape_type, center, shape_size=None, radius=None, color=(255, 0, 0)
-    ):
-        # Create a new image with a white background
-        image = Image.new("RGB", image_size, "gray")
+    def draw_shape(image_size, shape_type, size=None, radius=None, color=(255, 0, 0)):
+        # Create a new image with a black background
+        image = Image.new("RGB", image_size, "black")
         draw = ImageDraw.Draw(image)
 
+        scale_factor = 1 - torch.rand((1,)).item() / 4.0
+
+        # Determine random center coordinates based on the shape type
         if shape_type == "cylinder":
-            if shape_size is None:
-                raise ValueError("shape_size must be provided for a cylinder.")
+            if size is None:
+                raise ValueError("Size must be provided for a cylinder.")
+            width, height = int(size[0] * scale_factor), int(size[1] * scale_factor)
+            cap_size = 25
+
+            # Calculate the maximum allowed coordinates for the shape to be fully inside the canvas
+            max_x = image_size[0] - width // 2 - cap_size
+            max_y = image_size[1] - height // 2 - cap_size
+            min_x = width // 2 + cap_size
+            min_y = height // 2 + cap_size
+
+            # Randomize the center within these bounds
+            center = (
+                torch.randint(min_x, max_x, (1,)).item(),
+                torch.randint(min_y, max_y, (1,)).item(),
+            )
+
             # Draw top cap (ellipse)
-            x1_top, y1_top = (
-                center[0] - shape_size[0] // 2,
-                center[1] + shape_size[1] // 2 - 25,
-            )
-            x2_top, y2_top = (
-                center[0] + shape_size[0] // 2,
-                center[1] + shape_size[1] // 2 + 25,
-            )
+            x1_top, y1_top = center[0] - width // 2, center[1] + height // 2 - cap_size
+            x2_top, y2_top = center[0] + width // 2, center[1] + height // 2 + cap_size
             draw.ellipse([x1_top, y1_top, x2_top, y2_top], fill=color)
 
             # Draw body (rectangle)
-            x1_body, y1_body = (
-                center[0] - shape_size[0] // 2,
-                center[1] - shape_size[1] // 2,
-            )
-            x2_body, y2_body = (
-                center[0] + shape_size[0] // 2,
-                center[1] + shape_size[1] // 2,
-            )
+            x1_body, y1_body = center[0] - width // 2, center[1] - height // 2
+            x2_body, y2_body = center[0] + width // 2, center[1] + height // 2
             draw.rectangle([x1_body, y1_body, x2_body, y2_body], fill=color)
 
             # Draw bottom cap (ellipse)
             x1_bottom, y1_bottom = (
-                center[0] - shape_size[0] // 2,
-                center[1] - shape_size[1] // 2 - 25,
+                center[0] - width // 2,
+                center[1] - height // 2 - cap_size,
             )
             x2_bottom, y2_bottom = (
-                center[0] + shape_size[0] // 2,
-                center[1] - shape_size[1] // 2 + 25,
+                center[0] + width // 2,
+                center[1] - height // 2 + cap_size,
             )
             draw.ellipse([x1_bottom, y1_bottom, x2_bottom, y2_bottom], fill=color)
 
         elif shape_type == "cube":
-            if shape_size is None:
-                raise ValueError("shape_size must be provided for a square.")
-            x1, y1 = center[0] - shape_size // 2, center[1] - shape_size // 2
-            x2, y2 = center[0] + shape_size // 2, center[1] + shape_size // 2
+            if size is None:
+                raise ValueError("Size must be provided for a cube.")
+
+            # Calculate the maximum allowed coordinates for the shape to be fully inside the canvas
+            max_x = image_size[0] - size // 2 - 1
+            max_y = image_size[1] - size // 2 - 1
+            min_x = size // 2 + 1
+            min_y = size // 2 + 1
+
+            # Randomize the center within these bounds
+            center = (
+                torch.randint(min_x, max_x, (1,)).item(),
+                torch.randint(min_y, max_y, (1,)).item(),
+            )
+
+            size = size * scale_factor
+            x1, y1 = center[0] - size // 2, center[1] - size // 2
+            x2, y2 = center[0] + size // 2, center[1] + size // 2
             draw.rectangle([x1, y1, x2, y2], fill=color)
 
         elif shape_type == "sphere":
             if radius is None:
-                raise ValueError("Radius must be provided for a circle.")
+                raise ValueError("Radius must be provided for a sphere.")
+            radius = int(radius * scale_factor)
+
+            # Calculate the maximum allowed coordinates for the shape to be fully inside the canvas
+            max_x = image_size[0] - radius - 1
+            max_y = image_size[1] - radius - 1
+            min_x = radius + 1
+            min_y = radius + 1
+
+            # Randomize the center within these bounds
+            center = (
+                torch.randint(min_x, max_x, (1,)).item(),
+                torch.randint(min_y, max_y, (1,)).item(),
+            )
+
             x1, y1 = center[0] - radius, center[1] - radius
             x2, y2 = center[0] + radius, center[1] + radius
             draw.ellipse([x1, y1, x2, y2], fill=color)
 
         else:
-            raise ValueError(
-                f"Invalid shape_type {shape_type}. Use 'cylinder', 'square', or 'circle'."
-            )
+            raise ValueError("Invalid shape_type. Use 'cylinder', 'cube', or 'sphere'.")
 
         return image
 
@@ -316,15 +347,14 @@ class QCLEVRDataset(Dataset):
         cue.paste(self.color_dict[cue_str], [0, 0, cue.size[0], cue.size[1]])
         return cue
 
-    def gen_shape(self, img, cue_str, shape_size=100):
+    def gen_shape(self, img, cue_str, size=100):
         if self.primitive:
             if cue_str == "cylinder":
-                shape_size = (50, 100)
+                size = (50, 100)
             cue = self.draw_shape(
                 image_size=(img.size[0], img.size[1]),
                 shape_type=cue_str,
-                center=(img.size[0] / 2, img.size[1] / 2),
-                shape_size=shape_size,
+                size=size,
                 radius=100,
                 color=(255, 255, 255),
             )
@@ -332,17 +362,16 @@ class QCLEVRDataset(Dataset):
             cue = self.cue_assets[cue_str][self.shape_cue_color].copy()
         return cue
 
-    def gen_conjunction(self, img, cue_str, shape_size=100):
+    def gen_conjunction(self, img, cue_str, size=100):
         shape = cue_str[0]
         color = cue_str[1]
         if self.primitive:
             if shape == "cylinder":
-                shape_size = (50, 100)
+                size = (50, 100)
             cue = self.draw_shape(
                 image_size=(img.size[0], img.size[1]),
                 shape_type=shape,
-                center=(img.size[0] / 2, img.size[1] / 2),
-                shape_size=shape_size,
+                size=size,
                 radius=100,
                 color=color,
             )
@@ -373,7 +402,7 @@ class QCLEVRDataset(Dataset):
         else:
             raise ValueError("Invalid mode. Must be 'color', 'shape', or 'conjunction'")
 
-        if self.return_image_metadata:
+        if self.return_metadata:
             if mode == "conjunction":
                 cue_str = f"{cue_str[0]}_{cue_str[1]}"
             return (

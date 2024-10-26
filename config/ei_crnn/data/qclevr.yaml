@@ -2,8 +2,10 @@
 data:
   dataset: qclevr
   root: data/qclevr
+  resolution: [128, 128]
   cue_assets_root: null # data/CLEVR_v1.0/cues
-  train_batch_size: 256
+  return_metadata: false
+  train_batch_size: 128
   val_batch_size: 64
   mode: every
   holdout: [] # [blue,green,cube,cube_blue,cube_green]
@@ -30,6 +32,9 @@ model:
     - [5, 5]
     - [3, 3]
     - [3, 3]
+  flush_hidden: true
+  flush_out: true
+  flush_fb: true
   modulation_enable: true
   modulation_type: ag
   modulation_op: mul
@@ -37,12 +42,6 @@ model:
   modulation_apply_to: layer_output
   modulation_timestep_cue: same
   modulation_timestep_mix: all
-  flush_hidden: true
-  flush_out: true
-  flush_fb: true
-  num_classes: 6
-  fc_dim: 512
-  dropout: 0.5
 train:
   num_steps: 5
   epochs: 100
