@@ -5,6 +5,7 @@ data:
   resolution: null
   batch_size: 512
   num_workers: 8
+  shuffle_test: true
 model:
   rnn_kwargs:
     in_size: [48, 48]

@@ -60,7 +60,7 @@ def initialize_optimizer(
 def initialize_scheduler(optimizer, fn, max_lr, total_steps):
     if fn is None:
         scheduler = None
-    if fn == "one_cycle":
+    elif fn == "one_cycle":
         scheduler = OneCycleLR(
             optimizer,
             max_lr=max_lr,
@@ -83,27 +83,27 @@ def initialize_criterion(fn: str, num_classes=None) -> torch.nn.Module:
     return criterion
 
 
-def initialize_dataloader(config, resolution, seed):
-    if config.data.dataset == "qclevr":
+def initialize_dataloader(config: AttrDict, seed: Optional[int]):
+    if config.dataset == "qclevr":
         train_loader, val_loader = get_qclevr_dataloaders(
-            **without_keys(config.data, ["dataset"]),
-            seed=config.seed,
+            **without_keys(config, ["dataset"]),
+            seed=seed,
         )
-    elif config.data.dataset == "cabc":
+    elif config.dataset == "cabc":
         train_loader, val_loader = get_cabc_dataloaders(
-            **without_keys(config.data, ["dataset"]),
-            seed=config.seed,
+            **without_keys(config, ["dataset"]),
+            seed=seed,
         )
-    elif config.data.dataset == "mazes":
+    elif config.dataset == "mazes":
         train_loader, val_loader = get_mazes_dataloaders(
-            **without_keys(config.data, ["dataset"]),
-            seed=config.seed,
+            **without_keys(config, ["dataset"]),
+            seed=seed,
         )
 
-    elif config.data.dataset in ("mnist", "cifar10", "cifar100"):
+    elif config.dataset in ("mnist", "cifar10", "cifar100"):
         train_loader, val_loader = get_image_classification_dataloaders(
-            **config.data,
-            seed=config.seed,
+            **config,
+            seed=seed,
         )
     else:
         raise NotImplementedError(f"Dataset {config.data.dataset} not implemented")
@@ -363,9 +363,7 @@ def train(config: DictConfig) -> None:
     )
 
     # Get the data loaders
-    train_loader, val_loader = initialize_dataloader(
-        config, config.model.rnn_kwargs.in_size, config.seed
-    )
+    train_loader, val_loader = initialize_dataloader(config.data, config.seed)
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(

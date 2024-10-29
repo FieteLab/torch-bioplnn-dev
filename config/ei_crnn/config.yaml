@@ -14,7 +14,7 @@ optimizer:
   beta1: 0.9
   beta2: 0.999
 scheduler:
-  fn: one_cycle
+  fn: null # one_cycle
   pct_start: 0.3
 criterion: 
   fn: ce
@@ -36,8 +36,8 @@ train:
 checkpoint:
   load: false
   root: checkpoints/ei
-  run: easy-lake-3210
-  epoch: null
+  run: true-water-3342
+  epoch: 33
 wandb:
   project: EI RNN
   mode: online
@@ -45,7 +45,7 @@ wandb:
 activations:
   save_root: activations/ei
   save_activations: false
-  num_samples: 50
+  num_samples: 1000
 seed: null
 tqdm: true
 matmul_precision: high

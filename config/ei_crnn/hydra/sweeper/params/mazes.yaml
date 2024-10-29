@@ -1,0 +1,4 @@
+# experiment/dimensions: choice(channels_64, channels_128)
+train.num_steps: choice(10, 20)
+optimizer.lr: choice(0.0005, 0.0001)
+model: choice(e1l, ei1l)

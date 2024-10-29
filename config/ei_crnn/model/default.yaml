@@ -26,7 +26,7 @@ rnn_kwargs:
   use_three_compartments: false
   immediate_inhibition: false
   num_layers: 4
-  inter_mode: half
+  inter_mode: same
   layer_time_delay: false
   exc_rectify: false
   inh_rectify: true
@@ -45,6 +45,7 @@ rnn_kwargs:
   pre_inh_activation: relu
   post_inh_activation: tanh
   post_integration_activation: null
+  tau_mode: channel
 num_classes: 10
 fc_dim: 256
 dropout: 0.5

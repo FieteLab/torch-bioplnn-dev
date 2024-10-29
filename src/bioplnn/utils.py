@@ -9,11 +9,7 @@ from addict import Dict
 from torch import nn
 from torch.profiler import ProfilerActivity, profile
 from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 from torchvision.transforms import transforms
-
-from bioplnn.datasets.cabc import CABCDataset
-from bioplnn.datasets.mazes import Mazes
 
 
 class AttrDict(Dict):
@@ -177,6 +173,7 @@ def get_qclevr_dataloaders(
     use_cache: bool = False,
     num_workers: int = 0,
     seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     from bioplnn.datasets.qclevr import QCLEVRDataset
 
@@ -238,7 +235,7 @@ def get_qclevr_dataloaders(
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=val_batch_size,
-        shuffle=False,
+        shuffle=shuffle_test,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
@@ -247,7 +244,7 @@ def get_qclevr_dataloaders(
     # test_dataloader = DataLoader(
     #     test_dataset,
     #     batch_size=val_batch_size,
-    #     shuffle=False,
+    #     shuffle=shuffle_test,
     #     num_workers=num_workers,
     #     pin_memory=torch.cuda.is_available(),
     #     worker_init_fn=manual_seed if seed is not None else None,
@@ -262,7 +259,10 @@ def get_cabc_dataloaders(
     batch_size: int = 16,
     num_workers: int = 0,
     seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
+    from bioplnn.datasets.cabc import CABCDataset
+
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
@@ -291,7 +291,7 @@ def get_cabc_dataloaders(
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=shuffle_test,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
@@ -308,7 +308,10 @@ def get_mazes_dataloaders(
     batch_size: int = 16,
     num_workers: int = 0,
     seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
+    from bioplnn.datasets.mazes import Mazes
+
     if resolution is not None:
         transform = transforms.Resize(
             size=resolution,
@@ -343,7 +346,7 @@ def get_mazes_dataloaders(
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=shuffle_test,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
@@ -362,7 +365,10 @@ def _image_classification_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
+    from torchvision.datasets import CIFAR10, CIFAR100, MNIST
+
     from bioplnn.datasets.v1 import CIFAR10_V1, CIFAR100_V1, MNIST_V1
 
     resize = [transforms.Resize(resolution)] if resolution is not None else []
@@ -430,7 +436,7 @@ def _image_classification_dataloaders(
     test_loader = DataLoader(
         dataset=test_set,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=shuffle_test,
         pin_memory=torch.cuda.is_available(),
         num_workers=num_workers,
         worker_init_fn=(lambda x: manual_seed(x + seed)) if seed is not None else None,
@@ -447,6 +453,7 @@ def get_image_classification_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset=dataset,
@@ -456,6 +463,7 @@ def get_image_classification_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -467,6 +475,7 @@ def get_v1_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset=dataset,
@@ -477,6 +486,7 @@ def get_v1_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -486,6 +496,7 @@ def get_mnist_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="mnist",
@@ -495,6 +506,7 @@ def get_mnist_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -504,6 +516,7 @@ def get_cifar10_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar10",
@@ -513,6 +526,7 @@ def get_cifar10_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -522,6 +536,7 @@ def get_cifar100_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar100",
@@ -531,6 +546,7 @@ def get_cifar100_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -541,6 +557,7 @@ def get_mnist_v1_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="mnist",
@@ -551,6 +568,7 @@ def get_mnist_v1_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -561,6 +579,7 @@ def get_cifar10_v1_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar10",
@@ -571,6 +590,7 @@ def get_cifar10_v1_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )
 
 
@@ -581,6 +601,7 @@ def get_cifar100_v1_dataloaders(
     batch_size=16,
     num_workers=0,
     seed=None,
+    shuffle_test=False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar100",
@@ -591,4 +612,5 @@ def get_cifar100_v1_dataloaders(
         batch_size=batch_size,
         num_workers=num_workers,
         seed=seed,
+        shuffle_test=shuffle_test,
     )

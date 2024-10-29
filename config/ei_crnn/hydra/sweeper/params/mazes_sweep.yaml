@@ -1,3 +1,0 @@
-experiment/dimensions: choice(channels_32, channels_64, channels_128)
-train.num_steps: choice(10, 20)
-optimizer.lr: choice(0.005, 0.001)

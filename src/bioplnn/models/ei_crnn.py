@@ -82,6 +82,8 @@ class Conv2dEIRNNCell(nn.Module):
         post_integration_activation (str | list[str], optional): Activation \
             function applied after integration. Defaults to None. If a list is \
             provided, the activations are applied sequentially.
+        tau_mode (str, optional): Mode for handling membrane time constants. \
+            Defaults to "channel". Options are None, "channel", "spatial", and "channel_spatial".
         bias (bool, optional): Whether to add a bias term for convolutions. \
             Defaults to True.
 
@@ -109,6 +111,7 @@ class Conv2dEIRNNCell(nn.Module):
         pre_inh_activation: Optional[str | list[str]] = "relu",
         post_inh_activation: Optional[str | list[str]] = "tanh",
         post_integration_activation: Optional[str | list[str]] = None,
+        tau_mode: Optional[str] = "channel",
         bias: bool = True,
     ):
         super().__init__()
@@ -152,7 +155,6 @@ class Conv2dEIRNNCell(nn.Module):
         self.immediate_inhibition = immediate_inhibition
         self.use_three_compartments = use_three_compartments
         self.pool_stride = pool_stride
-
         # Create activation functions
         try:
             self.pre_inh_activation = get_activation_class(pre_inh_activation)()
@@ -213,12 +215,33 @@ class Conv2dEIRNNCell(nn.Module):
             )
 
         # Initialize learnable membrane time constants
-        self.tau_pyr = nn.Parameter(
-            torch.randn((1, self.h_pyr_channels, *self.in_size))
-        )
-        if self.use_h_inter:
-            self.tau_inter = nn.Parameter(
-                torch.randn((1, self.h_inter_channels_sum, *self.inter_size))
+        if tau_mode == "channel":
+            self.tau_pyr = nn.Parameter(torch.randn((1, self.h_pyr_channels, 1, 1)))
+            if self.use_h_inter:
+                self.tau_inter = nn.Parameter(
+                    torch.randn((1, self.h_inter_channels_sum, 1, 1))
+                )
+        elif tau_mode == "spatial":
+            self.tau_pyr = nn.Parameter(torch.randn((1, 1, *self.in_size)))
+            if self.use_h_inter:
+                self.tau_inter = nn.Parameter(torch.randn((1, 1, *self.inter_size)))
+        elif tau_mode == "channel_spatial":
+            self.tau_pyr = nn.Parameter(
+                torch.randn((1, self.h_pyr_channels, *self.in_size))
+            )
+            if self.use_h_inter:
+                self.tau_inter = nn.Parameter(
+                    torch.randn((1, self.h_inter_channels_sum, *self.inter_size))
+                )
+        elif tau_mode is None:
+            self.tau_pyr = nn.Parameter(torch.ones(1, 1, 1, 1), requires_grad=False)
+            if self.use_h_inter:
+                self.tau_inter = nn.Parameter(
+                    torch.ones(1, 1, 1, 1), requires_grad=False
+                )
+        else:
+            raise ValueError(
+                "tau_mode must be None, 'channel', 'spatial', or 'channel_spatial'."
             )
 
         # Create pyramidal convolutional layers
@@ -620,6 +643,7 @@ class Conv2dEIRNN(nn.Module):
         pre_inh_activation: Optional[str] = "tanh",
         post_inh_activation: Optional[str] = None,
         post_integration_activation: Optional[str] = None,
+        tau_mode: Optional[str] = "channel",
         fb_activation: Optional[str] = None,
         bias: bool | tuple[bool] = True,
         num_layers: int = 1,
@@ -752,6 +776,7 @@ class Conv2dEIRNN(nn.Module):
                     pre_inh_activation=pre_inh_activation,
                     post_inh_activation=post_inh_activation,
                     post_integration_activation=post_integration_activation,
+                    tau_mode=tau_mode,
                 )
             )
 

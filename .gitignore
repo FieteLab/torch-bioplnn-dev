@@ -13,3 +13,5 @@ ruff.toml
 slurm_scripts/
 test.ipynb
 activations/
+summary*
+bioplnn.egg-info/

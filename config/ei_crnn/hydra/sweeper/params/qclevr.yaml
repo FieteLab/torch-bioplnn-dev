@@ -11,6 +11,8 @@
 # model.rnn_kwargs.modulation.apply_to: layer_output,hidden
 # model.rnn_kwargs.modulation.op: mul,add
 
-experiment/activation: choice(relu_tanh, tanh_none, none_tanh)
+model.rnn_kwargs.immediate_inhibition: choice(false, true)
+experiment/activation: choice(none_tanh, relu_tanh, tanh_none)
+optimizer.lr: choice(0.001, 0.0004)
 
 # python src/bioplnn/trainers/ei_crnn.py -m hydra/launcher=slurm +hydra/sweeper/params=qclevr wandb.mode=online wandb.group=sweepQCLEVR_0 model=ei data=qclevr
