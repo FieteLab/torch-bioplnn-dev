@@ -16,24 +16,14 @@ classifiers = [
 ]
 dependencies = [
   "numpy",
-  "tqdm",
   "torch",
   "torchvision",
   "torch-scatter",
   "torch-sparse",
-  "opencv-python",
-  "scipy",
-  "tabulate",
-  "scikit-learn",
-  "pandas",
   "matplotlib",
-  "accelerate",
-  "lightning",
-  "hydra-core",
-  "hydra-submitit-launcher",
-  "addict"
+  "torchsparsegradutils @ git+https://github.com/cai4cai/torchsparsegradutils",
 ]
 
 [project.urls]
-Homepage = "https://github.com/hpvok13/bioplnn"
-Issues = "https://github.com/hpvok13/bioplnn/issues"
+Homepage = "https://github.com/valmikikothare/bioplnn"
+Issues = "https://github.com/valmikikothare/bioplnn/issues"
