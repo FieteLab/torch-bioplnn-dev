@@ -26,3 +26,5 @@ model:
       - [3, 3]
       - [3, 3]
   num_classes: 2
+wandb:
+  group: cabc

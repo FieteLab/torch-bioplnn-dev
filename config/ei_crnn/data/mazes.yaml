@@ -13,3 +13,5 @@ model:
   num_classes: 2
 train:
   num_steps: 20
+wandb:
+  group: mazes

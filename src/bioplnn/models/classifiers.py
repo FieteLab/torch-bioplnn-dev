@@ -45,7 +45,6 @@ class ImageClassifier(nn.Module):
         outs, h_pyrs, h_inters, fbs = self.rnn(
             x,
             num_steps=num_steps,
-            return_all_layers_out=True,
         )
 
         if loss_all_timesteps:
@@ -630,7 +629,6 @@ class QCLEVRClassifier(nn.Module):
         outs_cue, h_pyrs_cue, h_inters_cue, fbs_cue = self.rnn(
             x=cue,
             num_steps=num_steps,
-            return_all_layers_out=True,
         )
 
         out_0, h_pyr_0, h_inter_0, fb_0 = None, None, None, None
@@ -695,7 +693,6 @@ class QCLEVRClassifier(nn.Module):
             modulation_out_fn=modulation_out_fn,
             modulation_pyr_fn=modulation_pyr_fn,
             modulation_inter_fn=modulation_inter_fn,
-            return_all_layers_out=True,
         )
 
         if loss_all_timesteps:

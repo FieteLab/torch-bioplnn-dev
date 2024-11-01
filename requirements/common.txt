@@ -1,5 +1,5 @@
+-U
 jupyterlab
-ipykernel
 numpy
 scikit-learn
 pandas

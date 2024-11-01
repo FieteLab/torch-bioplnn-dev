@@ -48,3 +48,5 @@ train:
   epochs: 100
 optimizer:
   lr: 0.001
+wandb:
+  group: qclevr

@@ -21,3 +21,5 @@ model:
       - [3, 3]
       - [3, 3]
   num_classes: 10
+wandb:
+  group: image_classification
