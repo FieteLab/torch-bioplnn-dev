@@ -28,7 +28,7 @@ rnn_kwargs:
   num_layers: 4
   inter_mode: same
   layer_time_delay: false
-  exc_rectify: false
+  exc_rectify: true
   inh_rectify: true
   hidden_init_mode: zeros
   fb_init_mode: zeros
@@ -42,8 +42,8 @@ rnn_kwargs:
   pool_stride: [2, 2]
   pool_global: false
   bias: true
-  pre_inh_activation: relu
-  post_inh_activation: tanh
+  pre_inh_activation: relu6
+  post_inh_activation: relu
   post_integration_activation: null
   tau_mode: channel
 num_classes: 10

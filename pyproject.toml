@@ -14,7 +14,15 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dependencies = ["numpy", "torch", "torchvision", "matplotlib"]
+dependencies = [
+  "numpy",
+  "torch",
+  "torchvision",
+  "torch-scatter",
+  "torch-sparse",
+  "opencv-python",
+  "matplotlib",
+]
 
 [project.urls]
 Homepage = "https://github.com/valmikikothare/bioplnn"

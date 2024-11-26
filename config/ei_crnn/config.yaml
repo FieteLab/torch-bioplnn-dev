@@ -15,7 +15,7 @@ optimizer:
   beta2: 0.999
 scheduler:
   fn: null # one_cycle
-  pct_start: 0.3
+  pct_start: 0.2
 criterion: 
   fn: ce
   all_timesteps: false

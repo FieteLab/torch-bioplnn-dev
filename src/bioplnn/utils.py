@@ -11,6 +11,8 @@ from torch.profiler import ProfilerActivity, profile
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
+from bioplnn.datasets.correlated_dots import CorrelatedDots
+
 
 class AttrDict(Dict):
     def __missing__(self, key):
@@ -46,6 +48,8 @@ def get_activation_class(activation):
         return nn.Identity
     elif activation == "relu":
         return nn.ReLU
+    elif activation == "relu6":
+        return nn.ReLU6
     elif activation == "tanh":
         return nn.Tanh
     elif activation == "sigmoid":
@@ -96,7 +100,9 @@ def idx_2D_to_1D(x, m, n):
 
 def dict_flatten(d, delimiter=".", key=None):
     key = f"{key}{delimiter}" if key is not None else ""
-    non_dicts = {f"{key}{k}": v for k, v in d.items() if not isinstance(v, dict)}
+    non_dicts = {
+        f"{key}{k}": v for k, v in d.items() if not isinstance(v, dict)
+    }
     dicts = {
         f"{key}{k}": v
         for _k, _v in d.items()
@@ -115,7 +121,9 @@ def expand_list(param, n, depth=0):
     inner = param
     for _ in range(depth):
         if not isinstance(inner, (list, tuple)):
-            raise ValueError(f"The intermediate depth {depth} is not a list or tuple")
+            raise ValueError(
+                f"The intermediate depth {depth} is not a list or tuple"
+            )
         inner = inner[0]
 
     if not isinstance(inner, (list, tuple)):
@@ -139,7 +147,8 @@ def count_parameters(model):
     for param in model.parameters():
         num_params = (
             param._nnz()
-            if param.layout in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
+            if param.layout
+            in (torch.sparse_coo, torch.sparse_csr, torch.sparse_csc)
             else param.numel()
         )
         total_params += num_params
@@ -230,7 +239,9 @@ def get_qclevr_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -239,7 +250,9 @@ def get_qclevr_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
     # test_dataloader = DataLoader(
     #     test_dataset,
@@ -286,7 +299,9 @@ def get_cabc_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -295,7 +310,9 @@ def get_cabc_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
     return train_dataloader, val_dataloader
 
@@ -334,6 +351,7 @@ def get_mazes_dataloaders(
         return_metadata=return_metadata,
         transform=transform,
     )
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -341,7 +359,9 @@ def get_mazes_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
     val_dataloader = DataLoader(
         val_dataset,
@@ -350,7 +370,64 @@ def get_mazes_dataloaders(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         worker_init_fn=manual_seed if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
+    )
+
+    return train_dataloader, val_dataloader
+
+
+def get_correlated_dots_dataloaders(
+    resolution: tuple[int, int] = (128, 128),
+    n_frames: int = 10,
+    n_dots: int = 100,
+    correlation: float = 1.0,
+    max_speed: int = 5,
+    samples_per_epoch: int = 10000,
+    val_samples_per_epoch: int = 2000,
+    batch_size: int = 512,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+) -> tuple[DataLoader, DataLoader]:
+    train_dataset = CorrelatedDots(
+        resolution=resolution,
+        n_frames=n_frames,
+        n_dots=n_dots,
+        correlation=correlation,
+        max_speed=max_speed,
+        samples_per_epoch=samples_per_epoch,
+    )
+
+    val_dataset = CorrelatedDots(
+        resolution=resolution,
+        n_frames=n_frames,
+        n_dots=n_dots,
+        correlation=correlation,
+        max_speed=max_speed,
+        samples_per_epoch=val_samples_per_epoch,
+    )
+
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
+    )
+
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        worker_init_fn=manual_seed if seed is not None else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
 
     return train_dataloader, val_dataloader
@@ -401,7 +478,9 @@ def _image_classification_dataloaders(
         transform = T.Compose(
             [
                 T.ToTensor(),
-                T.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+                T.Normalize(
+                    (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
+                ),
                 *resize,
             ]
         )
@@ -429,8 +508,12 @@ def _image_classification_dataloaders(
         shuffle=True,
         pin_memory=torch.cuda.is_available(),
         num_workers=num_workers,
-        worker_init_fn=(lambda x: manual_seed(x + seed)) if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        worker_init_fn=(lambda x: manual_seed(x + seed))
+        if seed is not None
+        else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
 
     test_loader = DataLoader(
@@ -439,8 +522,12 @@ def _image_classification_dataloaders(
         shuffle=shuffle_test,
         pin_memory=torch.cuda.is_available(),
         num_workers=num_workers,
-        worker_init_fn=(lambda x: manual_seed(x + seed)) if seed is not None else None,
-        generator=torch.Generator().manual_seed(seed) if seed is not None else None,
+        worker_init_fn=(lambda x: manual_seed(x + seed))
+        if seed is not None
+        else None,
+        generator=torch.Generator().manual_seed(seed)
+        if seed is not None
+        else None,
     )
 
     return train_loader, test_loader

@@ -18,7 +18,7 @@ class ImageClassifier(nn.Module):
     ):
         super().__init__()
 
-        self.rnn = Conv2dEIRNN(batch_first=False, **rnn_kwargs)  # type: ignore
+        self.rnn = Conv2dEIRNN(**rnn_kwargs)  # type: ignore
 
         self.num_layers = rnn_kwargs["num_layers"]
 
@@ -47,10 +47,17 @@ class ImageClassifier(nn.Module):
             num_steps=num_steps,
         )
 
+        # Get the output from last layer
+        outs_tmp = outs[-1]
+        if self.rnn.batch_first:
+            outs_tmp = outs_tmp.transpose(0, 1)
+
         if loss_all_timesteps:
-            pred = torch.stack([self.out_layer(out.flatten(1)) for out in outs[-1]])
+            pred = torch.stack(
+                [self.out_layer(out.flatten(1)) for out in outs_tmp]
+            )
         else:
-            pred = self.out_layer(outs[-1][-1].flatten(1))
+            pred = self.out_layer(outs_tmp[-1].flatten(1))
 
         if return_activations:
             return pred, outs, h_pyrs, h_inters, fbs
@@ -59,7 +66,9 @@ class ImageClassifier(nn.Module):
 
 
 class AttentionalGainModulation(nn.Module):
-    def __init__(self, in_channels, out_channels, spatial_size: tuple[int, int]):
+    def __init__(
+        self, in_channels, out_channels, spatial_size: tuple[int, int]
+    ):
         """
         Initializes the SimpleAttentionalGain module.
 
@@ -71,7 +80,9 @@ class AttentionalGainModulation(nn.Module):
         self.spatial_size = spatial_size
 
         self.spatial_average = nn.AdaptiveAvgPool2d(spatial_size)
-        self.match_channels = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.match_channels = nn.Conv2d(
+            in_channels, out_channels, kernel_size=1
+        )
 
         self.bias = nn.Parameter(torch.zeros(1))  # init gain scaling to zero
         self.slope = nn.Parameter(torch.ones(1))  # init slope to one
@@ -108,7 +119,9 @@ class AttentionalGainModulation(nn.Module):
             # Apply slope
             modulation = modulation * self.slope
             # Apply sigmoid & bias
-            modulation = self.bias + (1 - self.bias) * torch.sigmoid(modulation)
+            modulation = self.bias + (1 - self.bias) * torch.sigmoid(
+                modulation
+            )
 
         self.cached = modulation
 
@@ -130,7 +143,11 @@ class LowRankModulation(nn.Module):
         self.cached = None
 
     def forward(
-        self, x: torch.Tensor, modulation: list[torch.Tensor], op="add", use_cache=False
+        self,
+        x: torch.Tensor,
+        modulation: list[torch.Tensor],
+        op="add",
+        use_cache=False,
     ):
         # rank_one_vector = torch.matmul(input, self.W) + self.bias
         # # compute the rank one matrix
@@ -146,9 +163,9 @@ class LowRankModulation(nn.Module):
             h_vec = self.rank_one_vec_h(sp_vec)
             w_vec = self.rank_one_vec_w(sp_vec)
 
-            modulation = torch.bmm(h_vec.unsqueeze(-1), w_vec.unsqueeze(-2)).unsqueeze(
-                -3
-            )
+            modulation = torch.bmm(
+                h_vec.unsqueeze(-1), w_vec.unsqueeze(-2)
+            ).unsqueeze(-3)
             modulation = sp_vec.unsqueeze(-1).unsqueeze(-1) * modulation
 
         self.cached = modulation
@@ -315,7 +332,9 @@ class SelfAttnModulation(nn.Module):
         else:
             modulation = self.conv1(modulation)
             modulation_shape = modulation.shape
-            modulation = self.norm1(modulation.flatten(2)).reshape(modulation_shape)
+            modulation = self.norm1(modulation.flatten(2)).reshape(
+                modulation_shape
+            )
             q, k, v = self.qkv(modulation).flatten(2).chunk(3, dim=1)
             modulation = self.attn(q, k, v, need_weights=False)[0]
             modulation = self.norm2(modulation).reshape(modulation_shape)
@@ -357,10 +376,15 @@ class ModulationWrapper(nn.Module):
                         "If x is 4D, num_steps must be provided and greater than 0"
                     )
                 modulations[i] = (
-                    modulations[i].unsqueeze(0).expand((num_steps, -1, -1, -1, -1))
+                    modulations[i]
+                    .unsqueeze(0)
+                    .expand((num_steps, -1, -1, -1, -1))
                 )
             elif modulations[i].dim() == 5:
-                if num_steps is not None and num_steps != modulations[i].shape[0]:
+                if (
+                    num_steps is not None
+                    and num_steps != modulations[i].shape[0]
+                ):
                     raise ValueError(
                         "If x is 5D and num_steps is provided, it must match the sequence length."
                     )
@@ -372,13 +396,16 @@ class ModulationWrapper(nn.Module):
 
         if modulation_from_all_layers:
             upsamplers = [
-                nn.Upsample(size=modulation.shape[-2:]) for modulation in modulations
+                nn.Upsample(size=modulation.shape[-2:])
+                for modulation in modulations
             ]
             modulations_new = [[] * num_steps for _ in range(num_layers)]
             for t in range(num_steps):
                 upsampled_modulation = []
                 for i in range(num_layers):
-                    upsampled_modulation.append(upsamplers[i](modulations[i][t]))
+                    upsampled_modulation.append(
+                        upsamplers[i](modulations[i][t])
+                    )
                 upsampled_modulation = torch.cat(upsampled_modulation, dim=1)
                 for i in range(num_layers):
                     modulations_new[i][t] = upsampled_modulation
@@ -454,7 +481,9 @@ class QCLEVRClassifier(nn.Module):
         self.flush_fb = flush_fb
 
         if modulation_apply_to not in ("hidden", "layer_output"):
-            raise ValueError("modulation_apply_to must be 'hidden' or 'layer_output'.")
+            raise ValueError(
+                "modulation_apply_to must be 'hidden' or 'layer_output'."
+            )
 
         self.modulations = nn.ModuleList()
         self.modulations_inter = nn.ModuleList()
@@ -495,7 +524,9 @@ class QCLEVRClassifier(nn.Module):
                         }
                         kwargs_inter = {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
+                            "out_channels": self.rnn.layers[
+                                i
+                            ].h_inter_channels_sum,
                             "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
@@ -537,7 +568,9 @@ class QCLEVRClassifier(nn.Module):
                         }
                         kwargs_inter = kwargs_common | {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
+                            "out_channels": self.rnn.layers[
+                                i
+                            ].h_inter_channels_sum,
                             "spatial_size": self.rnn.layers[i].inter_size,
                         }
                     else:
@@ -561,7 +594,9 @@ class QCLEVRClassifier(nn.Module):
                         }
                         kwargs_inter = kwargs_common | {
                             "in_channels": h_inter_in_dim,
-                            "out_channels": self.rnn.layers[i].h_inter_channels_sum,
+                            "out_channels": self.rnn.layers[
+                                i
+                            ].h_inter_channels_sum,
                         }
                     else:
                         kwargs_out = kwargs_common | {
@@ -575,14 +610,17 @@ class QCLEVRClassifier(nn.Module):
 
                 if modulation_apply_to == "hidden":
                     self.modulations.append(modulation_class(**kwargs_pyr))
-                    self.modulations_inter.append(modulation_class(**kwargs_inter))
+                    self.modulations_inter.append(
+                        modulation_class(**kwargs_inter)
+                    )
                 else:
                     self.modulations.append(modulation_class(**kwargs_out))
 
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.layers[-1].out_channels * prod(self.rnn.layers[-1].out_size),
+                self.rnn.layers[-1].out_channels
+                * prod(self.rnn.layers[-1].out_size),
                 fc_dim,
             ),
             nn.ReLU(),
@@ -606,7 +644,9 @@ class QCLEVRClassifier(nn.Module):
                 modulation_timestep not in ("all", "same")
                 and -num_steps <= modulation_timestep < num_steps
             ):
-                modulation_timestep = (num_steps + modulation_timestep) % num_steps
+                modulation_timestep = (
+                    num_steps + modulation_timestep
+                ) % num_steps
             elif (i == 0 and modulation_timestep != "same") or (
                 i == 1 and modulation_timestep != "all"
             ):
@@ -637,11 +677,17 @@ class QCLEVRClassifier(nn.Module):
         if not self.flush_hidden:
             h_pyr_0 = [h[-1] for h in h_pyrs_cue]
             if h_inters_cue is not None:
-                h_inter_0 = [h[-1] if h is not None else None for h in h_inters_cue]
+                h_inter_0 = [
+                    h[-1] if h is not None else None for h in h_inters_cue
+                ]
         if not self.flush_fb and fbs_cue is not None:
             fb_0 = [f[-1] if f is not None else None for f in fbs_cue]
 
-        modulation_out_fn, modulation_pyr_fn, modulation_inter_fn = None, None, None
+        modulation_out_fn, modulation_pyr_fn, modulation_inter_fn = (
+            None,
+            None,
+            None,
+        )
         if self.modulation_enable:
             num_steps = h_pyrs_cue[0].shape[0]
             modulation_timestep_cue, modulation_timestep_mix = (
@@ -696,7 +742,9 @@ class QCLEVRClassifier(nn.Module):
         )
 
         if loss_all_timesteps:
-            pred = torch.stack([self.out_layer(out.flatten(2)) for out in outs_mix[-1]])
+            pred = torch.stack(
+                [self.out_layer(out.flatten(2)) for out in outs_mix[-1]]
+            )
         else:
             pred = self.out_layer(outs_mix[-1][-1].flatten(1))
 

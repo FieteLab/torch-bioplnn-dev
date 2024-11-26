@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  rnn_kwargs:
+    pre_inh_activation: sigmoid
+    post_inh_activation: relu

@@ -1,8 +1,7 @@
 -r common.txt
---extra-index-url https://download.pytorch.org/whl/cu124
--f https://data.pyg.org/whl/torch-2.4.0+cu124.html
 torch
 torchvision
 torchaudio
-torch-scatter 
+-f https://data.pyg.org/whl/torch-2.5.1+cu124.html
+torch-scatter
 torch-sparse
