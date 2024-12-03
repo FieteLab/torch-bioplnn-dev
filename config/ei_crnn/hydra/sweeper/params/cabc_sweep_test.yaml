@@ -1,6 +1,0 @@
-checkpoint.epoch: choice(null, 10)
-data.root: choice(data/cabc/medium, data/cabc/hard)
-model: choice(ei, eifb)
-checkpoint.run: choice(lunar-waterfall-3198, snowy-sponge-3180)
-
-# python -u examples/ei_tester.py -m hydra/launcher=slurm +hydra/sweeper/params=cabc_sweep_test wandb.mode=online wandb.group=cabc_0 data=cabc

@@ -1,5 +1,0 @@
-# @package _global_
-model:
-  rnn_kwargs:
-    pre_inh_activation: tanh
-    post_inh_activation: null

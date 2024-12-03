@@ -406,7 +406,9 @@ class Conv2dEIRNNCell(nn.Module):
         elif init_mode == "randn":
             func = torch.randn
         else:
-            raise ValueError("Invalid init_mode. Must be 'zeros', 'ones', or 'randn'.")
+            raise ValueError(
+                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
+            )
 
         return (
             func(
@@ -447,7 +449,9 @@ class Conv2dEIRNNCell(nn.Module):
         elif init_mode == "randn":
             func = torch.randn
         else:
-            raise ValueError("Invalid init_mode. Must be 'zeros', 'ones', or 'randn'.")
+            raise ValueError(
+                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
+            )
 
         return func(
             batch_size, self.out_channels, *self.out_size, device=device
@@ -478,7 +482,9 @@ class Conv2dEIRNNCell(nn.Module):
         elif init_mode == "randn":
             func = torch.randn
         else:
-            raise ValueError("Invalid init_mode. Must be 'zeros', 'ones', or 'randn'.")
+            raise ValueError(
+                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
+            )
 
         return (
             func(batch_size, self.fb_channels, *self.in_size, device=device)
@@ -590,7 +596,7 @@ class Conv2dEIRNNCell(nn.Module):
 
         # Compute Euler update for pyramidal cell hidden state
         tau_pyr = torch.sigmoid(self.tau_pyr)
-        h_pyr = (1 - tau_pyr) * h_pyr + tau_pyr * h_pyr_new
+        h_pyr = tau_pyr * h_pyr_new + (1 - tau_pyr) * h_pyr
 
         # Compute new interneuron cell hidden state
         if self.use_h_inter:
@@ -612,7 +618,7 @@ class Conv2dEIRNNCell(nn.Module):
             h_inter_new = self.post_inh_activation(h_inter_new)
             # Compute Euler update for interneuron cell hidden state
             tau_inter = torch.sigmoid(self.tau_inter)
-            h_inter = (1 - tau_inter) * h_inter + tau_inter * h_inter_new
+            h_inter = tau_inter * h_inter_new + (1 - tau_inter) * h_inter
 
         # Pool the output
         out = self.out_pool(h_pyr)
@@ -700,7 +706,9 @@ class Conv2dEIRNN(nn.Module):
         exc_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
         inh_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
         fb_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
-        pool_kernel_size: Optional[tuple[int, int] | tuple[tuple[int, int]]] = None,
+        pool_kernel_size: Optional[
+            tuple[int, int] | tuple[tuple[int, int]]
+        ] = None,
         pool_stride: Optional[tuple[int, int] | tuple[tuple[int, int]]] = None,
         pool_global: bool | tuple[bool] = True,
         pre_inh_activation: Optional[str] = None,
@@ -714,7 +722,7 @@ class Conv2dEIRNN(nn.Module):
         hidden_init_mode: str = "zeros",
         fb_init_mode: str = "zeros",
         out_init_mode: str = "zeros",
-        batch_first: bool = False,
+        batch_first: bool = True,
     ):
         super().__init__()
 
@@ -942,35 +950,71 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             tuple(list[list[torch.Tensor]], list[list[torch.Tensor]], list[list[torch.Tensor]], list[list[torch.Tensor]]): A tuple containing the initialized outputs, pyramidal cell hidden states, interneuron cell hidden states, and feedback inputs for each layer and time step.
         """
-        outs = [[None] * num_steps for _ in self.layers]
-        h_pyrs = [[None] * num_steps for _ in self.layers]
-        h_inters = [[None] * num_steps for _ in self.layers]
+        outs = [[None] * num_steps for _ in range(self.num_layers)]
+        h_pyrs = [[None] * num_steps for _ in range(self.num_layers)]
+        h_inters = [[None] * num_steps for _ in range(self.num_layers)]
         fbs = [
             [0 if self.receives_fb[i] else None] * num_steps
             for i in range(self.num_layers)
         ]
 
-        out_0 = expand_list(out_0, self.num_layers)
-        h_pyr_0 = expand_list(h_pyr_0, self.num_layers)
-        h_inter_0 = expand_list(h_inter_0, self.num_layers)
-        fb_0 = expand_list(fb_0, self.num_layers)
+        if (
+            out_0 is not None
+            and self.num_layers > 1
+            and len(out_0) != self.num_layers
+        ):
+            raise ValueError(
+                "The length of out_0 must be equal to the number of layers."
+            )
+
+        if (
+            h_pyr_0 is not None
+            and self.num_layers > 1
+            and len(h_pyr_0) != self.num_layers
+        ):
+            raise ValueError(
+                "The length of h_pyr_0 must be equal to the number of layers."
+            )
+
+        if (
+            h_inter_0 is not None
+            and self.num_layers > 1
+            and len(h_inter_0) != self.num_layers
+        ):
+            raise ValueError(
+                "The length of h_inter_0 must be equal to the number of layers."
+            )
+
+        if (
+            fb_0 is not None
+            and self.num_layers > 1
+            and len(fb_0) != self.num_layers
+        ):
+            raise ValueError(
+                "The length of fb_0 must be equal to the number of layers."
+            )
+
+        if not isinstance(out_0, (list, tuple)):
+            out_0 = [out_0] * self.num_layers
+        if not isinstance(h_pyr_0, (list, tuple)):
+            h_pyr_0 = [h_pyr_0] * self.num_layers
+        if not isinstance(h_inter_0, (list, tuple)):
+            h_inter_0 = [h_inter_0] * self.num_layers
+        if not isinstance(fb_0, (list, tuple)):
+            fb_0 = [fb_0] * self.num_layers
 
         if any(x is None for x in out_0):
             out_tmp = self._init_out(
                 batch_size, init_mode=self.out_init_mode, device=device
             )
-        if all(
-            x is None for x in h_pyr_0 or all(x is None for x in h_inter_0)
+        if any(x is None for x in h_pyr_0) or any(
+            x is None for x in h_inter_0
         ):
             h_pyr_tmp, h_inter_tmp = self._init_hidden(
                 batch_size, init_mode=self.hidden_init_mode, device=device
             )
-            h_pyr_0 = h_pyr_tmp if all(x is None for x in h_pyr_0) else h_pyr_0
-            h_inter_0 = (
-                h_inter_tmp if all(x is None for x in h_inter_0) else h_inter_0
-            )
-        if all(x is None for x in fb_0):
-            fb_0 = self._init_fb(
+        if any(x is None for x in fb_0):
+            fb_tmp = self._init_fb(
                 batch_size, init_mode=self.fb_init_mode, device=device
             )
 
@@ -1048,7 +1092,7 @@ class Conv2dEIRNN(nn.Module):
 
         return modulation_fns
 
-    def _format_outputs(self, outs, h_pyrs, h_inters, fbs):
+    def _format_result(self, outs, h_pyrs, h_inters, fbs):
         """
         Formats the outputs, hidden states, and feedback inputs.
 
@@ -1181,7 +1225,7 @@ class Conv2dEIRNN(nn.Module):
                         outs[i][t]
                     )
 
-        outs, h_pyrs, h_inters, fbs = self._format_outputs(
+        outs, h_pyrs, h_inters, fbs = self._format_result(
             outs, h_pyrs, h_inters, fbs
         )
 

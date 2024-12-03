@@ -1,6 +1,0 @@
-model.synapses_per_neuron: 32,16
-model.use_layernorm: true,false
-model.synapse_std: 10,25,50
-model: random_rnn,random_rkan,random_rchebykan
-
-# Command: python -m trainers/topography.py hydra/launcher=slurm +hydra/sweeper/params=sweep_rnn wandb.group=all_sweep 

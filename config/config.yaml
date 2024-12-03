@@ -1,0 +1,59 @@
+defaults:
+  - _self_
+  - model: null
+  - data: null
+  - experiment/activation: null
+  - experiment/rectify: null
+  - experiment/test_run: null
+  - experiment/dimensions: null
+
+optimizer:
+  fn: adamw
+  lr: 0.0005
+  momentum: 0.9
+  beta1: 0.9
+  beta2: 0.999
+scheduler:
+  fn: null # one_cycle
+  pct_start: 0.2
+criterion:
+  fn: ce
+  all_timesteps: false
+compile:
+  disable: true
+  fullgraph: true
+  dynamic: null
+  backend: inductor
+  mode: reduce-overhead
+train:
+  num_steps: 5
+  epochs: 100
+  log_freq: 5
+  grad_clip:
+    enable: false
+    type: norm
+    value: 1.0
+checkpoint:
+  load: false
+  root: checkpoints/ei
+  run: daily-armadillo-3361
+  epoch: null
+wandb:
+  project: bioplnn
+  mode: online
+  group: null
+activations:
+  save_root: activations/ei
+  save_activations: true
+  num_samples: 10
+visualizations:
+  enable: false
+  save_dir: visualizations
+  fps: 4
+  frames: [0, 20]
+seed: null
+deterministic: false
+tqdm: true
+matmul_precision: high
+debug_level: 1
+debug_num_batches: null

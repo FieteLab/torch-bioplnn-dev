@@ -31,7 +31,9 @@ from bioplnn.utils import (
 def initialize_model(
     cls: str, config: AttrDict, exclude_keys: list[str]
 ) -> torch.nn.Module:
-    if cls == "topographical_rnn":
+    if cls == "topographical_rnn_ode":
+        model = TopographicalRNNLayer(**without_keys(config, exclude_keys))
+    elif cls == "topographical_rnn":
         model = TopographicalRNN(**without_keys(config, exclude_keys))
     elif cls == "topographical_rkan":
         model = TopographicalRKAN(**without_keys(config, exclude_keys))
@@ -316,7 +318,6 @@ def train(config: DictConfig) -> None:
             )
 
     # Initialize Weights & Biases
-    wandb.require("core")
     wandb.init(
         config=config,
         settings=wandb.Settings(start_method="thread"),
@@ -428,6 +429,53 @@ def train(config: DictConfig) -> None:
         os.symlink(file_path, link_path)
 
 
+def dynamics(config: DictConfig) -> None:
+    """
+    Train the model using the provided configuration.
+
+    Args:
+        config (AttrDict): Configuration parameters.
+    """
+    config = OmegaConf.to_container(config, resolve=True)
+    print(yaml.dump(config))
+    config = AttrDict(config)
+
+    if config.seed is not None:
+        if config.deterministic:
+            manual_seed_deterministic(config.seed)
+        else:
+            manual_seed(config.seed)
+    else:
+        if config.deterministic:
+            raise ValueError(
+                "Seed must be provided for deterministic training"
+            )
+
+    # Initialize Weights & Biases
+    wandb.init(
+        config=config,
+        settings=wandb.Settings(start_method="thread"),
+        **config.wandb,
+    )
+    global_step = 0
+
+    if config.wandb.mode == "disabled":
+        checkpoint_dir = os.path.join(
+            config.checkpoint.root, config.checkpoint.run
+        )
+    else:
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = initialize_model(
+        cls=config.model.cls, exclude_keys=["cls"], config=config.model
+    ).to(device)
+
+    # Get the data loaders
+
+
 @hydra.main(
     version_base=None,
     config_path="/om2/user/valmiki/bioplnn/config/topography",
@@ -435,7 +483,12 @@ def train(config: DictConfig) -> None:
 )
 def main(config: DictConfig):
     try:
-        train(config)
+        if config.mode == "train":
+            train(config)
+        elif config.mode == "dynamics":
+            dynamics(config)
+        else:
+            raise ValueError(f"Unknown mode: {config.mode}")
     except Exception as e:
         if config.debug_level > 1:
             print_exc(file=sys.stderr)
@@ -446,7 +499,3 @@ def main(config: DictConfig):
     finally:
         sys.stdout.flush()
         sys.stderr.flush()
-
-
-if __name__ == "__main__":
-    main()

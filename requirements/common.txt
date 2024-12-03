@@ -1,4 +1,4 @@
--U
+opencv-python
 jupyterlab
 numpy
 scikit-learn
@@ -9,4 +9,3 @@ tqdm
 hydra-core
 hydra-submitit-launcher
 addict
-torchsparsegradutils

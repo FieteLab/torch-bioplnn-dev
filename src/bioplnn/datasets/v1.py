@@ -18,7 +18,9 @@ def r_theta_mp(data):
 
 
 class V1Dataset:
-    def __init__(self, retina_path, m, n, retina_radius, image_top_corner=(4, 4)):
+    def __init__(
+        self, retina_path, m, n, retina_radius, image_top_corner=(4, 4)
+    ):
         """
         Read cortex information.
         """
@@ -36,9 +38,6 @@ class V1Dataset:
         self.grid[:, retina_indices[0], retina_indices[1], :] = torch.stack(
             (normed_grid_y, normed_grid_x), dim=-1
         )
-
-    def to_(self, device):
-        self.grid = self.grid.to(device)
 
     def image_to_cortex(self, image: torch.Tensor):
         if image.dim() == 3:

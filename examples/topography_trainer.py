@@ -5,7 +5,6 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from addict import Dict as AttrDict
 from omegaconf import DictConfig, OmegaConf
@@ -13,12 +12,12 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
+import wandb
 from bioplnn.models.topography import (
     TopographicalRChebyKAN,
     TopographicalRKAN,
     TopographicalRNN,
 )
-from bioplnn.optimizers import SparseSGD
 from bioplnn.utils import (
     get_v1_dataloaders,
     manual_seed,
@@ -29,67 +28,43 @@ from bioplnn.utils import (
 
 
 def initialize_model(
-    cls: str, config: AttrDict, exclude_keys: list[str]
+    arch: str, config: AttrDict, exclude_keys: list[str]
 ) -> torch.nn.Module:
-    if cls == "topographical_rnn":
+    if arch == "topographical_rnn":
         model = TopographicalRNN(**without_keys(config, exclude_keys))
-    elif cls == "topographical_rkan":
+    elif arch == "topographical_rkan":
         model = TopographicalRKAN(**without_keys(config, exclude_keys))
-    elif cls == "topographical_rchebykan":
+    elif arch == "topographical_rchebykan":
         model = TopographicalRChebyKAN(**without_keys(config, exclude_keys))
     else:
-        raise NotImplementedError(f"Model {cls} not implemented")
+        raise NotImplementedError(f"Model {arch} not implemented")
 
     return model
 
 
 def initialize_optimizer(
-    model_parameters,
-    fn,
-    sparse_format,
-    mm_function,
-    lr,
-    momentum=0.9,
-    beta1=0.9,
-    beta2=0.9,
+    model_parameters, fn, lr, momentum=0.9, beta1=0.9, beta2=0.9, **kwargs
 ) -> torch.optim.Optimizer:
     if fn == "sgd":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "sgd is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.SGD(
             model_parameters,
             lr=lr,
             momentum=momentum,
+            **kwargs,
         )
     elif fn == "adam":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "adam is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.Adam(
             model_parameters,
             lr=lr,
             betas=(beta1, beta2),
+            **kwargs,
         )
     elif fn == "adamw":
-        if sparse_format in ("coo", "csr"):
-            raise ValueError(
-                "adam is not supported with coo or csr: Use sparse_sgd instead"
-            )
         optimizer = torch.optim.AdamW(
             model_parameters,
             lr=lr,
             betas=(beta1, beta2),
-        )
-    elif fn == "sparse_sgd":
-        if mm_function == "torch_sparse":
-            raise ValueError("sparse_sgd is not supported with torch_sparse")
-        optimizer = SparseSGD(
-            model_parameters,
-            lr=lr,
-            momentum=momentum,
+            **kwargs,
         )
     else:
         raise NotImplementedError(f"Optimizer {fn} not implemented")
@@ -168,7 +143,9 @@ def train_epoch(
 
     bar = tqdm(
         train_loader,
-        desc=(f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"),
+        desc=(
+            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
+        ),
         disable=not config.tqdm,
     )
 
@@ -198,7 +175,9 @@ def train_epoch(
         optimizer.zero_grad()
         loss.backward()
         clip_grad_(
-            model.parameters(), config.train.grad_clip.value, foreach=config.foreach
+            model.parameters(),
+            config.train.grad_clip.value,
+            foreach=config.foreach,
         )
         optimizer.step()
         if scheduler is not None:
@@ -307,10 +286,11 @@ def train(config: DictConfig) -> None:
             manual_seed(config.seed)
     else:
         if config.deterministic:
-            raise ValueError("Seed must be provided for deterministic training")
+            raise ValueError(
+                "Seed must be provided for deterministic training"
+            )
 
     # Initialize Weights & Biases
-    wandb.require("core")
     wandb.init(
         config=config,
         settings=wandb.Settings(start_method="thread"),
@@ -319,7 +299,9 @@ def train(config: DictConfig) -> None:
     global_step = 0
 
     if config.wandb.mode == "disabled":
-        checkpoint_dir = os.path.join(config.checkpoint.root, config.checkpoint.run)
+        checkpoint_dir = os.path.join(
+            config.checkpoint.root, config.checkpoint.run
+        )
     else:
         checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -327,7 +309,7 @@ def train(config: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = initialize_model(
-        cls=config.model.cls, exclude_keys=["cls"], config=config.model
+        arch=config.model.arch, exclude_keys=["arch"], config=config.model
     ).to(device)
 
     optimizer = initialize_optimizer(
@@ -340,7 +322,9 @@ def train(config: DictConfig) -> None:
     criterion = initialize_criterion(config.criterion.fn)
 
     # Get the data loaders
-    train_loader, val_loader = get_v1_dataloaders(**config.data, seed=config.seed)
+    train_loader, val_loader = get_v1_dataloaders(
+        **config.data, seed=config.seed
+    )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(
@@ -364,10 +348,14 @@ def train(config: DictConfig) -> None:
             global_step,
             device,
         )
-        wandb.log(dict(train_loss=train_loss, train_acc=train_acc), step=global_step)
+        wandb.log(
+            dict(train_loss=train_loss, train_acc=train_acc), step=global_step
+        )
 
         # Evaluate model on the val set
-        val_loss, val_acc = val_epoch(config, model, criterion, val_loader, device)
+        val_loss, val_acc = val_epoch(
+            config, model, criterion, val_loader, device
+        )
 
         wandb.log(dict(val_loss=val_loss, val_acc=val_acc), step=global_step)
 
@@ -375,7 +363,9 @@ def train(config: DictConfig) -> None:
             images, _ = next(iter(val_loader))
             images = images.to(device)
             if config.visualize.save_dir is not None:
-                save_dir = os.path.join(config.visualize.save_dir, wandb.run.name)
+                save_dir = os.path.join(
+                    config.visualize.save_dir, wandb.run.name
+                )
                 os.makedirs(save_dir, exist_ok=True)
                 save_path = os.path.join(save_dir, f"epoch_{epoch}")
             _, activations = model(images, return_activations=True)
@@ -394,10 +384,14 @@ def train(config: DictConfig) -> None:
         file_path = os.path.abspath(
             os.path.join(checkpoint_dir, f"checkpoint_{epoch}.pt")
         )
-        link_path = os.path.abspath(os.path.join(checkpoint_dir, "checkpoint.pt"))
+        link_path = os.path.abspath(
+            os.path.join(checkpoint_dir, "checkpoint.pt")
+        )
         checkpoint = {
             "epoch": epoch,
-            "model_state_dict": getattr(model, "_orig_mod", model).state_dict(),
+            "model_state_dict": getattr(
+                model, "_orig_mod", model
+            ).state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
         }
         torch.save(checkpoint, file_path)

@@ -1,7 +1,7 @@
-import torch.nn.functional as F
-import torch.nn as nn
-import torch
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 """
 Sensoy, M., Kaplan, L., & Kandemir, M. (2018). Evidential deep learning to quantify classification uncertainty. 
@@ -61,21 +61,25 @@ class EDLLoss(nn.Module):
         self.step_count = 0
 
     def KL(self, alpha):
-        beta = torch.ones((1, self.num_classes), dtype=torch.float, device=alpha.device)
+        beta = torch.ones(
+            (1, self.num_classes), dtype=torch.float, device=alpha.device
+        )
         S_alpha = torch.sum(alpha, dim=1, keepdim=True)
         S_beta = torch.sum(beta, dim=1, keepdims=True)
         lnB = torch.lgamma(S_alpha) - torch.sum(
             torch.lgamma(alpha), axis=1, keepdim=True
         )
-        lnB_uni = torch.sum(torch.lgamma(beta), axis=1, keepdim=True) - torch.lgamma(
-            S_beta
-        )
+        lnB_uni = torch.sum(
+            torch.lgamma(beta), axis=1, keepdim=True
+        ) - torch.lgamma(S_beta)
 
         dg0 = torch.digamma(S_alpha)
         dg1 = torch.digamma(alpha)
 
         kl = (
-            torch.sum((alpha - beta) * (dg1 - dg0), dim=1, keepdim=True) + lnB + lnB_uni
+            torch.sum((alpha - beta) * (dg1 - dg0), dim=1, keepdim=True)
+            + lnB
+            + lnB_uni
         )
         return kl
 
@@ -91,11 +95,15 @@ class EDLLoss(nn.Module):
         m = alpha / S
 
         A = torch.sum((target - m) ** 2, dim=1, keepdim=True)
-        B = torch.sum(alpha * (S - alpha) / (S * S * (S + 1)), dim=1, keepdim=True)
+        B = torch.sum(
+            alpha * (S - alpha) / (S * S * (S + 1)), dim=1, keepdim=True
+        )
 
         if global_step is not None:
             self.step_count = global_step
-        annealing_coef = float(self.step_count) / annealing_step  # rho in the paper
+        annealing_coef = (
+            float(self.step_count) / annealing_step
+        )  # rho in the paper
         self.step_count += 1
         annealing_coef = min(1.0, annealing_coef)
         # print(annealing_coef)

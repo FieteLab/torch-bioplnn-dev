@@ -2,16 +2,18 @@ import os
 import random
 from typing import Optional
 
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torchvision.transforms as T
 from addict import Dict
 from torch import nn
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.profiler import ProfilerActivity, profile
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
-
-from bioplnn.datasets.correlated_dots import CorrelatedDots
 
 
 class AttrDict(Dict):
@@ -168,6 +170,61 @@ def rescale(x):
     return x * 2 - 1
 
 
+def visualize_crnn_activations(
+    activations_path: str = "activations/ei/mazes/daily-armadillo-3361/activations.pt",
+    save_dir: str = "visualizations",
+    fps: int = 5,
+):
+    os.makedirs(save_dir, exist_ok=True)
+
+    activations = torch.load(activations_path)
+
+    # Convert activations (which is a list of dicts, where the inner dicts are column names) to a pandas df
+    df = pd.DataFrame(activations)
+
+    for i, sample in df.iterrows():
+        plt.imsave(
+            f"{save_dir}/x_maze_{i}.png",
+            sample.x.squeeze()[:3].permute(1, 2, 0).numpy(),
+        )
+        plt.imsave(
+            f"{save_dir}/x_start_end_{i}.png",
+            sample.x.squeeze()[3].numpy(),
+            cmap="viridis",
+        )
+        for activation in ("h_pyrs", "h_inters"):
+            # Assuming 'sample' is your data object containing h_pyrs
+            hs = sample[activation][-1].squeeze()
+
+            # Create a figure and axis
+            fig, ax = plt.subplots(figsize=(8, 8))
+
+            # Initialize the plot with the first frame
+            im = ax.imshow(hs[0].sum(dim=0).cpu().numpy(), cmap="viridis")
+
+            # Function to update the frame
+            def update(frame):
+                im.set_array(hs[frame].sum(dim=0).cpu().numpy())
+                return [im]
+
+            # Create the animation
+            anim = animation.FuncAnimation(
+                fig, update, frames=len(hs), interval=1000 / fps, blit=True
+            )
+
+            # Display the animation in the notebook
+            # display(HTML(anim.to_jshtml()))
+
+            # Save the animation as an MP4 file
+            anim.save(
+                f"{save_dir}/{activation}_{i}.mp4",
+                writer="ffmpeg",
+                fps=fps,
+            )
+
+            plt.close(fig)
+
+
 def get_qclevr_dataloaders(
     root: str,
     cue_assets_root: str,
@@ -190,7 +247,10 @@ def get_qclevr_dataloaders(
         [
             transforms.ToTensor(),
             transforms.Lambda(rescale),
-            transforms.Resize(resolution),
+            transforms.Resize(
+                resolution,
+                interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+            ),
         ]
     )
     train_dataset = QCLEVRDataset(
@@ -279,7 +339,10 @@ def get_cabc_dataloaders(
     transform = transforms.Compose(
         [
             transforms.ToTensor(),
-            transforms.Resize(resolution),
+            transforms.Resize(
+                resolution,
+                interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+            ),
         ]
     )
     train_dataset = CABCDataset(
@@ -330,9 +393,11 @@ def get_mazes_dataloaders(
     from bioplnn.datasets.mazes import Mazes
 
     if resolution is not None:
-        transform = transforms.Resize(
-            size=resolution,
-            interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+        transform = (
+            transforms.Resize(
+                resolution,
+                interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+            ),
         )
     else:
         transform = nn.Identity()
@@ -390,6 +455,8 @@ def get_correlated_dots_dataloaders(
     num_workers: int = 0,
     seed: Optional[int] = None,
 ) -> tuple[DataLoader, DataLoader]:
+    from bioplnn.datasets.correlated_dots import CorrelatedDots
+
     train_dataset = CorrelatedDots(
         resolution=resolution,
         n_frames=n_frames,
@@ -448,7 +515,16 @@ def _image_classification_dataloaders(
 
     from bioplnn.datasets.v1 import CIFAR10_V1, CIFAR100_V1, MNIST_V1
 
-    resize = [transforms.Resize(resolution)] if resolution is not None else []
+    resize = (
+        [
+            transforms.Resize(
+                resolution,
+                interpolation=transforms.InterpolationMode.NEAREST_EXACT,
+            )
+        ]
+        if resolution is not None
+        else []
+    )
 
     if dataset == "mnist":
         transform = T.Compose(
@@ -701,3 +777,144 @@ def get_cifar100_v1_dataloaders(
         seed=seed,
         shuffle_test=shuffle_test,
     )
+
+
+def initialize_dataloader(config: AttrDict, seed: Optional[int]):
+    if config.dataset == "qclevr":
+        train_loader, val_loader = get_qclevr_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "cabc":
+        train_loader, val_loader = get_cabc_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "mazes":
+        train_loader, val_loader = get_mazes_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "correlated_dots":
+        train_loader, val_loader = get_correlated_dots_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "mnist":
+        train_loader, val_loader = get_mnist_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "cifar10":
+        train_loader, val_loader = get_cifar10_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "cifar100":
+        train_loader, val_loader = get_cifar100_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "mnistv1":
+        train_loader, val_loader = get_mnist_v1_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "cifar10v1":
+        train_loader, val_loader = get_cifar10_v1_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    elif config.dataset == "cifar100v1":
+        train_loader, val_loader = get_cifar100_v1_dataloaders(
+            **without_keys(config, ["dataset"]),
+            seed=seed,
+        )
+    else:
+        raise NotImplementedError(f"Dataset {config.dataset} not implemented")
+
+    return train_loader, val_loader
+
+
+def initialize_model(dataset: str, config: AttrDict) -> nn.Module:
+    """
+    Initialize a model based on the dataset and config.
+
+    Args:
+        dataset (str): The dataset to use.
+        config (AttrDict): The model configuration.
+
+    Returns:
+        nn.Module: The initialized model.
+    """
+    from bioplnn.models.classifiers import (
+        CRNNImageClassifier,
+        QCLEVRClassifier,
+        TopographicalImageClassifier,
+    )
+
+    if config.arch == "topographical_rnn":
+        model = TopographicalImageClassifier(**without_keys(config, ["arch"]))
+    elif config.arch == "crnn":
+        if dataset == "qclevr":
+            model = QCLEVRClassifier(**without_keys(config, ["arch"]))
+        else:
+            model = CRNNImageClassifier(**without_keys(config, ["arch"]))
+    else:
+        raise NotImplementedError(f"Model {config.arch} not implemented")
+
+    return model
+
+
+def initialize_optimizer(
+    model_parameters, fn, lr, momentum=0.9, beta1=0.9, beta2=0.9, **kwargs
+) -> torch.optim.Optimizer:
+    if fn == "sgd":
+        optimizer = torch.optim.SGD(
+            model_parameters,
+            lr=lr,
+            momentum=momentum,
+            **kwargs,
+        )
+    elif fn == "adam":
+        optimizer = torch.optim.Adam(
+            model_parameters,
+            lr=lr,
+            betas=(beta1, beta2),
+            **kwargs,
+        )
+    elif fn == "adamw":
+        optimizer = torch.optim.AdamW(
+            model_parameters,
+            lr=lr,
+            betas=(beta1, beta2),
+            **kwargs,
+        )
+    else:
+        raise NotImplementedError(f"Optimizer {fn} not implemented")
+
+    return optimizer
+
+
+def initialize_scheduler(optimizer, fn, max_lr, total_steps):
+    if fn is None:
+        scheduler = None
+    elif fn == "one_cycle":
+        scheduler = OneCycleLR(
+            optimizer,
+            max_lr=max_lr,
+            total_steps=total_steps,
+        )
+    else:
+        raise NotImplementedError(f"Scheduler {fn} not implemented")
+
+    return scheduler
+
+
+def initialize_criterion(fn: str) -> torch.nn.Module:
+    if fn == "ce":
+        criterion = torch.nn.CrossEntropyLoss()
+    else:
+        raise NotImplementedError(f"Criterion {fn} not implemented")
+
+    return criterion

@@ -1,17 +1,18 @@
-from .classifiers import ImageClassifier, QCLEVRClassifier
+from .classifiers import (
+    CRNNImageClassifier,
+    QCLEVRClassifier,
+    TopographicalImageClassifier,
+)
 from .ei_crnn import Conv2dEIRNN
-from .sparse import SparseLinear, SparseRChebyKAN, SparseRKAN, SparseRNN
-from .topography import TopographicalRChebyKAN, TopographicalRKAN, TopographicalRNN
+from .sparse import SparseLinear, SparseRNN
+from .topography import TopographicalRNN
 
 __all__ = [
-    "ImageClassifier",
-    "QCLEVRClassifier",
     "Conv2dEIRNN",
+    "CRNNImageClassifier",
+    "QCLEVRClassifier",
     "SparseLinear",
     "SparseRNN",
-    "SparseRKAN",
-    "SparseRChebyKAN",
+    "TopographicalImageClassifier",
     "TopographicalRNN",
-    "TopographicalRKAN",
-    "TopographicalRChebyKAN",
 ]

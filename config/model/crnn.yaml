@@ -1,0 +1,53 @@
+rnn_kwargs:
+  in_size: [32, 32]
+  in_channels: 3
+  h_pyr_channels: [16, 32, 64, 128]
+  h_inter_channels:
+    - [16]
+    - [32]
+    - [64]
+    - [128]
+  fb_channels: [16, 32, 64, 128]
+  exc_kernel_size:
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+  inh_kernel_size:
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+  fb_kernel_size:
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+    - [3, 3]
+  use_three_compartments: false
+  immediate_inhibition: false
+  num_layers: 4
+  inter_mode: same
+  layer_time_delay: false
+  exc_rectify: true
+  inh_rectify: true
+  hidden_init_mode: zeros
+  fb_init_mode: zeros
+  out_init_mode: zeros
+  fb_adjacency:
+    - [0, 0, 0, 0]
+    - [1, 0, 0, 0]
+    - [0, 1, 0, 0]
+    - [0, 0, 1, 0]
+  pool_kernel_size: [5, 5]
+  pool_stride: [2, 2]
+  pool_global: false
+  bias: true
+  pre_inh_activation: relu6
+  post_inh_activation: relu
+  post_integration_activation: null
+  tau_mode: channel
+  batch_first: true
+arch: crnn
+num_classes: 10
+fc_dim: 256
+dropout: 0.5

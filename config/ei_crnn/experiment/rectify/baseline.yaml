@@ -1,5 +1,0 @@
-# @package _global_
-model:
-  rnn_kwargs:
-    exc_rectify: false
-    inh_rectify: true
