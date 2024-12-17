@@ -9,7 +9,7 @@ from bioplnn.models.topography import TopographicalRNN
 from bioplnn.utils import get_activation_class
 
 
-class TopographicalImageClassifier(nn.Module):
+class TopographicalImageClassifierBase(nn.Module):
     def __init__(
         self,
         rnn_kwargs,
@@ -34,6 +34,35 @@ class TopographicalImageClassifier(nn.Module):
             nn.Linear(fc_dim, num_classes),
         )
 
+
+class TopographicalImageClassifier(TopographicalImageClassifierBase):
+    def forward(
+        self,
+        x: torch.Tensor,
+        num_steps: Optional[int] = None,
+        loss_all_timesteps: bool = False,
+        return_activations: bool = False,
+    ):
+        outs, hs = self.rnn(
+            x,
+            num_steps=num_steps,
+        )
+
+        if self.rnn.batch_first:
+            outs = outs.transpose(0, 1)
+
+        if loss_all_timesteps:
+            pred = torch.stack([self.out_layer(out) for out in outs])
+        else:
+            pred = self.out_layer(outs[-1])
+
+        if return_activations:
+            return pred, outs, hs
+        else:
+            return pred
+
+
+class TopographicalImageClassifierODE(TopographicalImageClassifierBase):
     def forward(
         self,
         x: torch.Tensor,

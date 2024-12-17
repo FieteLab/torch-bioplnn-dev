@@ -1,0 +1,17 @@
+rnn_kwargs:
+  sheet_size: [150, 300]
+  synapse_std: 10
+  synapses_per_neuron: 32
+  self_recurrence: true
+  connectivity_hh: null
+  connectivity_ih: null
+  input_indices: null
+  output_indices: null
+  hidden_init_mode: zeros
+  nonlinearity: tanh
+  use_layernorm: false
+  bias: true
+arch: topographical_rnn
+num_classes: 10
+fc_dim: 256
+dropout: 0.5

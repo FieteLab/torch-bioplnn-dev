@@ -1,3 +1,4 @@
+torchode
 opencv-python
 jupyterlab
 numpy

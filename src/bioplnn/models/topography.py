@@ -3,10 +3,8 @@ from os import PathLike
 from typing import Optional
 from warnings import warn
 
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from matplotlib import animation
 
 from bioplnn.models.sparse import SparseRNN
 from bioplnn.utils import idx_1D_to_2D, idx_2D_to_1D
@@ -95,14 +93,18 @@ class TopographicalRNN(SparseRNN):
     def _init_indices(self, input_indices, output_indices):
         if input_indices is not None:
             try:
-                input_indices = torch.load(input_indices).squeeze()
+                input_indices = torch.load(
+                    input_indices, weights_only=True
+                ).squeeze()
             except AttributeError:
                 pass
             if input_indices.dim() > 1:
                 raise ValueError("Input indices must be a 1D tensor")
         if output_indices is not None:
             try:
-                output_indices = torch.load(output_indices).squeeze()
+                output_indices = torch.load(
+                    output_indices, weights_only=True
+                ).squeeze()
             except AttributeError:
                 pass
             if output_indices.dim() > 1:
@@ -140,11 +142,15 @@ class TopographicalRNN(SparseRNN):
                     "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
                 )
             try:
-                connectivity_ih = torch.load(connectivity_ih)
+                connectivity_ih = torch.load(
+                    connectivity_ih, weights_only=True
+                )
             except AttributeError:
                 pass
             try:
-                connectivity_hh = torch.load(connectivity_hh)
+                connectivity_hh = torch.load(
+                    connectivity_hh, weights_only=True
+                )
             except AttributeError:
                 pass
             if (
@@ -193,7 +199,7 @@ class TopographicalRNN(SparseRNN):
             self_recurrence (bool): Whether to include self-recurrent connections.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
+            tuple[torch.Tensor, torcvvvvvvvh.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
         """
         # Generate random connectivity for hidden-to-hidden connections
         num_neurons = sheet_size[0] * sheet_size[1]
@@ -234,7 +240,6 @@ class TopographicalRNN(SparseRNN):
         ).coalesce()
 
         # Generate random connectivity for input-to-hidden connections
-
         indices_ih = torch.stack(
             (
                 self.input_indices
@@ -244,9 +249,7 @@ class TopographicalRNN(SparseRNN):
             )
         )
 
-        values_ih = torch.randn(indices_ih.shape[1]) * math.sqrt(
-            2 / synapses_per_neuron
-        )
+        values_ih = torch.ones(indices_ih.shape[1])
 
         connectivity_ih = torch.sparse_coo_tensor(
             indices_ih,
@@ -257,51 +260,18 @@ class TopographicalRNN(SparseRNN):
 
         return connectivity_ih, connectivity_hh
 
-    def visualize(self, activations, save_path=None, fps=4, frames=None):
-        """
-        Visualizes the activations of the TopographicalRNN as an animation.
+    def forward_ode(self, t, y, x):
+        h = y
 
-        Args:
-            activations (torch.Tensor): Tensor of activations.
-            save_path (str, optional): Path to save the animation. Defaults to None.
-            fps (int, optional): Frames per second for the animation. Defaults to 4.
-            frames (tuple[int, int], optional): Range of frames to visualize. Defaults to None.
-        """
-        if frames is not None:
-            activations = activations[frames[0] : frames[1]]
-        for i in range(len(activations)):
-            activations[i] = activations[i][0].reshape(*self.sheet_size)
+        x_t = self._get_x_t_ode(x, t)
 
-        # First set up the figure, the axis, and the plot element we want to animate
-        fig = plt.figure(figsize=(8, 8))
+        h = self.nonlinearity(self.ih(x_t) + self.hh(h))
+        h = self.layernorm(h)
 
-        im = plt.imshow(
-            activations[0], interpolation="none", aspect="auto", vmin=0, vmax=1
-        )
+        tau = torch.sigmoid(self.tau)
+        h = tau * h + (1 - tau) * h
 
-        def animate_func(i):
-            if i % fps == 0:
-                print(".", end="")
-
-            im.set_array(activations[i])
-            return [im]
-
-        anim = animation.FuncAnimation(
-            fig,
-            animate_func,
-            frames=len(activations),
-            interval=1000 / fps,  # in ms
-        )
-
-        if save_path is not None:
-            anim.save(
-                save_path,
-                fps=fps,
-            )
-        else:
-            plt.show(block=False)
-            plt.pause(5)
-            plt.close()
+        return h
 
     def forward(
         self,
@@ -336,7 +306,7 @@ class TopographicalRNN(SparseRNN):
         for t in range(num_steps):
             hs[t] = self.nonlinearity(self.ih(x[t]) + self.hh(hs[t - 1]))
             hs[t] = self.layernorm(hs[t])
-            tau = self.sigmoid(self.tau)
+            tau = torch.sigmoid(self.tau)
             hs[t] = tau * hs[t] + (1 - tau) * hs[t - 1]
 
         # Stack outputs and adjust dimensions if necessary

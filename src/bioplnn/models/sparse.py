@@ -156,7 +156,7 @@ class SparseRNN(nn.Module):
             hidden_size,
             connectivity_ih,
             feature_dim=0,
-            bias=bias,
+            bias=False,
         )
         self.hh = SparseLinear(
             hidden_size,
@@ -201,7 +201,7 @@ class SparseRNN(nn.Module):
 
         return func(batch_size, self.hidden_size, device=device)
 
-    def _init_state(
+    def init_state(
         self,
         h_0: Optional[torch.Tensor],
         num_steps: int,
@@ -266,6 +266,32 @@ class SparseRNN(nn.Module):
             )
         return x, num_steps
 
+    def _get_x_t_ode(self, x: torch.Tensor, t: torch.Tensor):
+        """
+        Formats the input tensor to match the expected shape.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            t (torch.Tensor): Time tensor.
+
+        Returns:
+            torch.Tensor: The formatted input tensor.
+        """
+        if x.dim() == 2:
+            x = x.t()
+        elif x.dim() == 3:
+            if self.batch_first:
+                x = x.permute(1, 2, 0)
+            else:
+                x = x.permute(0, 2, 1)
+            x = x[t]
+        else:
+            raise ValueError(
+                f"Input tensor must be 2D or 3D, but got {x.dim()} dimensions."
+            )
+
+        return x
+
     def _format_result(self, hs: list[torch.Tensor]):
         """
         Formats the hidden states.
@@ -284,8 +310,13 @@ class SparseRNN(nn.Module):
 
         return hs
 
-    def forward_ode(self, t, y, x):
+    def forward_ode(self, t, y, args):
         h = y
+
+        x = args["x"]
+
+        x = self._format_x_ode(x)
+
         h = self.nonlinearity(self.ih(x[t]) + self.hh(h))
         h = self.layernorm(h)
 
@@ -314,7 +345,7 @@ class SparseRNN(nn.Module):
 
         batch_size = x.shape[-1]
 
-        hs = self._init_state(
+        hs = self.init_state(
             h_0,
             num_steps,
             batch_size,

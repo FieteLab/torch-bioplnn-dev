@@ -47,29 +47,33 @@ class CorrelatedDots(Dataset):
         y = torch.rand(self.n_dots) * height
 
         # Determine the direction and speed vector for correlated dots
-        speed = (torch.rand(1) * self.max_speed).round()
-        direction = torch.randint(4, (1,)).squeeze()
+        correlated_speed = 0
+        while correlated_speed == 0:
+            correlated_speed = (torch.rand(1) * self.max_speed).ceil()
+        correlated_direction = torch.randint(4, (1,)).squeeze()
 
-        dx, dy = self.direction_vectors[direction.item()] * speed
+        correlated_dx, correlated_dy = (
+            self.direction_vectors[correlated_direction.item()]
+            * correlated_speed
+        )
 
         # Precompute random directions for uncorrelated dots
+        random_speed = torch.rand(self.n_dots) * self.max_speed
         random_directions = torch.rand(self.n_dots) * 2 * torch.pi
-        random_dx = torch.cos(random_directions) * speed
-        random_dy = torch.sin(random_directions) * speed
+        random_dx = torch.cos(random_directions) * random_speed
+        random_dy = torch.sin(random_directions) * random_speed
 
         # Generate each frame
         for _ in range(self.n_frames):
             # Create an empty frame
             frame = torch.zeros(height, width)
 
-            # Update dot positions
-            correlated_mask = (
-                torch.rand(self.n_dots) < self.correlation
-            )  # Determine which dots move in the correlated direction
+            # Determine which dots move in the correlated direction
+            correlated_mask = torch.rand(self.n_dots) < self.correlation
 
             # Apply correlated movement
-            x[correlated_mask] = (x[correlated_mask] + dx) % width
-            y[correlated_mask] = (y[correlated_mask] + dy) % height
+            x[correlated_mask] = (x[correlated_mask] + correlated_dx) % width
+            y[correlated_mask] = (y[correlated_mask] + correlated_dy) % height
 
             # Apply random movement to uncorrelated dots
             x[~correlated_mask] = (
@@ -90,4 +94,4 @@ class CorrelatedDots(Dataset):
 
         assert frames.shape == (self.n_frames, 1, height, width)
 
-        return frames, direction
+        return frames, correlated_direction

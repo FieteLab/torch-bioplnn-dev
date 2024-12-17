@@ -1,0 +1,12 @@
+defaults:
+  - topo
+  - _self_
+
+rnn_kwargs:
+  sheet_size: null
+  synapse_std: null
+  synapses_per_neuron: null
+  self_recurrence: null
+  connectivity_hh: connectivity/sunny/connectivity_hh.pt
+  connectivity_ih: connectivity/sunny/connectivity_ih.pt
+  input_indices: connectivity/sunny/input_indices.pt

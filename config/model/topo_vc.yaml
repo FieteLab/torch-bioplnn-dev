@@ -1,0 +1,11 @@
+defaults:
+  - topo
+  - _self_
+
+rnn_kwargs:
+  input_indices: connectivity/V1_indices_flat.pt
+  output_indices: connectivity/V4_indices_flat.pt
+arch: topographical_rnn
+num_classes: 10
+fc_dim: 256
+dropout: 0.5

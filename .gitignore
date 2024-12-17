@@ -13,7 +13,8 @@ ruff.toml
 slurm_scripts/
 test.ipynb
 activations/
-summary*
 bioplnn.egg-info/
 config_topography/
 visualizations/
+connectivity/sunny/
+post_proc/
