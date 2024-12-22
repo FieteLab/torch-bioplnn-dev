@@ -36,7 +36,7 @@ train:
 checkpoint:
   load: false
   root: checkpoints/ei
-  run: daily-armadillo-3361
+  run: avid-disco-3472
   epoch: null
 wandb:
   project: bioplnn
@@ -46,11 +46,7 @@ activations:
   save_root: activations/ei
   save_activations: true
   num_samples: 10
-visualizations:
-  enable: false
-  save_dir: visualizations
-  fps: 4
-  frames: [0, 20]
+  shuffle_test: true
 seed: null
 deterministic: false
 tqdm: true

@@ -44,6 +44,12 @@ def test(config: DictConfig) -> None:
         else:
             config.data.batch_size = 1
 
+    if (
+        config.data.dataset != "correlated_dots"
+        and config.activations.shuffle_test
+    ):
+        config.data.shuffle_test = True
+
     _, test_loader = initialize_dataloader(config.data, config.seed)
 
     # Record results
