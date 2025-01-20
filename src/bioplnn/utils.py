@@ -45,7 +45,7 @@ def manual_seed_deterministic(seed):
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 
-def get_activation_class(activation):
+def get_activation_class(activation: Optional[str] = None):
     if activation is None or activation == "identity":
         return nn.Identity
     elif activation == "relu":
@@ -72,6 +72,15 @@ def get_activation_class(activation):
         return nn.SiLU
     else:
         raise ValueError(f"Activation function {activation} not supported.")
+
+
+def get_activation(activation):
+    try:
+        return get_activation_class(activation)()
+    except ValueError:
+        return nn.Sequential(
+            *(get_activation_class(act)() for act in activation)
+        )
 
 
 def idx_1D_to_2D(x, m, n):
@@ -141,7 +150,7 @@ def expand_list(param, n, depth=0):
 
 def print_cuda_mem_stats():
     f, t = torch.cuda.mem_get_info()
-    print(f"Free/Total: {f/(1024**3):.2f}GB/{t/(1024**3):.2f}GB")
+    print(f"Free/Total: {f / (1024**3):.2f}GB/{t / (1024**3):.2f}GB")
 
 
 def count_parameters(model):
