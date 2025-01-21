@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch_sparse
 
-from bioplnn.utils import get_activation_class
+from bioplnn.utils import get_activation
 
 
 class SparseLinear(nn.Module):
@@ -147,7 +147,7 @@ class SparseRNN(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.hidden_init_mode = hidden_init_mode
-        self.nonlinearity = get_activation_class(nonlinearity)()
+        self.nonlinearity = get_activation(nonlinearity)
         self.batch_first = batch_first
 
         # Create layers and layer normalization modules

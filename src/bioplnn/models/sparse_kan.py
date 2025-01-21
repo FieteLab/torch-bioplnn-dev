@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from bioplnn.models.sparse import SparseLinear, SparseRNN
 from bioplnn.models.topography import TopographicalRNNBase
-from bioplnn.utils import expand_list, get_activation_class
+from bioplnn.utils import expand_list, get_activation
 
 
 class SparseSplineLinear(SparseLinear):
@@ -159,7 +159,7 @@ class SparseKANLayer(nn.Module):
 
         # Create base linear layer if use_base_update is True
         if use_base_update:
-            self.base_nonlinearity = get_activation_class(base_nonlinearity)()
+            self.base_nonlinearity = get_activation(base_nonlinearity)
             connectivity_base = torch.sparse_coo_tensor(
                 connectivity.indices().clone(),
                 connectivity.values().clone(),

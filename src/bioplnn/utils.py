@@ -45,7 +45,7 @@ def manual_seed_deterministic(seed):
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
 
-def get_activation_class(activation: Optional[str] = None):
+def _get_single_activation_class(activation: Optional[str] = None):
     if activation is None or activation == "identity":
         return nn.Identity
     elif activation == "relu":
@@ -74,12 +74,23 @@ def get_activation_class(activation: Optional[str] = None):
         raise ValueError(f"Activation function {activation} not supported.")
 
 
-def get_activation(activation):
-    try:
-        return get_activation_class(activation)()
-    except ValueError:
+def get_activation_class(activation: Optional[str] = None):
+    activations = [act.strip() for act in activation.split(",")]
+    if len(activations) == 1:
+        return _get_single_activation_class(activations[0])
+    else:
         return nn.Sequential(
-            *(get_activation_class(act)() for act in activation)
+            *[_get_single_activation_class(act) for act in activations]
+        )
+
+
+def get_activation(activation):
+    activations = [act.strip() for act in activation.split(",")]
+    if len(activations) == 1:
+        return _get_single_activation_class(activations[0])()
+    else:
+        return nn.Sequential(
+            *[_get_single_activation_class(act)() for act in activations]
         )
 
 

@@ -1,7 +1,8 @@
 import warnings
 from math import ceil
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -9,7 +10,6 @@ import torch.nn as nn
 from bioplnn.utils import (
     expand_list,
     get_activation,
-    get_activation_class,
 )
 
 
@@ -58,8 +58,8 @@ def circuit_connectivity_df(
     )
 
     if circuit_connectivity is None:
-        circuit_connectivity = torch.zeros(
-            (len(row_labels), len(column_labels)), dtype=torch.bool
+        circuit_connectivity = torch.full(
+            (len(row_labels), len(column_labels)), False, dtype=torch.bool
         )
 
     df = pd.DataFrame(
@@ -129,17 +129,16 @@ class Conv2dEIRNNCell(nn.Module):
             [1, 0],
             [0, 1],
         ],
+        rectify: bool | list[list[bool]] = False,
         kernel_size: tuple[int, int] | list[list[tuple[int, int]]] = (3, 3),
+        bias: bool | list[list[bool]] = True,
         out_pool_kernel_size: tuple[int, int] = (3, 3),
         out_pool_stride: Optional[tuple[int, int]] = None,
         out_pool_size: Optional[tuple[int, int]] = None,
-        rectify: bool | list[list[bool]] = False,
         inh_mode: str = "same",
-        pre_inh_activation: Optional[str | list[str]] = None,
-        post_inh_activation: Optional[str | list[str]] = "tanh",
-        post_integration_activation: Optional[str | list[str]] = None,
+        conv_activation: Optional[str | list[list[str]]] = None,
+        post_activation: Optional[str | list[str]] = "tanh",
         tau_mode: Optional[str] = "channel",
-        bias: bool = True,
     ):
         super().__init__()
 
@@ -173,6 +172,7 @@ class Conv2dEIRNNCell(nn.Module):
         else:
             self.out_size = in_size
 
+        # Format excitatory neuron channels
         try:
             iter(h_exc_channels)
         except TypeError:
@@ -180,6 +180,7 @@ class Conv2dEIRNNCell(nn.Module):
         else:
             self.h_exc_channels = h_exc_channels
 
+        # Format inhibitory neuron channels
         if h_inh_channels is not None:
             try:
                 iter(h_inh_channels)
@@ -189,54 +190,67 @@ class Conv2dEIRNNCell(nn.Module):
                 self.h_inh_channels = h_inh_channels
         else:
             self.h_inh_channels = []
-
         self.use_inh = bool(self.h_inh_channels)
 
-        # Create activation functions
-        self.pre_inh_activation = get_activation(pre_inh_activation)
-        self.post_inh_activation = get_activation(post_inh_activation)
-        self.post_integration_activation = get_activation(
-            post_integration_activation
-        )
-
+        # Format circuit connectivity
         self.circuit_connectivity = torch.tensor(circuit_connectivity)
-
-        if not (
-            self.circuit_connectivity.shape[0]
-            == len(self.h_exc_channels) + len(self.h_inh_channels) + 1
-            == self.circuit_connectivity.shape[1] - 1 - int(self.use_fb)
+        if (
+            self.circuit_connectivity.dim() != 2
+            or (
+                self.circuit_connectivity.shape[0]
+                != len(self.h_exc_channels) + len(self.h_inh_channels) + 1
+            )
+            or (
+                self.circuit_connectivity.shape[1]
+                != len(self.h_exc_channels)
+                + len(self.h_inh_channels)
+                + int(self.use_fb)
+                + 1
+            )
         ):
             raise ValueError(
                 "circuit_connectivity must be an array-like of shape (len(h_exc_channels) + len(h_inh_channels) + 1 [for output], len(h_exc_channels) + len(h_inh_channels) + 1 [for input] + int(use_fb) [for feedback])."
             )
 
-        try:
-            kernel_size[0][0][0]
-        except IndexError:
-            kernel_size = [
-                [kernel_size] * self.circuit_connectivity.shape[1]
-            ] * self.circuit_connectivity.shape[0]
+        # Format connectivity variables
+        def to_connectivity(
+            var: Any, name: str, transform: Callable = lambda x: x
+        ):
+            try:
+                var[0][0]
+            except IndexError:
+                var = [
+                    [var] * self.circuit_connectivity.shape[1]
+                    for _ in range(self.circuit_connectivity.shape[0])
+                ]
 
-        self.kernel_size = torch.tensor(kernel_size)
+            arr = np.empty(self.circuit_connectivity.shape, dtype=object)
 
-        if self.kernel_size.shape[:2] != self.circuit_connectivity.shape[:2]:
-            raise ValueError(
-                "kernel_size must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1], 2)."
-            )
+            if len(var) != self.circuit_connectivity.shape[0]:
+                raise ValueError(
+                    f"{name} must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1])."
+                )
+            for i in range(self.circuit_connectivity.shape[0]):
+                if len(var[i]) != self.circuit_connectivity.shape[1]:
+                    raise ValueError(
+                        f"{name} must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1])."
+                    )
+                for j in range(self.circuit_connectivity.shape[1]):
+                    arr[i, j] = (
+                        transform(var[i][j])
+                        if self.circuit_connectivity[i, j]
+                        else None
+                    )
 
-        try:
-            rectify[0, 0]
-        except IndexError:
-            rectify = [
-                [rectify] * self.circuit_connectivity.shape[1]
-            ] * self.circuit_connectivity.shape[0]
+            return arr
 
-        self.rectify = torch.tensor(rectify, dtype=torch.bool)
-
-        if self.rectify.shape[:2] != self.circuit_connectivity.shape[:2]:
-            raise ValueError(
-                "rectify must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1])."
-            )
+        self.kernel_size = to_connectivity(kernel_size, name="kernel_size")
+        self.rectify = to_connectivity(rectify, name="rectify")
+        self.conv_activations = to_connectivity(
+            conv_activation,
+            name="conv_activation",
+            transform=get_activation,
+        )
 
         # Initialize learnable membrane time constants
         tau_exc_shape_dict = {
@@ -252,14 +266,14 @@ class Conv2dEIRNNCell(nn.Module):
             "none": (1, 1, 1, 1),
         }
 
-        tau_mode = tau_mode if tau_mode is not None else "none"
+        self.tau_mode = tau_mode if tau_mode is not None else "none"
         try:
             self.tau_exc = nn.Parameter(
-                torch.randn(tau_exc_shape_dict[tau_mode])
+                torch.randn(tau_exc_shape_dict[self.tau_mode])
             )
             if self.use_inh:
                 self.tau_inh = nn.Parameter(
-                    torch.randn(tau_inh_shape_dict[tau_mode])
+                    torch.randn(tau_inh_shape_dict[self.tau_mode])
                 )
         except KeyError:
             raise ValueError(
@@ -501,16 +515,16 @@ class Conv2dEIRNNCell(nn.Module):
         out = 0
         for i in range(self.circuit_connectivity.shape[0]):
             if i == 0:
-                in_type = "input"
+                in_sign = 1
                 in_data = input
             elif self.use_fb and i == 1:
-                in_type = "feedback"
+                in_sign = 1
                 in_data = fb
             elif i < 1 + int(self.use_fb) + len(self.h_exc_channels):
-                in_type = "excitatory"
+                in_sign = 1
                 in_data = h_exc[i - 1 - int(self.use_fb)]
             else:
-                in_type = "inhibitory"
+                in_sign = -1
                 in_data = h_inh[
                     i - 1 - int(self.use_fb) - len(self.h_exc_channels)
                 ]
@@ -519,17 +533,17 @@ class Conv2dEIRNNCell(nn.Module):
                 if self.circuit_connectivity[i, j] == 1:
                     if j < len(self.h_exc_channels):
                         # excitatory
-                        excs[j] += self.convs[f"{i}->{j}"](in_data)
+                        excs[j] += in_sign * self.convs[f"{i}->{j}"](in_data)
                     elif j < len(self.h_exc_channels) + len(
                         self.h_inh_channels
                     ):
                         # inhibitory
-                        inhs[j - len(self.h_exc_channels)] += self.convs[
-                            f"{i}->{j}"
-                        ](in_data)
-
+                        inhs[j - len(self.h_exc_channels)] += (
+                            in_sign * self.convs[f"{i}->{j}"](in_data)
+                        )
                     else:
-                        out += self.convs[f"{i}->{j}"](in_data)
+                        # output
+                        out += in_sign * self.convs[f"{i}->{j}"](in_data)
 
         # Compute excitations for excitatory cells
         exc_cat = torch.cat(
@@ -765,7 +779,7 @@ class Conv2dEIRNN(nn.Module):
         self.hidden_init_mode = hidden_init_mode
         self.fb_init_mode = fb_init_mode
         self.out_init_mode = out_init_mode
-        fb_activation_class = get_activation_class(fb_activation)
+        self.fb_activation = get_activation(fb_activation)
 
         # Calculate input sizes for each layer
         self.in_sizes = [in_size]
@@ -829,7 +843,7 @@ class Conv2dEIRNN(nn.Module):
                             ),
                             bias=self.biases[j],
                         ),
-                        fb_activation_class(),
+                        self.fb_activation,
                     )
         elif any(self.fb_channels):
             raise ValueError(

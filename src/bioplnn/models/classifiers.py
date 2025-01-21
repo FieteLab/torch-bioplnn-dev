@@ -6,7 +6,7 @@ from torch import nn
 
 from bioplnn.models.ei_crnn import Conv2dEIRNN
 from bioplnn.models.topography import TopographicalRNN
-from bioplnn.utils import get_activation_class
+from bioplnn.utils import get_activation
 
 
 class TopographicalImageClassifierBase(nn.Module):
@@ -283,7 +283,7 @@ class ConvModulation(nn.Module):
             padding=(kernel_size[0] // 2, kernel_size[1] // 2),
             bias=bias,
         )
-        self.activation = get_activation_class(activation)()
+        self.activation = get_activation(activation)
         self.conv2 = nn.Conv2d(
             out_channels,
             out_channels,
@@ -352,7 +352,7 @@ class SelfAttnModulation(nn.Module):
         self.spatial_size = spatial_size
         embed_dim = spatial_size[0] * spatial_size[1]
 
-        self.activation = get_activation_class(activation)()
+        self.activation = get_activation(activation)
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
