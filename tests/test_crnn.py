@@ -1,9 +1,9 @@
+import hydra
+
 from bioplnn.models.ei_crnn import Conv2dEIRNNCell
 
 
 def test_cell():
-    import hydra
-
     # Load config
     with hydra.initialize(config_path="../config"):
         cfg = hydra.compose(

@@ -5,6 +5,7 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from addict import Dict as AttrDict
 from omegaconf import DictConfig, OmegaConf
@@ -12,7 +13,6 @@ from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from torch.optim.lr_scheduler import OneCycleLR
 from tqdm import tqdm
 
-import wandb
 from bioplnn.models.topography import (
     TopographicalRChebyKAN,
     TopographicalRKAN,

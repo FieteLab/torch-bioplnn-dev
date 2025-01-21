@@ -4,11 +4,11 @@ from traceback import print_exc
 
 import hydra
 import torch
+import wandb
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from tqdm import tqdm
 
-import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,

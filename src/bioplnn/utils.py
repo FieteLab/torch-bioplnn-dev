@@ -839,7 +839,7 @@ def get_cifar100_v1_dataloaders(
     )
 
 
-def initialize_dataloader(config: AttrDict, seed: Optional[int]):
+def initialize_dataloader(config: dict, seed: Optional[int]):
     if config.dataset == "qclevr":
         train_loader, val_loader = get_qclevr_dataloaders(
             **without_keys(config, ["dataset"]),
@@ -896,13 +896,13 @@ def initialize_dataloader(config: AttrDict, seed: Optional[int]):
     return train_loader, val_loader
 
 
-def initialize_model(dataset: str, config: AttrDict) -> nn.Module:
+def initialize_model(dataset: str, config: dict) -> nn.Module:
     """
     Initialize a model based on the dataset and config.
 
     Args:
         dataset (str): The dataset to use.
-        config (AttrDict): The model configuration.
+        config (dict): The model configuration.
 
     Returns:
         nn.Module: The initialized model.
@@ -921,7 +921,7 @@ def initialize_model(dataset: str, config: AttrDict) -> nn.Module:
         else:
             model = CRNNImageClassifier(**without_keys(config, ["arch"]))
     else:
-        raise NotImplementedError(f"Model {config.arch} not implemented")
+        raise NotImplementedError(f"Model {config['arch']} not implemented")
 
     return model
 

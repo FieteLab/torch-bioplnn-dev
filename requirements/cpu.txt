@@ -1,7 +1,3 @@
 -r common.txt
 --extra-index-url https://download.pytorch.org/whl/cpu
 -f https://data.pyg.org/whl/torch-2.5.1+cpu.html
-torch
-torchvision
-torch-scatter 
-torch-sparse

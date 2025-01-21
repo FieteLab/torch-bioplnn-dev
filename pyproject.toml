@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "bioplnn"
@@ -21,8 +21,25 @@ dependencies = [
   "torchode",
   "opencv-python",
   "matplotlib",
+  "pandas",
+  "addict",
+]
+
+[project.optional-dependencies]
+dev = [
+  "hydra-core",
+  "hydra-submitit-launcher",
+  "pre-commit",
+  "pytest",
+  "ruff",
+  "scikit-learn",
+  "tqdm",
+  "wandb",
 ]
 
 [project.urls]
 Homepage = "https://github.com/valmikikothare/bioplnn"
 Issues = "https://github.com/valmikikothare/bioplnn/issues"
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]

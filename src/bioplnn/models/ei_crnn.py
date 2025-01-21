@@ -2,6 +2,7 @@ import warnings
 from math import ceil
 from typing import Callable, Optional
 
+import pandas as pd
 import torch
 import torch.nn as nn
 
@@ -36,6 +37,38 @@ class Conv2dRectify(nn.Conv2d):
         if self.bias is not None:
             self.bias.data = torch.relu(self.bias.data)
         return super().forward(*args, **kwargs)
+
+
+def circuit_connectivity_df(
+    num_exc: int,
+    num_inh: int,
+    use_fb: bool,
+    circuit_connectivity: Optional[list[list[int]]] = None,
+):
+    row_labels = (
+        ["input"]
+        + (["fb"] if use_fb else [])
+        + [f"exc_{i}" for i in range(num_exc)]
+        + [f"inh_{i}" for i in range(num_inh)]
+    )
+    column_labels = (
+        [f"exc_{i}" for i in range(num_exc)]
+        + [f"inh_{i}" for i in range(num_inh)]
+        + ["output"]
+    )
+
+    if circuit_connectivity is None:
+        circuit_connectivity = torch.zeros(
+            (len(row_labels), len(column_labels)), dtype=torch.bool
+        )
+
+    df = pd.DataFrame(
+        circuit_connectivity, index=row_labels, columns=column_labels
+    )
+    df.index.name = "from"
+    df.columns.name = "to"
+
+    return df
 
 
 class Conv2dEIRNNCell(nn.Module):
@@ -93,7 +126,7 @@ class Conv2dEIRNNCell(nn.Module):
         h_inh_channels: Optional[int | list[int]] = None,
         fb_channels: Optional[int] = None,
         circuit_connectivity: list[list[int]] = [
-            [0, 1],
+            [1, 0],
             [0, 1],
         ],
         kernel_size: tuple[int, int] | list[list[tuple[int, int]]] = (3, 3),
@@ -239,7 +272,7 @@ class Conv2dEIRNNCell(nn.Module):
         # The convolution self.convs[f"{i}->{j}"] corresponds to the connection
         # from neuron class i to neuron class j.
         self.convs = nn.ModuleDict()
-        for i in range(circuit_connectivity.shape[0]):
+        for i in range(self.circuit_connectivity.shape[0]):
             if i == 0:
                 in_type = "input"
                 conv_in_channels = self.in_channels
@@ -463,6 +496,41 @@ class Conv2dEIRNNCell(nn.Module):
         if self.use_fb and fb is None:
             raise ValueError("If use_fb is True, fb must be provided.")
 
+        excs = [0] * len(self.h_exc_channels)
+        inhs = [0] * len(self.h_inh_channels)
+        out = 0
+        for i in range(self.circuit_connectivity.shape[0]):
+            if i == 0:
+                in_type = "input"
+                in_data = input
+            elif self.use_fb and i == 1:
+                in_type = "feedback"
+                in_data = fb
+            elif i < 1 + int(self.use_fb) + len(self.h_exc_channels):
+                in_type = "excitatory"
+                in_data = h_exc[i - 1 - int(self.use_fb)]
+            else:
+                in_type = "inhibitory"
+                in_data = h_inh[
+                    i - 1 - int(self.use_fb) - len(self.h_exc_channels)
+                ]
+
+            for j in range(self.circuit_connectivity.shape[1]):
+                if self.circuit_connectivity[i, j] == 1:
+                    if j < len(self.h_exc_channels):
+                        # excitatory
+                        excs[j] += self.convs[f"{i}->{j}"](in_data)
+                    elif j < len(self.h_exc_channels) + len(
+                        self.h_inh_channels
+                    ):
+                        # inhibitory
+                        inhs[j - len(self.h_exc_channels)] += self.convs[
+                            f"{i}->{j}"
+                        ](in_data)
+
+                    else:
+                        out += self.convs[f"{i}->{j}"](in_data)
+
         # Compute excitations for excitatory cells
         exc_cat = torch.cat(
             [h_exc, input, fb] if self.use_fb else [h_exc, input], dim=1
@@ -617,7 +685,7 @@ class Conv2dEIRNN(nn.Module):
         fb_activation (Optional[str]): Activation function for feedback connections.
         bias (bool | tuple[bool]): Whether to add bias for convolutions in each layer.
         layer_time_delay (bool): Whether to introduce a time delay between layers.
-        fb_adjacency (Optional[tuple[tuple[int | bool]] | torch.Tensor] = None): \ 
+        fb_adjacency (Optional[tuple[tuple[int | bool]] | torch.Tensor] = None): \
             Adjacency matrix for feedback connections.
         hidden_init_mode (str): Initialization mode for hidden states ('zeros' or
             'normal').
@@ -740,7 +808,7 @@ class Conv2dEIRNN(nn.Module):
 
             # Create feedback convolutions
             if exc_rectify:
-                Conv2dFb = Conv2dPositive
+                Conv2dFb = Conv2dRectify
             else:
                 Conv2dFb = nn.Conv2d
             self.fb_convs = nn.ModuleDict()

@@ -9,7 +9,12 @@ from torch.utils.data import Dataset
 
 class Mazes(Dataset):
     def __init__(
-        self, root, train=True, subset=1.0, return_metadata=False, transform=None
+        self,
+        root,
+        train=True,
+        subset=1.0,
+        return_metadata=False,
+        transform=None,
     ):
         if train:
             self.annotations_path = os.path.join(root, "mazes_train.json")
@@ -41,9 +46,9 @@ class Mazes(Dataset):
         if subset != 1:
             pos = [x for x in annotations if x["same"] == 1]
             neg = [x for x in annotations if x["same"] == 0]
-            annotations = random.sample(pos, int(subset * len(pos))) + random.sample(
-                neg, int(subset * len(neg))
-            )
+            annotations = random.sample(
+                pos, int(subset * len(pos))
+            ) + random.sample(neg, int(subset * len(neg)))
         data["serrelab_anns"] = annotations
 
         return data
@@ -71,8 +76,12 @@ class Mazes(Dataset):
         maze = self.mazes[record["id"]].copy()
         maze = np.transpose(maze, (1, 2, 0))
         # Remove red and green points from original data
-        y_values_red, x_values_red = np.where(np.all(maze == (1, 0, 0), axis=-1))
-        y_values_green, x_values_green = np.where(np.all(maze == (0, 1, 0), axis=-1))
+        y_values_red, x_values_red = np.where(
+            np.all(maze == (1, 0, 0), axis=-1)
+        )
+        y_values_green, x_values_green = np.where(
+            np.all(maze == (0, 1, 0), axis=-1)
+        )
 
         maze[y_values_red, x_values_red, :] = (1.0, 1.0, 1.0)
         maze[y_values_green, x_values_green, :] = (1.0, 1.0, 1.0)
@@ -131,10 +140,14 @@ class Mazes(Dataset):
             :,
         ] = 1
         dot_channel[
-            record["cue_top_y"] // self.annotation_scaling : record["cue_top_y"]
+            record["cue_top_y"] // self.annotation_scaling : record[
+                "cue_top_y"
+            ]
             // self.annotation_scaling
             + self.cue_size,
-            record["cue_left_x"] // self.annotation_scaling : record["cue_left_x"]
+            record["cue_left_x"] // self.annotation_scaling : record[
+                "cue_left_x"
+            ]
             // self.annotation_scaling
             + self.cue_size,
             :,

@@ -60,7 +60,7 @@ Args:
     fb_activation (Optional[str]): Activation function for feedback connections.
     bias (bool | tuple[bool]): Whether to add bias for convolutions in each layer.
     layer_time_delay (bool): Whether to introduce a time delay between layers.
-    fb_adjacency (Optional[tuple[tuple[int | bool]] | torch.Tensor] = None): \ 
+    fb_adjacency (Optional[tuple[tuple[int | bool]] | torch.Tensor] = None): \
         Adjacency matrix for feedback connections.
     hidden_init_mode (str): Initialization mode for hidden states ('zeros' or
         'normal').
@@ -143,9 +143,9 @@ rnn = Conv2dEIRNN(
     h_pyr_channels=(16, 16),
     h_inter_channels=(4, 4, 4),
     fb_adjacency=(
-        (1, 1, 1, 0, 1), 
-        (1, 1, 0, 1, 1), 
-        (1, 0, 1, 0, 0), 
+        (1, 1, 1, 0, 1),
+        (1, 1, 0, 1, 1),
+        (1, 0, 1, 0, 0),
         (0, 1, 0, 1, 0),
         (1, 1, 1, 1, 1)
     ),

@@ -5,13 +5,13 @@ from typing import Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,

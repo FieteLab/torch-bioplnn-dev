@@ -1,0 +1,9 @@
+-r common.txt
+hydra-core
+hydra-submitit-launcher
+pre-commit
+pytest
+ruff
+scikit-learn
+tqdm
+wandb

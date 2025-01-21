@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 """
-Sensoy, M., Kaplan, L., & Kandemir, M. (2018). Evidential deep learning to quantify classification uncertainty. 
-Advances in Neural Information Processing Systems, 
+Sensoy, M., Kaplan, L., & Kandemir, M. (2018). Evidential deep learning to quantify classification uncertainty.
+Advances in Neural Information Processing Systems,
 31. https://papers.nips.cc/paper_files/paper/2018/hash/a981f2b708044d6fb4a71a1463242520-Abstract.html
 
 """

@@ -112,18 +112,29 @@ class QCLEVRDataset(Dataset):
             root = root[:-1]
         if not os.path.exists(root):
             raise ValueError(f"root path '{root}' does not exist")
-        if not (self.split == "train" or self.split == "valid" or self.split == "test"):
+        if not (
+            self.split == "train"
+            or self.split == "valid"
+            or self.split == "test"
+        ):
             raise ValueError("split must be 'train', 'valid', or 'test'")
 
         self.modes_avail = (
-            ["color", "shape", "conjunction"] if self.mode == "every" else [self.mode]
+            ["color", "shape", "conjunction"]
+            if self.mode == "every"
+            else [self.mode]
         )
         self.data_paths = {
-            _mode: os.path.join(root, "{}_{}".format(self.split, _mode), "images")
+            _mode: os.path.join(
+                root, "{}_{}".format(self.split, _mode), "images"
+            )
             for _mode in self.modes_avail
         }
         if not all(
-            [os.path.exists(data_path) for data_path in self.data_paths.values()]
+            [
+                os.path.exists(data_path)
+                for data_path in self.data_paths.values()
+            ]
         ):
             raise ValueError("Data paths for all modes must exist.")
 
@@ -133,7 +144,11 @@ class QCLEVRDataset(Dataset):
         # populate this by reading in meta data
         parent_dir = os.path.dirname(self.root)
         cache_dir = os.path.join(
-            parent_dir, "qclevr_cache", self.split, mode, f"holdout={self.holdout}"
+            parent_dir,
+            "qclevr_cache",
+            self.split,
+            mode,
+            f"holdout={self.holdout}",
         )
         os.makedirs(cache_dir, exist_ok=True)
         cache_path = os.path.join(cache_dir, "cache.json")
@@ -156,7 +171,9 @@ class QCLEVRDataset(Dataset):
             )
 
         if len(self.files) == 0:
-            raise ValueError("No files found in the dataset. Check your parameters.")
+            raise ValueError(
+                "No files found in the dataset. Check your parameters."
+            )
 
         """
         object colors: gray, red, blue, green, brown, purple, cyan, yellow
@@ -193,7 +210,9 @@ class QCLEVRDataset(Dataset):
                 self.cue_assets[shape][color] = Image.open(path).convert("RGB")
         else:
             if cue_assets_root is not None:
-                raise ValueError("cue_assets_root must be None if primitive is True")
+                raise ValueError(
+                    "cue_assets_root must be None if primitive is True"
+                )
 
     def get_file(self, mode, scene_path):
         scene = json.load(open(scene_path, "r"))
@@ -204,7 +223,9 @@ class QCLEVRDataset(Dataset):
             self.split in ("valid", "test")
             and (len(self.holdout) == 0 or cue_type in self.holdout)
         ):
-            image_path = os.path.join(self.data_paths[mode], scene["image_filename"])
+            image_path = os.path.join(
+                self.data_paths[mode], scene["image_filename"]
+            )
             if not os.path.exists(image_path):
                 raise ValueError(f"Image path '{image_path}' does not exist")
             return image_path, scene["cue"], scene["target_count"], mode
@@ -223,7 +244,8 @@ class QCLEVRDataset(Dataset):
             if self.num_workers > 1:
                 path, cue, count, mode = zip(
                     *pool.starmap(
-                        self.get_file, zip([_mode] * len(scene_paths), scene_paths)
+                        self.get_file,
+                        zip([_mode] * len(scene_paths), scene_paths),
                     )
                 )
             else:
@@ -248,7 +270,9 @@ class QCLEVRDataset(Dataset):
         return paths, cues, counts, modes
 
     @staticmethod
-    def draw_shape(image_size, shape_type, size=None, radius=None, color=(255, 0, 0)):
+    def draw_shape(
+        image_size, shape_type, size=None, radius=None, color=(255, 0, 0)
+    ):
         # Create a new image with a black background
         image = Image.new("RGB", image_size, "black")
         draw = ImageDraw.Draw(image)
@@ -259,7 +283,10 @@ class QCLEVRDataset(Dataset):
         if shape_type == "cylinder":
             if size is None:
                 raise ValueError("Size must be provided for a cylinder.")
-            width, height = int(size[0] * scale_factor), int(size[1] * scale_factor)
+            width, height = (
+                int(size[0] * scale_factor),
+                int(size[1] * scale_factor),
+            )
             cap_size = 25
 
             # Calculate the maximum allowed coordinates for the shape to be fully inside the canvas
@@ -275,8 +302,14 @@ class QCLEVRDataset(Dataset):
             )
 
             # Draw top cap (ellipse)
-            x1_top, y1_top = center[0] - width // 2, center[1] + height // 2 - cap_size
-            x2_top, y2_top = center[0] + width // 2, center[1] + height // 2 + cap_size
+            x1_top, y1_top = (
+                center[0] - width // 2,
+                center[1] + height // 2 - cap_size,
+            )
+            x2_top, y2_top = (
+                center[0] + width // 2,
+                center[1] + height // 2 + cap_size,
+            )
             draw.ellipse([x1_top, y1_top, x2_top, y2_top], fill=color)
 
             # Draw body (rectangle)
@@ -293,7 +326,9 @@ class QCLEVRDataset(Dataset):
                 center[0] + width // 2,
                 center[1] - height // 2 + cap_size,
             )
-            draw.ellipse([x1_bottom, y1_bottom, x2_bottom, y2_bottom], fill=color)
+            draw.ellipse(
+                [x1_bottom, y1_bottom, x2_bottom, y2_bottom], fill=color
+            )
 
         elif shape_type == "cube":
             if size is None:
@@ -338,7 +373,9 @@ class QCLEVRDataset(Dataset):
             draw.ellipse([x1, y1, x2, y2], fill=color)
 
         else:
-            raise ValueError("Invalid shape_type. Use 'cylinder', 'cube', or 'sphere'.")
+            raise ValueError(
+                "Invalid shape_type. Use 'cylinder', 'cube', or 'sphere'."
+            )
 
         return image
 
@@ -400,7 +437,9 @@ class QCLEVRDataset(Dataset):
         elif mode == "conjunction":
             cue = self.gen_conjunction(img, cue_str)
         else:
-            raise ValueError("Invalid mode. Must be 'color', 'shape', or 'conjunction'")
+            raise ValueError(
+                "Invalid mode. Must be 'color', 'shape', or 'conjunction'"
+            )
 
         if self.return_metadata:
             if mode == "conjunction":
