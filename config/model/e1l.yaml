@@ -3,7 +3,6 @@ defaults:
   - _self_
 
 rnn_kwargs:
-  h_pyr_channels: 32
   h_inter_channels: null
   fb_channels: null
   exc_kernel_size: [3, 3]

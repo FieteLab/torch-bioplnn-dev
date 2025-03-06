@@ -5,13 +5,13 @@ from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
+import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,
@@ -72,9 +72,7 @@ def _train(
 
     bar = tqdm(
         train_loader,
-        desc=(
-            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
-        ),
+        desc=(f"Training | Epoch: {epoch} | Loss: {0:.4f} | Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
     for i, (x, labels) in enumerate(iterable=bar):
@@ -295,7 +293,9 @@ def train(config: DictConfig) -> None:
     criterion = initialize_criterion(config.criterion.fn)
 
     # Get the data loaders
-    train_loader, val_loader = initialize_dataloader(config.data, config.seed)
+    train_loader, val_loader = initialize_dataloader(
+        seed=config.seed, **config.data
+    )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(

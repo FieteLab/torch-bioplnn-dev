@@ -1,17 +1,18 @@
 import os
 import sys
+from collections.abc import Callable
 from traceback import print_exc
 from typing import Optional
 
 import hydra
 import torch
-import wandb
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
+import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,
@@ -27,7 +28,7 @@ from bioplnn.utils import (
 
 def _train(
     config: AttrDict,
-    model: nn.Module,
+    model: nn.Module | Callable,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[torch.optim.lr_scheduler.LRScheduler],
     criterion: torch.nn.Module,
@@ -35,7 +36,7 @@ def _train(
     epoch: int,
     global_step: int,
     device: torch.device,
-) -> tuple[float, float]:
+) -> tuple[float, float, int]:
     """
     Perform a single training iteration.
 
@@ -72,9 +73,7 @@ def _train(
 
     bar = tqdm(
         train_loader,
-        desc=(
-            f"Training | Epoch: {epoch} | " f"Loss: {0:.4f} | " f"Acc: {0:.2%}"
-        ),
+        desc=(f"Training | Epoch: {epoch} | Loss: {0:.4f} | Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
     for i, (x, labels) in enumerate(iterable=bar):
@@ -156,7 +155,7 @@ def _train(
 
 def _validate(
     config: AttrDict,
-    model: nn.Module,
+    model: nn.Module | Callable,
     criterion: torch.nn.Module,
     val_loader: torch.utils.data.DataLoader,
     device: torch.device,
@@ -172,7 +171,7 @@ def _validate(
         device (torch.device): The device to perform computations on.
 
     Returns:
-        tuple: A tuple containing the val loss and accuracy.
+        tuple[float, float]: A tuple containing the val loss and accuracy.
     """
     model.eval()
     val_loss = 0.0
@@ -226,7 +225,7 @@ def _validate(
     return val_loss, val_acc
 
 
-def train(config: DictConfig) -> None:
+def train(dict_config: DictConfig) -> None:
     """
     Train the model using the provided configuration.
 
@@ -234,7 +233,7 @@ def train(config: DictConfig) -> None:
         config (dict): Configuration parameters.
     """
 
-    config = OmegaConf.to_container(config, resolve=True)
+    config = OmegaConf.to_container(dict_config, resolve=True)
     config = AttrDict(config)
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))
@@ -252,10 +251,10 @@ def train(config: DictConfig) -> None:
         settings=wandb.Settings(start_method="thread"),
         **config.wandb,
     )
-    global_step = 0
+    global_step: int = 0
 
     if config.wandb.mode != "disabled":
-        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)  # type: ignore
     else:
         checkpoint_dir = os.path.join(
             config.checkpoint.root, config.checkpoint.run
@@ -282,43 +281,49 @@ def train(config: DictConfig) -> None:
 
     # Initialize model
     model = initialize_model(
-        dataset=config.data.dataset, config=config.model
+        class_name=config.model.arch,
+        dataset=config.data.dataset,
+        **config.model,
     ).to(device)
 
     # Compile the model if requested
     model = torch.compile(model, **config.compile)
 
     # Initialize the optimizer
-    optimizer = initialize_optimizer(model.parameters(), **config.optimizer)
+    optimizer = initialize_optimizer(
+        model_parameters=model.parameters(), **config.optimizer
+    )
 
     # Initialize the loss function
-    criterion = initialize_criterion(config.criterion.fn)
+    criterion = initialize_criterion(**config.criterion)
 
     # Get the data loaders
-    train_loader, val_loader = initialize_dataloader(config.data, config.seed)
+    train_loader, val_loader = initialize_dataloader(
+        **config.data, seed=config.seed
+    )
 
     # Initialize the learning rate scheduler
     scheduler = initialize_scheduler(
-        optimizer,
-        fn=config.scheduler.fn,
+        optimizer=optimizer,
         max_lr=config.optimizer.lr,
         total_steps=len(train_loader) * config.train.epochs,
+        **config.scheduler,
     )
 
     for epoch in range(config.train.epochs):
         print(f"Epoch {epoch}/{config.train.epochs}")
-        wandb.log(dict(epoch=epoch), step=global_step)
+        wandb.log({"epoch": epoch}, step=global_step)
         # Train the model
         train_loss, train_acc, global_step = _train(
-            config,
-            model,
-            optimizer,
-            scheduler,
-            criterion,
-            train_loader,
-            epoch,
-            global_step,
-            device,
+            config=config,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            criterion=criterion,
+            train_loader=train_loader,
+            epoch=epoch,
+            global_step=global_step,
+            device=device,
         )
         wandb.log(
             dict(train_loss=train_loss, train_acc=train_acc), step=global_step
@@ -326,7 +331,11 @@ def train(config: DictConfig) -> None:
 
         # Evaluate the model on the validation set
         val_loss, val_acc = _validate(
-            config, model, criterion, val_loader, device
+            config=config,
+            model=model,
+            criterion=criterion,
+            val_loader=val_loader,
+            device=device,
         )
         wandb.log(dict(test_loss=val_loss, test_acc=val_acc), step=global_step)
 

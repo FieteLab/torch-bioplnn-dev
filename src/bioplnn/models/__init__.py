@@ -1,16 +1,16 @@
 from .classifiers import (
     CRNNImageClassifier,
-    QCLEVRClassifier,
     TopographicalImageClassifier,
 )
-from .ei_crnn import Conv2dEIRNN
+from .ei_crnn import Conv2dEIRNN, Conv2dEIRNNLayer, Conv2dEIRNNLayerConfig
 from .sparse import SparseLinear, SparseRNN
 from .topography import TopographicalRNN
 
 __all__ = [
     "Conv2dEIRNN",
+    "Conv2dEIRNNLayer",
+    "Conv2dEIRNNLayerConfig",
     "CRNNImageClassifier",
-    "QCLEVRClassifier",
     "SparseLinear",
     "SparseRNN",
     "TopographicalImageClassifier",

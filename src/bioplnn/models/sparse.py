@@ -56,12 +56,14 @@ class SparseLinear(nn.Module):
             )
 
         # Create sparse matrix
+        indices: torch.Tensor
+        values: torch.Tensor
         indices, values = torch_sparse.coalesce(
             connectivity.indices().clone(),
             connectivity.values().clone(),
             self.out_features,
             self.in_features,
-        )
+        )  # type: ignore
 
         self.indices = nn.Parameter(indices, requires_grad=False)
         self.values = nn.Parameter(values.float(), requires_grad=requires_grad)
@@ -106,7 +108,7 @@ class SparseLinear(nn.Module):
             x = x + self.bias
 
         if self.feature_dim != 0:
-            x = x.permute(*permutation)
+            x = x.permute(*permutation)  # type: ignore
 
         shape[self.feature_dim] = self.out_features
         x = x.view(*shape)
@@ -133,10 +135,10 @@ class SparseRNN(nn.Module):
 
     def __init__(
         self,
-        input_size: int | list[int],
-        hidden_size: int | list[int],
-        connectivity_ih: torch.Tensor | list[torch.Tensor],
-        connectivity_hh: torch.Tensor | list[torch.Tensor],
+        input_size: int,
+        hidden_size: int,
+        connectivity_ih: torch.Tensor,
+        connectivity_hh: torch.Tensor,
         hidden_init_mode: str = "zeros",
         use_layernorm: bool = False,
         nonlinearity: str = "tanh",
@@ -175,7 +177,7 @@ class SparseRNN(nn.Module):
         batch_size: int,
         init_mode: str = "zeros",
         device: Optional[torch.device] = None,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> torch.Tensor:
         """
         Initializes the hidden state.
 
@@ -188,18 +190,9 @@ class SparseRNN(nn.Module):
             torch.Tensor: The initialized hidden state.
         """
 
-        if init_mode == "zeros":
-            func = torch.zeros
-        elif init_mode == "ones":
-            func = torch.ones
-        elif init_mode == "randn":
-            func = torch.randn
-        else:
-            raise ValueError(
-                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
-            )
-
-        return func(batch_size, self.hidden_size, device=device)
+        return getattr(torch, init_mode)(
+            batch_size, self.hidden_size, device=device
+        )
 
     def init_state(
         self,
@@ -207,7 +200,7 @@ class SparseRNN(nn.Module):
         num_steps: int,
         batch_size: int,
         device=None,
-    ):
+    ) -> list[torch.Tensor]:
         """
         Initializes the internal state of the network.
 
@@ -218,10 +211,9 @@ class SparseRNN(nn.Module):
             device (torch.device, optional): Device to allocate tensors.
 
         Returns:
-            torch.Tensor: The initialized hidden states for each time step.
+            list[Optional[torch.Tensor]]: The initialized hidden states for each time step.
         """
-        # Initialize outputs and hidden state buffers
-        hs = [None] * num_steps
+        hs: list[torch.Tensor] = [None] * num_steps  # type: ignore
 
         if h_0 is None:
             hs[-1] = self._init_hidden(
@@ -292,7 +284,7 @@ class SparseRNN(nn.Module):
 
         return x
 
-    def _format_result(self, hs: list[torch.Tensor]):
+    def _format_result(self, hs: list[torch.Tensor]) -> torch.Tensor:
         """
         Formats the hidden states.
 
@@ -302,13 +294,13 @@ class SparseRNN(nn.Module):
         Returns:
             torch.Tensor: The formatted hidden states.
         """
-        hs = torch.stack(hs)
+        h = torch.stack(hs)
         if self.batch_first:
-            hs = hs.permute(2, 0, 1)
+            h = h.permute(2, 0, 1)
         else:
-            hs = hs.permute(0, 2, 1)
+            h = h.permute(0, 2, 1)
 
-        return hs
+        return h
 
     def forward_ode(self, t, y, args):
         h = y
@@ -327,7 +319,7 @@ class SparseRNN(nn.Module):
         x: torch.Tensor,
         num_steps: Optional[int] = None,
         h_0: Optional[torch.Tensor] = None,
-    ):
+    ) -> torch.Tensor:
         """
         Forward pass of the SparseRNN layer.
 

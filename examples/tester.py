@@ -4,11 +4,11 @@ from traceback import print_exc
 
 import hydra
 import torch
-import wandb
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from tqdm import tqdm
 
+import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,
@@ -130,7 +130,9 @@ def test(config: DictConfig) -> None:
     criterion = initialize_criterion(config.criterion.fn)
 
     # Initialize Test Dataloader
-    _, test_loader = initialize_dataloader(config.data, config.seed)
+    _, test_loader = initialize_dataloader(
+        **config.data.dataset, seed=config.seed
+    )
 
     # Compute loss and accuracy on test data
     loss, acc = _test(config, model, criterion, test_loader, device)

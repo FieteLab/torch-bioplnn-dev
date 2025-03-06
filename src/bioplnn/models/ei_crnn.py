@@ -1,16 +1,57 @@
 import warnings
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 from math import ceil
-from typing import Any, Callable, Optional
+from typing import Any, Optional, TypeVar, Union
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from numpy.typing import NDArray
 
 from bioplnn.utils import (
+    expand_array_2d,
     expand_list,
     get_activation,
+    init_tensor,
 )
+
+TensorInitFnType = Callable[..., torch.Tensor]
+ActivationFnType = Callable[[torch.Tensor], torch.Tensor]
+T = TypeVar("T", bound=Any)
+Param1dType = Union[T, list[T], NDArray[T]]
+Param2dType = Union[T, list[list[T]], NDArray[T]]
+
+
+def circuit_connectivity_df(
+    num_exc: int,
+    num_inh: int,
+    use_fb: bool,
+    circuit_connectivity: Optional[Param2dType] = None,
+):
+    row_labels = (
+        ["input"]
+        + (["fb"] if use_fb else [])
+        + [f"exc_{i}" for i in range(num_exc)]
+        + [f"inh_{i}" for i in range(num_inh)]
+    )
+    column_labels = (
+        [f"exc_{i}" for i in range(num_exc)]
+        + [f"inh_{i}" for i in range(num_inh)]
+        + ["output"]
+    )
+
+    if circuit_connectivity is None:
+        circuit_connectivity = [[0] * len(column_labels)] * len(row_labels)
+
+    df = pd.DataFrame(
+        circuit_connectivity, index=row_labels, columns=column_labels
+    )
+    df.index.name = "from"
+    df.columns.name = "to"
+
+    return df
 
 
 class Conv2dRectify(nn.Conv2d):
@@ -39,39 +80,39 @@ class Conv2dRectify(nn.Conv2d):
         return super().forward(*args, **kwargs)
 
 
-def circuit_connectivity_df(
-    num_exc: int,
-    num_inh: int,
-    use_fb: bool,
-    circuit_connectivity: Optional[list[list[int]]] = None,
-):
-    row_labels = (
-        ["input"]
-        + (["fb"] if use_fb else [])
-        + [f"exc_{i}" for i in range(num_exc)]
-        + [f"inh_{i}" for i in range(num_inh)]
+@dataclass(kw_only=True, slots=True)
+class Conv2dEIRNNLayerConfig:
+    """
+    Configuration class for Conv2dEIRNN layers.
+    """
+
+    spatial_size: tuple[int, int]
+    in_channels: int
+    out_channels: int
+    num_neuron_types: int = 1
+    neuron_channels: Param1dType[int] = 16
+    neuron_type: Param1dType[str] = "excitatory"
+    neuron_spatial_mode: Param1dType[str] = "same"
+    fb_channels: Optional[int] = None
+    conv_connectivity: Param2dType[int | bool] = field(
+        default_factory=lambda: [[1, 0], [0, 1]]
     )
-    column_labels = (
-        [f"exc_{i}" for i in range(num_exc)]
-        + [f"inh_{i}" for i in range(num_inh)]
-        + ["output"]
-    )
+    conv_rectify: Param2dType[bool] = False
+    conv_kernel_size: Param2dType[tuple[int, int]] = (3, 3)
+    conv_activation: Optional[Param2dType[str | ActivationFnType]] = None
+    conv_bias: Param2dType[bool] = True
+    post_agg_activation: Optional[Param1dType[str | ActivationFnType]] = "tanh"
+    tau_mode: Optional[Param1dType[str]] = "channel"
+    tau_init_mode: Param1dType[str | TensorInitFnType] = "zeros"
+    default_hidden_init_mode: str | TensorInitFnType = "zeros"
+    default_fb_init_mode: str | TensorInitFnType = "zeros"
+    default_out_init_mode: str | TensorInitFnType = "zeros"
 
-    if circuit_connectivity is None:
-        circuit_connectivity = torch.full(
-            (len(row_labels), len(column_labels)), False, dtype=torch.bool
-        )
-
-    df = pd.DataFrame(
-        circuit_connectivity, index=row_labels, columns=column_labels
-    )
-    df.index.name = "from"
-    df.columns.name = "to"
-
-    return df
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
-class Conv2dEIRNNCell(nn.Module):
+class Conv2dEIRNNLayer(nn.Module):
     """
     Implements a 2D convolutional recurrent neural network cell with excitatory \
     and inhibitory neurons.
@@ -118,311 +159,333 @@ class Conv2dEIRNNCell(nn.Module):
     """
 
     def __init__(
-        self,
-        in_size: tuple[int, int],
-        in_channels: int,
-        out_channels: int,
-        h_exc_channels: int | list[int] = 16,
-        h_inh_channels: Optional[int | list[int]] = None,
-        fb_channels: Optional[int] = None,
-        circuit_connectivity: list[list[int]] = [
-            [1, 0],
-            [0, 1],
-        ],
-        rectify: bool | list[list[bool]] = False,
-        kernel_size: tuple[int, int] | list[list[tuple[int, int]]] = (3, 3),
-        bias: bool | list[list[bool]] = True,
-        out_pool_kernel_size: tuple[int, int] = (3, 3),
-        out_pool_stride: Optional[tuple[int, int]] = None,
-        out_pool_size: Optional[tuple[int, int]] = None,
-        inh_mode: str = "same",
-        conv_activation: Optional[str | list[list[str]]] = None,
-        post_activation: Optional[str | list[str]] = "tanh",
-        tau_mode: Optional[str] = "channel",
+        self, config: Optional[Conv2dEIRNNLayerConfig] = None, **kwargs
     ):
         super().__init__()
 
-        # Store necessary parameters
-        self.in_size = in_size
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.fb_channels = fb_channels if fb_channels is not None else 0
-        self.use_fb = fb_channels > 0
+        #####################################################################
+        # Input, output, and feedback dimensions
+        #####################################################################
 
-        # Calculate inhibitory neuron size based on mode
-        if inh_mode == "half":
-            self.inh_size = (ceil(in_size[0] / 2), ceil(in_size[1] / 2))
-        elif inh_mode == "same":
-            self.inh_size = in_size
-        else:
-            raise ValueError("inh_mode must be 'half' or 'same'.")
+        if config is None:
+            config = Conv2dEIRNNLayerConfig(**kwargs)
 
-        # Calculate output size based on pooling
-        if out_pool_stride is not None:
-            if out_pool_size is not None:
-                raise ValueError(
-                    "out_pool_stride and out_pool_size cannot both be provided."
-                )
-            self.out_size = (
-                ceil(in_size[0] / out_pool_stride[0]),
-                ceil(in_size[1] / out_pool_stride[1]),
-            )
-        elif out_pool_size is not None:
-            self.out_size = out_pool_size
-        else:
-            self.out_size = in_size
+        self.spatial_size = config.spatial_size
+        self.in_channels = config.in_channels
+        self.out_channels = config.out_channels
+        self.fb_channels = (
+            config.fb_channels if config.fb_channels is not None else 0
+        )
+        self.use_fb = self.fb_channels > 0
 
-        # Format excitatory neuron channels
-        try:
-            iter(h_exc_channels)
-        except TypeError:
-            self.h_exc_channels = [h_exc_channels]
-        else:
-            self.h_exc_channels = h_exc_channels
+        #####################################################################
+        # Neuron dimensions
+        #####################################################################
+        self.num_neuron_types = config.num_neuron_types
 
-        # Format inhibitory neuron channels
-        if h_inh_channels is not None:
-            try:
-                iter(h_inh_channels)
-            except TypeError:
-                self.h_inh_channels = [h_inh_channels]
-            else:
-                self.h_inh_channels = h_inh_channels
-        else:
-            self.h_inh_channels = []
-        self.use_inh = bool(self.h_inh_channels)
-
-        # Format circuit connectivity
-        self.circuit_connectivity = torch.tensor(circuit_connectivity)
-        if (
-            self.circuit_connectivity.dim() != 2
-            or (
-                self.circuit_connectivity.shape[0]
-                != len(self.h_exc_channels) + len(self.h_inh_channels) + 1
-            )
-            or (
-                self.circuit_connectivity.shape[1]
-                != len(self.h_exc_channels)
-                + len(self.h_inh_channels)
-                + int(self.use_fb)
-                + 1
-            )
-        ):
-            raise ValueError(
-                "circuit_connectivity must be an array-like of shape (len(h_exc_channels) + len(h_inh_channels) + 1 [for output], len(h_exc_channels) + len(h_inh_channels) + 1 [for input] + int(use_fb) [for feedback])."
-            )
-
-        # Format connectivity variables
-        def to_connectivity(
-            var: Any, name: str, transform: Callable = lambda x: x
-        ):
-            try:
-                var[0][0]
-            except IndexError:
-                var = [
-                    [var] * self.circuit_connectivity.shape[1]
-                    for _ in range(self.circuit_connectivity.shape[0])
-                ]
-
-            arr = np.empty(self.circuit_connectivity.shape, dtype=object)
-
-            if len(var) != self.circuit_connectivity.shape[0]:
-                raise ValueError(
-                    f"{name} must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1])."
-                )
-            for i in range(self.circuit_connectivity.shape[0]):
-                if len(var[i]) != self.circuit_connectivity.shape[1]:
-                    raise ValueError(
-                        f"{name} must be an array-like of shape (circuit_connectivity.shape[0], circuit_connectivity.shape[1])."
-                    )
-                for j in range(self.circuit_connectivity.shape[1]):
-                    arr[i, j] = (
-                        transform(var[i][j])
-                        if self.circuit_connectivity[i, j]
-                        else None
-                    )
-
-            return arr
-
-        self.kernel_size = to_connectivity(kernel_size, name="kernel_size")
-        self.rectify = to_connectivity(rectify, name="rectify")
-        self.conv_activations = to_connectivity(
-            conv_activation,
-            name="conv_activation",
-            transform=get_activation,
+        # Format neuron type
+        self.neuron_channels = expand_list(
+            config.neuron_channels, self.num_neuron_types, depth=1
+        )
+        self.neuron_type = expand_list(
+            config.neuron_type, self.num_neuron_types, depth=1
+        )
+        self.neuron_spatial_mode = expand_list(
+            config.neuron_spatial_mode, self.num_neuron_types, depth=1
         )
 
-        # Initialize learnable membrane time constants
-        tau_exc_shape_dict = {
-            "channel": (1, sum(self.h_exc_channels), 1, 1),
-            "spatial": (1, 1, *self.in_size),
-            "channel_spatial": (1, sum(self.h_exc_channels), *self.in_size),
-            "none": (1, 1, 1, 1),
-        }
-        tau_inh_shape_dict = {
-            "channel": (1, sum(self.h_inh_channels), 1, 1),
-            "spatial": (1, 1, *self.inh_size),
-            "channel_spatial": (1, sum(self.h_inh_channels), *self.inh_size),
-            "none": (1, 1, 1, 1),
-        }
-
-        self.tau_mode = tau_mode if tau_mode is not None else "none"
-        try:
-            self.tau_exc = nn.Parameter(
-                torch.randn(tau_exc_shape_dict[self.tau_mode])
-            )
-            if self.use_inh:
-                self.tau_inh = nn.Parameter(
-                    torch.randn(tau_inh_shape_dict[self.tau_mode])
-                )
-        except KeyError:
+        if set(self.neuron_type) <= {"excitatory", "inhibitory"}:
             raise ValueError(
-                "tau_mode must be 'channel', 'spatial', 'channel_spatial', or None."
+                "neuron_type for each neuron type must be 'excitatory' or 'inhibitory'."
+            )
+        if set(self.neuron_spatial_mode) <= {"same", "half"}:
+            raise ValueError(
+                "neuron_spatial_mode for each neuron type must be 'same' or 'half'."
             )
 
-        # Create convolutional layers
+        # Save number of "types" for the input to and output from the layer
+        self.num_input_types = (
+            1 + int(self.use_fb) + self.num_neuron_types
+        )  # input + fb + neurons
+        self.num_output_types = self.num_neuron_types + 1  # neurons + output
+
+        # Calculate half spatial size
+        self.half_spatial_size = (
+            ceil(self.spatial_size[0] / 2),
+            ceil(self.spatial_size[1] / 2),
+        )
+
+        # Calculate spatial size for each neuron type based on spatial mode
+        self.neuron_spatial_size = [
+            self.spatial_size
+            if self.neuron_spatial_mode == "same"
+            else self.half_spatial_size
+            for self.neuron_spatial_mode in self.neuron_spatial_mode
+        ]
+        #####################################################################
+        # Circuit motif connectivity
+        #####################################################################
+
+        # Format circuit connectivity
+        self.connectivity = np.array(config.conv_connectivity)
+        if self.connectivity.shape != (
+            self.num_output_types,
+            self.num_input_types,
+        ):
+            raise ValueError(
+                "The shape of conv_connectivity must match the number of output and input types."
+            )
+
+        # Format connectivity variables to match circuit connectivity
+        self.conv_kernel_size = expand_array_2d(
+            config.conv_kernel_size,
+            self.conv_connectivity.shape[0],
+            self.conv_connectivity.shape[1],
+            depth=2,
+        )
+        self.conv_rectify = expand_array_2d(
+            config.conv_rectify,
+            self.conv_connectivity.shape[0],
+            self.conv_connectivity.shape[1],
+            depth=1,
+        )
+        self.conv_activation = expand_array_2d(
+            config.conv_activation,
+            self.conv_connectivity.shape[0],
+            self.conv_connectivity.shape[1],
+            depth=1,
+        )
+        self.conv_bias = expand_array_2d(
+            config.conv_bias,
+            self.conv_connectivity.shape[0],
+            self.conv_connectivity.shape[1],
+            depth=1,
+        )
+
+        #####################################################################
+        # Circuit motif convolutions
         # Here, we represent the circuit connectivity between neuron classes
-        # as an array of convolutions (implemented as a dictionary for efficiency).
-        # The convolution self.convs[f"{i}->{j}"] corresponds to the connection
-        # from neuron class i to neuron class j.
+        # as an array of convolutions (implemented as a dictionary for
+        # efficiency). The convolution self.convs[f"{i}->{j}"] corresponds
+        # to the connection from neuron class i to neuron class j.
+        #####################################################################
+
         self.convs = nn.ModuleDict()
-        for i in range(self.circuit_connectivity.shape[0]):
-            if i == 0:
-                in_type = "input"
+        for i, row in enumerate(self.conv_connectivity):
+            # Handle input neuron channel and spatial mode based on neuron type
+            conv_in_type = self.input_type_from_idx(i)
+            if conv_in_type == "input":
                 conv_in_channels = self.in_channels
-            elif self.use_fb and i == 1:
-                in_type = "feedback"
+                conv_in_spatial_mode = "same"
+            elif conv_in_type == "feedback":
                 conv_in_channels = self.fb_channels
-            elif i < 1 + int(self.use_fb) + len(self.h_exc_channels):
-                in_type = "excitatory"
-                conv_in_channels = self.h_exc_channels[
+                conv_in_spatial_mode = "same"
+            elif conv_in_type in ("excitatory", "inhibitory"):
+                conv_in_channels = self.neuron_channels[
+                    i - 1 - int(self.use_fb)
+                ]
+                conv_in_spatial_mode = self.neuron_spatial_mode[
                     i - 1 - int(self.use_fb)
                 ]
             else:
-                in_type = "inhibitory"
-                conv_in_channels = self.h_inh_channels[
-                    i - 1 - int(self.use_fb) - len(self.h_exc_channels)
-                ]
+                raise ValueError(f"Invalid neuron type: {conv_in_type}.")
 
-            for j in range(self.circuit_connectivity.shape[1]):
-                if self.circuit_connectivity[i, j] == 1:
-                    if self.rectify[i, j]:
-                        if in_type == "input":
+            if conv_in_spatial_mode not in ("same", "half"):
+                raise ValueError(
+                    f"Invalid neuron spatial mode: {conv_in_spatial_mode}."
+                )
+
+            # Handle output neurons
+            output_indices = np.nonzero(row)[0]
+            for j in output_indices:
+                if self.conv_connectivity[i, j]:
+                    # Handle rectification
+                    if self.conv_rectify[i, j]:
+                        if conv_in_type == "input":
                             warnings.warn(
                                 "Rectification of input neurons may hinder learning."
                             )
                         Conv2d = Conv2dRectify
                     else:
                         Conv2d = nn.Conv2d
-                    conv = nn.Sequential()
-                    stride = 1
-                    if j < len(self.h_exc_channels):
-                        # excitatory
-                        conv_out_channels = self.h_exc_channels[j]
-                        if in_type == "inhibitory" and self.inh_mode == "half":
-                            # inh -> exc
-                            do_upsample = True
-                    elif j < len(self.h_exc_channels) + len(
-                        self.h_inh_channels
-                    ):
-                        # inhibitory neuron
-                        conv_out_channels = self.h_inh_channels[
-                            j - len(self.h_exc_channels)
-                        ]
-                        if in_type == "inhibitory":
-                            # inh -> inh
-                            do_upsample = False
-                        elif self.inh_mode == "half":
-                            # exc/input/fb -> inh
-                            stride = 2
 
+                    # Handle output neuron channel and spatial mode based on neuron type
+                    conv_out_type = self.output_type_from_idx(j)
+                    if conv_out_type in ("excitatory", "inhibitory"):
+                        conv_out_channels = self.neuron_channels[j]
+                        conv_out_spatial_mode = self.neuron_spatial_mode[j]
                     else:
                         conv_out_channels = self.out_channels
-                        if in_type == "inhibitory" and self.inh_mode == "half":
-                            # inh -> out
-                            do_upsample = True
+                        conv_out_spatial_mode = "same"
 
-                    if do_upsample:
+                    # Handle stride upsampling if necessary
+                    conv = nn.Sequential()
+                    conv_stride = 1
+                    if (
+                        conv_in_spatial_mode == "half"
+                        and conv_out_spatial_mode == "same"
+                    ):
+                        conv_stride = 2
+                    elif (
+                        conv_in_spatial_mode == "same"
+                        and conv_out_spatial_mode == "half"
+                    ):
                         conv.append(
-                            nn.Upsample(size=self.in_size, mode="bilinear")
+                            nn.Upsample(
+                                size=self.spatial_size, mode="bilinear"
+                            )
                         )
+
+                    # Handle upsampling if necessary
                     conv.append(
                         Conv2d(
                             in_channels=conv_in_channels,
                             out_channels=conv_out_channels,
-                            kernel_size=self.kernel_size[i, j],
-                            stride=stride,
+                            kernel_size=self.conv_kernel_size[i, j],
+                            stride=conv_stride,
                             padding=(
-                                self.kernel_size[i, j, 0] // 2,
-                                self.kernel_size[i, j, 1] // 2,
+                                self.conv_kernel_size[i, j, 0] // 2,
+                                self.conv_kernel_size[i, j, 1] // 2,
                             ),
-                            bias=bias,
+                            bias=self.conv_bias[i, j],
                         )
                     )
+
                     self.convs[f"{i}->{j}"] = conv
 
-        # Initialize output pooling layer
-        if out_pool_stride is not None:
-            self.out_pool = nn.AvgPool2d(
-                kernel_size=out_pool_kernel_size,
-                stride=out_pool_stride,
-                padding=(
-                    out_pool_kernel_size[0] // 2,
-                    out_pool_kernel_size[1] // 2,
-                ),
+        #####################################################################
+        # Post convolution operations
+        #####################################################################
+
+        # Format post convolution activation functions
+        self.post_agg_activation = expand_list(
+            config.post_agg_activation, self.num_neuron_types
+        )
+
+        # Initialize membrane time constants
+        self.tau_mode = expand_list(config.tau_mode, self.num_neuron_types)
+        self.tau_init_mode = expand_list(
+            config.tau_init_mode, self.num_neuron_types
+        )
+
+        self.tau = nn.ParameterList()
+        for i in range(self.num_neuron_types):
+            tau_channels = 1
+            tau_spatial_size = (1, 1)
+            match self.tau_mode[i]:
+                case "spatial":
+                    tau_spatial_size = self.neuron_spatial_size[i]
+                case "channel":
+                    tau_channels = self.neuron_channels[i]
+                case "channel_spatial":
+                    tau_channels = self.neuron_channels[i]
+                    tau_spatial_size = self.neuron_spatial_size[i]
+                case None:
+                    pass
+                case _:
+                    raise ValueError(
+                        f"Invalid tau_mode: {self.tau_mode[i]}. Must be one of: 'spatial', 'channel', 'channel_spatial', or None."
+                    )
+
+            self.tau.append(
+                nn.Parameter(
+                    init_tensor(
+                        self.tau_init_mode[i],
+                        1,
+                        tau_channels,
+                        *tau_spatial_size,
+                    )
+                )
             )
-        elif out_pool_size is not None:
-            self.out_pool = nn.AdaptiveAvgPool2d(out_pool_size)
+
+        #####################################################################
+        # Tensor initialization
+        #####################################################################
+
+        self.default_hidden_init_mode = config.default_hidden_init_mode
+        self.default_fb_init_mode = config.default_fb_init_mode
+        self.default_out_init_mode = config.default_out_init_mode
+
+    def input_type_from_idx(self, idx: int) -> str:
+        if idx == 0:
+            return "input"
+        elif self.use_fb and idx == 1:
+            return "feedback"
         else:
-            self.out_pool = nn.Identity()
+            return self.neuron_type[idx - 1 - int(self.use_fb)]
+
+    def output_type_from_idx(self, idx: int) -> str:
+        if idx < self.num_output_types - 1:
+            return self.neuron_type[idx]
+        else:
+            return "output"
 
     def init_hidden(
         self,
         batch_size: int,
-        init_mode: str = "zeros",
+        init_mode: Optional[str | TensorInitFnType] = None,
         device: Optional[torch.device] = None,
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> list[torch.Tensor]:
         """
-        Initializes the hidden state of the cell.
+        Initializes the neuron hidden states.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros' or 'normal'. Defaults to 'zeros'.
-            device (torch.device, optional): Device to allocate the hidden state on. Defaults to None.
+            init_mode (str, optional): Initialization mode. Must be 'zeros',
+                'ones', 'randn', 'rand', a function, or None. If None, the
+                default initialization mode will be used. If a function, it
+                must take a variable number of positional arguments corresponding
+                to the shape of the tensor to initialize, as well as a
+                `device` keyword argument that send.
+            device (torch.device, optional): Device to allocate the hidden
+                states on. Defaults to None.
 
         Returns:
-            tuple[torch.Tensor, Optional[torch.Tensor]]: A tuple containing the initialized excitatory cell hidden state and, if inhibitory neurons are used, the initialized inhibitory neuron cell hidden state.
+            list[torch.Tensor]: A list containing the initialized neuron
+                hidden states.
         """
 
-        if init_mode == "zeros":
-            func = torch.zeros
-        elif init_mode == "ones":
-            func = torch.ones
-        elif init_mode == "randn":
-            func = torch.randn
-        else:
-            raise ValueError(
-                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
-            )
-
-        return (
-            func(
-                batch_size, self.h_exc_channels, *self.in_size, device=device
-            ),
-            func(
-                batch_size,
-                sum(self.h_inh_channels),
-                *self.inh_size,
-                device=device,
-            )
-            if self.use_inh
-            else None,
+        init_mode = (
+            init_mode
+            if init_mode is not None
+            else self.default_hidden_init_mode
         )
+        if isinstance(init_mode, str):
+            return [
+                init_tensor(
+                    init_mode,
+                    batch_size,
+                    self.neuron_channels[i],
+                    *self.spatial_size,
+                    device=device,
+                )
+                for i in range(self.num_neuron_types)
+            ]
+        else:
+            try:
+                return [
+                    init_mode(
+                        batch_size,
+                        self.neuron_channels[i],
+                        *self.spatial_size,
+                        device=device,
+                    )
+                    for i in range(self.num_neuron_types)
+                ]
+            except TypeError:
+                return [
+                    init_mode(
+                        batch_size,
+                        self.neuron_channels[i],
+                        *self.spatial_size,
+                    ).to(device)
+                    for i in range(self.num_neuron_types)
+                ]
 
     def init_out(
         self,
         batch_size: int,
-        init_mode: str = "zeros",
+        init_mode: Optional[str | TensorInitFnType] = None,
         device: Optional[torch.device] = None,
     ) -> torch.Tensor:
         """
@@ -430,222 +493,137 @@ class Conv2dEIRNNCell(nn.Module):
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros' or 'randn'. Defaults to 'zeros'.
-            device (torch.device, optional): Device to allocate the output on. Defaults to None.
+            init_mode (str, optional): Initialization mode. Must be 'zeros',
+                'ones', 'randn', 'rand', a function, or None. If None, the
+                default initialization mode will be used.
+            device (torch.device, optional): Device to allocate the hidden
+                states on. Defaults to None.
 
         Returns:
             torch.Tensor: The initialized output.
         """
 
-        if init_mode == "zeros":
-            func = torch.zeros
-        elif init_mode == "ones":
-            func = torch.ones
-        elif init_mode == "randn":
-            func = torch.randn
-        else:
-            raise ValueError(
-                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
-            )
-
-        return func(
-            batch_size, self.out_channels, *self.out_size, device=device
+        init_mode = (
+            init_mode if init_mode is not None else self.default_out_init_mode
         )
+        if isinstance(init_mode, str):
+            return init_tensor(
+                init_mode,
+                batch_size,
+                self.out_channels,
+                *self.spatial_size,
+                device=device,
+            )
+        else:
+            return init_mode(
+                batch_size,
+                self.out_channels,
+                *self.spatial_size,
+                device=device,
+            )
 
     def init_fb(
         self,
         batch_size: int,
-        init_mode: str = "zeros",
+        init_mode: Optional[str | TensorInitFnType] = None,
         device: Optional[torch.device] = None,
-    ) -> Optional[torch.Tensor]:
+    ) -> torch.Tensor | None:
         """
         Initializes the feedback input.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros' or 'normal'. Defaults to 'zeros'.
-            device (torch.device, optional): Device to allocate the feedback input on. Defaults to None.
+            init_mode (str, optional): Initialization mode. Must be 'zeros',
+                'ones', 'randn', 'rand', a function, or None. If None, the
+                default initialization mode will be used.
+            device (torch.device, optional): Device to allocate the hidden
+                states on. Defaults to None.
 
         Returns:
-            Optional[torch.Tensor]: The initialized feedback input if `use_fb` is True, otherwise None.
+            Optional[torch.Tensor]: The initialized feedback input if `use_fb` is
+                True, otherwise None.
         """
 
-        if init_mode == "zeros":
-            func = torch.zeros
-        elif init_mode == "ones":
-            func = torch.ones
-        elif init_mode == "randn":
-            func = torch.randn
-        else:
-            raise ValueError(
-                "Invalid init_mode. Must be 'zeros', 'ones', or 'randn'."
-            )
+        if not self.use_fb:
+            return None
 
-        return (
-            func(batch_size, self.fb_channels, *self.in_size, device=device)
-            if self.use_fb
-            else None
+        init_mode = (
+            init_mode if init_mode is not None else self.default_fb_init_mode
         )
+        if isinstance(init_mode, str):
+            return init_tensor(
+                init_mode,
+                batch_size,
+                self.fb_channels,
+                *self.spatial_size,
+                device=device,
+            )
+        else:
+            return init_mode(
+                batch_size,
+                self.fb_channels,
+                *self.spatial_size,
+                device=device,
+            )
 
     def forward(
         self,
         input: torch.Tensor,
-        h_exc: torch.Tensor,
-        h_inh: Optional[torch.Tensor] = None,
+        h_neuron: torch.Tensor | list[torch.Tensor],
         fb: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]:
         """
-        Forward pass of the cell.
+        Forward pass of the EIRNN layer.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch_size, in_channels, in_size[0], in_size[1]).
-            h_exc (torch.Tensor): Excitatory cell hidden state of shape (batch_size, h_exc_channels, in_size[0], in_size[1]).
-            h_inh (Optional[torch.Tensor]): Inhibitory neuron cell hidden state of shape (batch_size, h_inh_channels_sum, inh_size[0], inh_size[1]).
+            h_neuron (torch.Tensor | list[torch.Tensor]): List of neuron hidden states of shape (batch_size, neuron_channels[i], in_size[0], in_size[1]) for each neuron type i.
             fb (Optional[torch.Tensor]): Feedback input of shape (batch_size, fb_channels, in_size[0], in_size[1]).
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]: A tuple containing the output, new excitatory cell hidden state, and new inhibitory neuron cell hidden state.
+            tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]: A tuple containing the output and new neuron hidden state.
         """
-
-        if self.use_fb and fb is None:
-            raise ValueError("If use_fb is True, fb must be provided.")
-
-        excs = [0] * len(self.h_exc_channels)
-        inhs = [0] * len(self.h_inh_channels)
-        out = 0
-        for i in range(self.circuit_connectivity.shape[0]):
-            if i == 0:
-                in_sign = 1
-                in_data = input
-            elif self.use_fb and i == 1:
-                in_sign = 1
-                in_data = fb
-            elif i < 1 + int(self.use_fb) + len(self.h_exc_channels):
-                in_sign = 1
-                in_data = h_exc[i - 1 - int(self.use_fb)]
-            else:
-                in_sign = -1
-                in_data = h_inh[
-                    i - 1 - int(self.use_fb) - len(self.h_exc_channels)
-                ]
-
-            for j in range(self.circuit_connectivity.shape[1]):
-                if self.circuit_connectivity[i, j] == 1:
-                    if j < len(self.h_exc_channels):
-                        # excitatory
-                        excs[j] += in_sign * self.convs[f"{i}->{j}"](in_data)
-                    elif j < len(self.h_exc_channels) + len(
-                        self.h_inh_channels
-                    ):
-                        # inhibitory
-                        inhs[j - len(self.h_exc_channels)] += (
-                            in_sign * self.convs[f"{i}->{j}"](in_data)
-                        )
-                    else:
-                        # output
-                        out += in_sign * self.convs[f"{i}->{j}"](in_data)
-
-        # Compute excitations for excitatory cells
-        exc_cat = torch.cat(
-            [h_exc, input, fb] if self.use_fb else [h_exc, input], dim=1
-        )
-        if self.use_three_compartments:
-            exc_exc_soma = self.pre_inh_activation(self.conv_exc_exc(h_exc))
-            exc_exc_basal = self.pre_inh_activation(
-                self.conv_exc_exc_input(input)
-            )
-            if self.use_fb:
-                exc_exc_apical = self.pre_inh_activation(
-                    self.conv_exc_exc_fb(fb)
-                )
-        else:
-            exc_exc_soma = self.pre_inh_activation(self.conv_exc_exc(exc_cat))
-
-        inhs = [0] * 4
-        if self.h_inh_channels:
-            # Compute excitations for inhibitory neurons
-            if len(self.h_inh_channels) == 4:
-                exc_inh = self.pre_inh_activation(self.conv_exc_inh(h_exc))
-                exc_input_inh = self.pre_inh_activation(
-                    self.conv_exc_input_inh(input)
-                )
-                exc_fb_inh = self.pre_inh_activation(self.conv_exc_inh_fb(fb))
-            else:
-                exc_inh = self.pre_inh_activation(self.conv_exc_inh(exc_cat))
-
-            # Compute inhibitions for all neurons
-            h_inhs = h_inh
-            if self.immediate_inhibition:
-                if h_inh is not None:
-                    raise ValueError(
-                        "If h_inh_channels is provided and immediate_inhibition is True, h_inh must not be provided."
-                    )
-                h_inhs = exc_inh
-            elif h_inh is None:
+        # Expand h_neuron to match the number of neuron channels
+        if isinstance(h_neuron, torch.Tensor):
+            if self.num_neuron_types != 1:
                 raise ValueError(
-                    "If h_inh_channels is provided and immediate_inhibition is False, h_inh must be provided."
+                    "h_neuron must be a list of tensors if num_neuron_types is not 1."
                 )
+            h_neuron = [h_neuron]
 
-            h_inhs = torch.split(
-                h_inhs,
-                self.h_inh_channels,
-                dim=1,
+        # Check if feedback is provided if necessary
+        if self.use_fb == fb is None:
+            raise ValueError(
+                "use_fb must be True if and only if fb is provided."
             )
-            inh_inh_2 = inh_inh_3 = 0
-            for i in range(len(self.h_inh_channels)):
-                conv = self.convs_inh[i]
-                if i in (2, 3):
-                    conv, conv2 = conv.conv1, conv.conv2
-                    if i == 2:
-                        inh_inh_3 = self.pre_inh_activation(conv2(h_inhs[i]))
-                    else:
-                        inh_inh_2 = self.pre_inh_activation(conv2(h_inhs[i]))
-                inhs[i] = self.pre_inh_activation(conv(h_inhs[i]))
-        inh_exc_soma, inh_inh, inh_exc_basal, inh_exc_apical = inhs
 
-        # Compute new excitatory cell hidden state
-        exc_soma = self.post_inh_activation(exc_exc_soma - inh_exc_soma)
-        if self.use_three_compartments:
-            exc_basal = self.post_inh_activation(exc_exc_basal - inh_exc_basal)
-            exc_apical = (
-                self.post_inh_activation(exc_exc_apical - inh_exc_apical)
-                if self.use_fb
-                else 0
-            )
-            exc_soma = exc_soma + exc_apical + exc_basal
-            exc_soma /= 3
-        h_exc_new = self.post_integration_activation(exc_soma)
+        # Compute convolutions for each connection in the circuit
+        conv_ins = [input] + ([fb] if self.use_fb else []) + h_neuron
+        conv_outs = [[] for _ in range(self.num_neuron_types + 1)]
+        for key, conv in self.convs.items():
+            i, j = key.split("->")
+            i, j = int(i), int(j)
+            if self.input_type_from_idx(i) == "inhibitory":
+                sign = -1
+            else:
+                sign = 1
+
+            conv_outs[j].append(sign * conv(conv_ins[i]))
+
+        h_neuron_new = [torch.cat(conv_out, dim=1) for conv_out in conv_outs]
 
         # Compute Euler update for excitatory cell hidden state
-        tau_exc = torch.sigmoid(self.tau_exc)
-        h_exc = tau_exc * h_exc_new + (1 - tau_exc) * h_exc
-
-        # Compute new inhibitory neuron cell hidden state
-        if self.use_inh:
-            h_inh_new = exc_inh - inh_inh
-            if len(self.h_inh_channels) == 4:
-                # Add excitations and inhibitions to inhibitory neuron 2
-                start = sum(self.h_inh_channels[:2])
-                end = start + self.h_inh_channels[2]
-                h_inh_new[:, start:end, ...] = (
-                    h_inh_new[:, start:end, ...] + exc_input_inh - inh_inh_2
-                )
-                # Add excitations and inhibitions to inhibitory neuron 3
-                start = sum(self.h_inh_channels[:3])
-                h_inh_new[:, start:, ...] = (
-                    h_inh_new[:, start:, ...] + exc_fb_inh - inh_inh_3
-                )
-            h_inh_new = self.post_inh_activation(h_inh_new)
-            # Compute Euler update for inhibitory neuron cell hidden state
-            tau_inh = torch.sigmoid(self.tau_inh)
-            h_inh = tau_inh * h_inh_new + (1 - tau_inh) * h_inh
+        for i in range(self.num_neuron_types):
+            tau = torch.sigmoid(self.tau[i])
+            h_neuron[i] = tau * h_neuron_new[i] + (1 - tau) * h_neuron[i]
 
         # Pool the output
-        out = self.out_pool(h_exc)
+        out = self.out_pool(h_neuron)
 
-        return out, h_exc, h_inh
+        return out, h_neuron
 
 
+# TODO: Update for new block
 class Conv2dEIRNN(nn.Module):
     """
     Implements a deep convolutional recurrent neural network with excitatory-inhibitory
@@ -712,179 +690,168 @@ class Conv2dEIRNN(nn.Module):
 
     def __init__(
         self,
-        in_size: tuple[int, int],
-        in_channels: int,
-        h_exc_channels: int | tuple[int],
-        h_inh_channels: tuple[int] | tuple[tuple[int]] = None,
-        fb_channels: Optional[int | tuple[int]] = None,
+        *,
         num_layers: int = 1,
-        inh_mode: str = "same",
-        use_three_compartments: bool = False,
-        immediate_inhibition: bool = False,
-        exc_rectify: bool = False,
-        inh_rectify: bool = False,
-        exc_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
-        inh_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
-        fb_kernel_size: tuple[int, int] | tuple[tuple[int, int]] = (3, 3),
-        pool_kernel_size: Optional[
-            tuple[int, int] | tuple[tuple[int, int]]
+        layer_configs: Optional[
+            Conv2dEIRNNLayerConfig | list[Conv2dEIRNNLayerConfig]
         ] = None,
-        pool_stride: Optional[tuple[int, int] | tuple[tuple[int, int]]] = None,
-        pool_global: bool | tuple[bool] = True,
-        pre_inh_activation: Optional[str] = None,
-        post_inh_activation: Optional[str] = "tanh",
-        post_integration_activation: Optional[str] = None,
-        tau_mode: Optional[str] = "channel",
-        fb_activation: Optional[str] = None,
-        bias: bool | tuple[bool] = True,
+        layer_kwargs: Optional[
+            Mapping[str, Any] | list[Mapping[str, Any]]
+        ] = None,
+        common_layer_kwargs: Optional[Mapping[str, Any]] = None,
+        fb_connectivity: Optional[Param2dType[int | bool]] = None,
+        fb_activations: Optional[Param2dType[str]] = None,
+        fb_rectify: Param2dType[bool] = False,
+        fb_kernel_sizes: Optional[Param2dType[tuple[int, int]]] = None,
         layer_time_delay: bool = False,
-        fb_adjacency: Optional[tuple[tuple[int | bool]] | torch.Tensor] = None,
-        hidden_init_mode: str = "zeros",
-        fb_init_mode: str = "zeros",
-        out_init_mode: str = "zeros",
         batch_first: bool = True,
     ):
         super().__init__()
 
-        # Expand the layer specific parameters as necessary
-        self.num_layers = num_layers
-        self.h_exc_channels = expand_list(h_exc_channels, self.num_layers)
-        self.h_inh_channels = expand_list(
-            h_inh_channels,
-            self.num_layers,
-            depth=0 if h_inh_channels is None else 1,
-        )
-        self.fb_channels = expand_list(fb_channels, self.num_layers)
-        self.exc_kernel_sizes = expand_list(
-            exc_kernel_size, self.num_layers, depth=1
-        )
-        self.inh_kernel_sizes = expand_list(
-            inh_kernel_size, self.num_layers, depth=1
-        )
-        self.fb_kernel_sizes = expand_list(
-            fb_kernel_size, self.num_layers, depth=1
-        )
-        self.pool_kernel_sizes = expand_list(
-            pool_kernel_size, self.num_layers, depth=1
-        )
-        self.pool_strides = expand_list(pool_stride, self.num_layers, depth=1)
-        self.pool_globals = expand_list(pool_global, self.num_layers)
-        self.biases = expand_list(bias, self.num_layers)
+        ############################################################
+        # Layer configs
+        ############################################################
 
-        # Save layer agnostic parameters
-        self.use_three_compartments = use_three_compartments
-        self.immediate_inhibition = immediate_inhibition
+        self.num_layers = num_layers
+
+        if layer_configs is not None:
+            if layer_kwargs is not None or common_layer_kwargs is not None:
+                raise ValueError(
+                    "layer_configs cannot be provided if layer_configs_kwargs "
+                    "or common_layer_config_kwargs is provided."
+                )
+            if isinstance(layer_configs, Conv2dEIRNNLayerConfig):
+                layer_configs = [layer_configs]
+            elif len(layer_configs) != self.num_layers:
+                raise ValueError("layer_configs must be of length num_layers.")
+        else:
+            if layer_kwargs is None:
+                raise ValueError(
+                    "layer_kwargs must be provided if layer_configs is not provided."
+                )
+            if isinstance(layer_kwargs, Mapping):
+                layer_kwargs = [layer_kwargs]
+            elif len(layer_kwargs) != self.num_layers:
+                raise ValueError("layer_kwargs must be of length num_layers.")
+
+            if common_layer_kwargs is None:
+                common_layer_kwargs = {}
+            layer_configs = [
+                Conv2dEIRNNLayerConfig(
+                    **common_layer_kwargs, **layer_kwargs[i]
+                )
+                for i in range(self.num_layers)
+            ]
+
+        ############################################################
+        # RNN parameters
+        ############################################################
+
         self.layer_time_delay = layer_time_delay
         self.batch_first = batch_first
-        self.hidden_init_mode = hidden_init_mode
-        self.fb_init_mode = fb_init_mode
-        self.out_init_mode = out_init_mode
-        self.fb_activation = get_activation(fb_activation)
 
-        # Calculate input sizes for each layer
-        self.in_sizes = [in_size]
-        for i in range(self.num_layers - 1):
-            self.in_sizes.append(
-                (
-                    ceil(self.in_sizes[i][0] / self.pool_strides[i][0]),
-                    ceil(self.in_sizes[i][1] / self.pool_strides[i][1]),
-                )
-            )
+        ############################################################
+        # Initialize layers
+        ############################################################
 
+        # Create layers
+        self.layers = nn.ModuleList(
+            [Conv2dEIRNNLayer(layer_config) for layer_config in layer_configs]
+        )
+
+        self.pools = nn.ModuleList([nn.Identity()])
+        for layer in self.layers[1:]:
+            self.pools.append(nn.AvgPool2d(layer.spatial_size))
+
+        ############################################################
         # Initialize feedback connections
-        self.receives_fb = [False] * self.num_layers
-        self.fb_adjacency = [[]] * self.num_layers
-        if fb_adjacency is not None:
-            # Check if fb_adjacency and fb_channels are consistent
-            if not any(self.fb_channels):
-                raise ValueError(
-                    "fb_adjacency must be provided if and only if fb_channels is "
-                    "provided for at least one layer."
-                )
+        ############################################################
 
-            # Load or create fb_adjacency tensor
-            if not isinstance(fb_adjacency, torch.Tensor):
-                fb_adjacency = torch.tensor(fb_adjacency)
+        if fb_connectivity is None:
+            if any(layer_config.fb_channels for layer_config in layer_configs):
+                raise ValueError(
+                    "fb_connectivity must be provided if and only if "
+                    "fb_channels is provided for at least one layer."
+                )
+            self.fb_convs = nn.ModuleDict()
+        else:
+            fb_connectivity = np.array(fb_connectivity, dtype=bool)
+            if fb_connectivity.shape != (
+                self.num_layers,
+                self.num_layers,
+            ):
+                raise ValueError(
+                    "The shape of fb_connectivity must be (num_layers, num_layers)."
+                )
+            fb_activations = expand_array_2d(
+                fb_activations,
+                self.num_layers,
+                self.num_layers,
+            )
+            fb_rectify = expand_array_2d(
+                fb_rectify,
+                self.num_layers,
+                self.num_layers,
+            )
+            fb_kernel_sizes = expand_array_2d(
+                fb_kernel_sizes,
+                self.num_layers,
+                self.num_layers,
+            )
 
             # Validate fb_adjacency tensor
             if (
-                fb_adjacency.dim() != 2
-                or fb_adjacency.shape[0] != self.num_layers
-                or fb_adjacency.shape[1] != self.num_layers
+                fb_connectivity.ndim != 2
+                or fb_connectivity.shape[0] != self.num_layers
+                or fb_connectivity.shape[1] != self.num_layers
             ):
                 raise ValueError(
-                    "The the dimensions of fb_adjacency must match number of layers."
+                    "The dimensions of fb_connectivity must match the number of layers."
                 )
-            if fb_adjacency.count_nonzero() == 0:
+            if fb_connectivity.sum() == 0:
                 raise ValueError(
-                    "fb_adjacency must be a non-zero tensor if provided."
+                    "fb_connectivity must be a non-zero tensor if provided."
                 )
 
             # Create feedback convolutions
-            if exc_rectify:
-                Conv2dFb = Conv2dRectify
-            else:
-                Conv2dFb = nn.Conv2d
             self.fb_convs = nn.ModuleDict()
-            for i, row in enumerate(fb_adjacency):
-                row = row.nonzero().squeeze(1).tolist()
-                self.fb_adjacency[i] = row
-                for j in row:
-                    self.receives_fb[j] = True
-                    self.fb_convs[(i, j)] = nn.Sequential(
-                        nn.Upsample(size=self.in_sizes[j], mode="bilinear"),
-                        Conv2dFb(
-                            in_channels=self.h_exc_channels[i],
-                            out_channels=self.fb_channels[j],
-                            kernel_size=self.fb_kernel_sizes[j],
-                            padding=(
-                                self.fb_kernel_sizes[j][0] // 2,
-                                self.fb_kernel_sizes[j][1] // 2,
-                            ),
-                            bias=self.biases[j],
+            for i, row in enumerate(fb_connectivity):
+                nonzero_indices = np.nonzero(row)[0]
+                for j in nonzero_indices:
+                    if not self.layers[j].use_fb:
+                        raise ValueError(
+                            f"the connection from layer {i} to layer {j} is "
+                            f"not valid because layer {j} does not receive "
+                            f"feedback (hint: fb_channels may not be provided)"
+                        )
+                    if fb_rectify[i, j]:
+                        Conv2dFb = Conv2dRectify
+                    else:
+                        Conv2dFb = nn.Conv2d
+                    self.fb_convs[f"{i}->{j}"] = nn.Sequential(
+                        nn.Upsample(
+                            size=layer_configs[j].spatial_size,
+                            mode="bilinear",
                         ),
-                        self.fb_activation,
+                        Conv2dFb(
+                            in_channels=layer_configs[i].out_channels,
+                            out_channels=layer_configs[j].fb_channels,
+                            kernel_size=layer_configs[j].fb_kernel_size,
+                            padding=(
+                                fb_kernel_sizes[j][0] // 2,
+                                fb_kernel_sizes[j][1] // 2,
+                            ),
+                            bias=layer_configs[j].fb_bias,
+                        ),
+                        get_activation(fb_activations[i, j]),
                     )
-        elif any(self.fb_channels):
-            raise ValueError(
-                "fb_adjacency must be provided if and only if fb_channels is provided "
-                "for at least one layer."
-            )
 
-        # Create layers and perturbation modules
-        self.layers = nn.ModuleList()
-
-        for i in range(self.num_layers):
-            self.layers.append(
-                Conv2dEIRNNCell(
-                    in_size=self.in_sizes[i],
-                    in_channels=(
-                        in_channels if i == 0 else self.h_exc_channels[i - 1]
-                    ),
-                    h_exc_channels=self.h_exc_channels[i],
-                    h_inh_channels=self.h_inh_channels[i],
-                    fb_channels=self.fb_channels[i]
-                    if self.receives_fb[i]
-                    else 0,
-                    inh_mode=inh_mode,
-                    exc_kernel_size=self.exc_kernel_sizes[i],
-                    inh_kernel_size=self.inh_kernel_sizes[i],
-                    use_three_compartments=self.use_three_compartments,
-                    immediate_inhibition=self.immediate_inhibition,
-                    exc_rectify=exc_rectify,
-                    inh_rectify=inh_rectify,
-                    pool_kernel_size=self.pool_kernel_sizes[i],
-                    pool_stride=self.pool_strides[i],
-                    pool_global=self.pool_globals[i],
-                    bias=self.biases[i],
-                    pre_inh_activation=pre_inh_activation,
-                    post_inh_activation=post_inh_activation,
-                    post_integration_activation=post_integration_activation,
-                    tau_mode=tau_mode,
-                )
-            )
-
-    def _init_hidden(self, batch_size, init_mode="zeros", device=None):
+    def _init_hidden(
+        self,
+        batch_size: int,
+        init_mode: Optional[str] = None,
+        device: Optional[torch.device] = None,
+    ) -> list[list[torch.Tensor]]:
         """
         Initializes the hidden states for all layers.
 
@@ -894,20 +861,19 @@ class Conv2dEIRNN(nn.Module):
             device (torch.device, optional): Device to allocate tensors.
 
         Returns:
-            tuple(list[torch.Tensor], list[torch.Tensor]): A tuple of lists containing \
-                the initialized excitatory and inhibitory neuron hidden states for each layer.
+            list[torch.Tensor]: A list containing the initialized neuron hidden states for each layer.
         """
-        h_excs = []
-        h_inhs = []
-        for layer in self.layers:
-            h_exc, h_inh = layer.init_hidden(
-                batch_size, init_mode=init_mode, device=device
-            )
-            h_excs.append(h_exc)
-            h_inhs.append(h_inh)
-        return h_excs, h_inhs
+        return [
+            layer.init_hidden(batch_size, init_mode, device)
+            for layer in self.layers
+        ]
 
-    def _init_fb(self, batch_size, init_mode="zeros", device=None):
+    def _init_fb(
+        self,
+        batch_size: int,
+        init_mode: Optional[str] = None,
+        device: Optional[torch.device] = None,
+    ) -> list[Optional[torch.Tensor]]:
         """
         Initializes the feedback inputs for all layers.
 
@@ -919,13 +885,17 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             list[torch.Tensor]: A list of initialized feedback inputs for each layer.
         """
-        fbs = []
-        for layer in self.layers:
-            fb = layer.init_fb(batch_size, init_mode=init_mode, device=device)
-            fbs.append(fb)
-        return fbs
+        return [
+            layer.init_fb(batch_size, init_mode, device)
+            for layer in self.layers
+        ]
 
-    def _init_out(self, batch_size, init_mode="zeros", device=None):
+    def _init_out(
+        self,
+        batch_size: int,
+        init_mode: Optional[str] = None,
+        device: Optional[torch.device] = None,
+    ) -> list[torch.Tensor]:
         """
         Initializes the outputs for all layers.
 
@@ -937,118 +907,109 @@ class Conv2dEIRNN(nn.Module):
         Returns:
             list[torch.Tensor]: A list of initialized outputs for each layer.
         """
-        outs = []
-        for layer in self.layers:
-            out = layer.init_out(
-                batch_size, init_mode=init_mode, device=device
-            )
-            outs.append(out)
-        return outs
+        return [
+            layer.init_out(batch_size, init_mode, device)
+            for layer in self.layers
+        ]
 
     def _init_state(
         self,
-        out_0,
-        h_exc_0,
-        h_inh_0,
-        fb_0,
-        num_steps,
-        batch_size,
-        device=None,
-    ):
+        out_0: Optional[Sequence[torch.Tensor | None]],
+        h_neuron_0: Optional[Sequence[Sequence[torch.Tensor | None]]],
+        fb_0: Optional[Sequence[torch.Tensor | None]],
+        num_steps: int,
+        batch_size: int,
+        device: Optional[torch.device] = None,
+    ) -> tuple[
+        list[list[torch.Tensor | None]],
+        list[list[list[torch.Tensor | None]]],
+        list[list[torch.Tensor | int | None]],
+    ]:
         """
-        Initializes the inhnal state of the network.
+        Initializes the state of the network.
 
         Args:
             out_0 (Optional[list[torch.Tensor]]): Initial outputs for each layer.
-            h_exc_0 (Optional[list[torch.Tensor]]): Initial excitatory cell hidden states for each layer.
-            h_inh_0 (Optional[list[torch.Tensor]]): Initial inhibitory neuron cell hidden states for each layer.
+            h_neuron_0 (Optional[list[torch.Tensor]]): Initial neuron hidden states for each layer.
             fb_0 (Optional[list[torch.Tensor]]): Initial feedback inputs for each layer.
             num_steps (int): Number of time steps.
             batch_size (int): Batch size.
             device (torch.device, optional): Device to allocate tensors.
 
         Returns:
-            tuple(list[list[torch.Tensor]], list[list[torch.Tensor]], list[list[torch.Tensor]], list[list[torch.Tensor]]): A tuple containing the initialized outputs, excitatory cell hidden states, inhibitory neuron cell hidden states, and feedback inputs for each layer and time step.
+            tuple(NDArray[np.object_], NDArray[np.object_], NDArray[np.object_]): A tuple
+                containing the initialized outputs, neuron hidden states, and
+                feedback inputs for each layer and time step.
         """
-        outs = [[None] * num_steps for _ in range(self.num_layers)]
-        h_excs = [[None] * num_steps for _ in range(self.num_layers)]
-        h_inhs = [[None] * num_steps for _ in range(self.num_layers)]
-        fbs = [
-            [0 if self.receives_fb[i] else None] * num_steps
-            for i in range(self.num_layers)
-        ]
 
-        if (
-            out_0 is not None
-            and self.num_layers > 1
-            and len(out_0) != self.num_layers
-        ):
+        # Validate input shapes of out_0, h_neuron_0, fb_0
+        if out_0 is None:
+            out_0 = [None] * self.num_layers
+        elif len(out_0) != self.num_layers:
             raise ValueError(
                 "The length of out_0 must be equal to the number of layers."
             )
-
-        if (
-            h_exc_0 is not None
-            and self.num_layers > 1
-            and len(h_exc_0) != self.num_layers
-        ):
+        if h_neuron_0 is None:
+            h_neuron_0 = [
+                [None] * self.layers[i].num_neuron_types
+                for i in range(self.num_layers)
+            ]
+        elif len(h_neuron_0) != self.num_layers:
             raise ValueError(
-                "The length of h_exc_0 must be equal to the number of layers."
+                "The length of h_neuron_0 must be equal to the number of layers."
             )
-
-        if (
-            h_inh_0 is not None
-            and self.num_layers > 1
-            and len(h_inh_0) != self.num_layers
-        ):
-            raise ValueError(
-                "The length of h_inh_0 must be equal to the number of layers."
-            )
-
-        if (
-            fb_0 is not None
-            and self.num_layers > 1
-            and len(fb_0) != self.num_layers
-        ):
+        if fb_0 is None:
+            fb_0 = [None] * self.num_layers
+        elif len(fb_0) != self.num_layers:
             raise ValueError(
                 "The length of fb_0 must be equal to the number of layers."
             )
 
-        if not isinstance(out_0, (list, tuple)):
-            out_0 = [out_0] * self.num_layers
-        if not isinstance(h_exc_0, (list, tuple)):
-            h_exc_0 = [h_exc_0] * self.num_layers
-        if not isinstance(h_inh_0, (list, tuple)):
-            h_inh_0 = [h_inh_0] * self.num_layers
-        if not isinstance(fb_0, (list, tuple)):
-            fb_0 = [fb_0] * self.num_layers
+        # Initialize default values
+        h_neuron_0_default = self._init_hidden(
+            batch_size, init_mode=self.hidden_init_mode, device=device
+        )
+        fb_0_default = self._init_fb(
+            batch_size, init_mode=self.fb_init_mode, device=device
+        )
+        out_0_default = self._init_out(batch_size, device=device)
 
-        if any(x is None for x in out_0):
-            out_tmp = self._init_out(
-                batch_size, init_mode=self.out_init_mode, device=device
-            )
-        if any(x is None for x in h_exc_0) or any(x is None for x in h_inh_0):
-            h_exc_tmp, h_inh_tmp = self._init_hidden(
-                batch_size, init_mode=self.hidden_init_mode, device=device
-            )
-        if any(x is None for x in fb_0):
-            fb_tmp = self._init_fb(
-                batch_size, init_mode=self.fb_init_mode, device=device
-            )
+        # Initialize output, hidden state, and feedback lists
+        outs: list[list[torch.Tensor | None]] = [
+            [None] * num_steps for _ in range(self.num_layers)
+        ]
+        h_neurons: list[list[list[torch.Tensor | None]]] = [
+            [
+                [None] * self.layers[i].num_neuron_types
+                for _ in range(num_steps)
+            ]
+            for i in range(self.num_layers)
+        ]
+        fbs: list[list[torch.Tensor | int | None]] = [
+            [0 if self.layers[i].use_fb else None] * num_steps
+            for i in range(self.num_layers)
+        ]
 
+        # Fill time step -1 with the initial values
         for i in range(self.num_layers):
-            if out_0[i] is None:
-                outs[i][-1] = out_tmp[i]
-            if h_exc_0[i] is None:
-                h_excs[i][-1] = h_exc_tmp[i]
-            if h_inh_0[i] is None:
-                h_inhs[i][-1] = h_inh_tmp[i]
-            if fb_0[i] is None:
-                fbs[i][-1] = fb_tmp[i]
+            outs[i][-1] = (
+                out_0[i] if out_0[i] is not None else out_0_default[i]
+            )
+            fbs[i][-1] = fb_0[i] if fb_0[i] is not None else fb_0_default[i]
+            for k in range(self.layers[i].num_neuron_types):
+                h_neurons[i][-1][k] = (
+                    h_neuron_0[i][k]
+                    if h_neuron_0[i][k] is not None
+                    else h_neuron_0_default[i][k]
+                )
 
-        return outs, h_excs, h_inhs, fbs
+        return outs, h_neurons, fbs
 
-    def _format_x(self, x, num_steps):
+    def _format_x(
+        self,
+        x: torch.Tensor,
+        num_steps: Optional[int] = None,
+    ) -> tuple[torch.Tensor, int]:
         """
         Formats the input tensor to match the expected shape.
 
@@ -1079,98 +1040,70 @@ class Conv2dEIRNN(nn.Module):
             )
         return x, num_steps
 
-    @staticmethod
-    def _modulation_identity(x, *args, **kwargs):
-        return x
-
-    def _format_modulation_fns(
-        self, modulation_out_fn, modulation_exc_fn, modulation_inh_fn
-    ):
-        """
-        Formats the modulation functions.
-
-        Args:
-            modulation_out_fn (Optional[torch.Tensor]): Modulation function for outputs.
-            modulation_exc_fn (Optional[torch.Tensor]): Modulation function for excitatory cell hidden states.
-            modulation_inh_fn (Optional[torch.Tensor]): Modulation function for inhibitory neuron cell hidden states.
-
-        Returns:
-            tuple(torch.Tensor, torch.Tensor, torch.Tensor): The formatted modulation functions.
-        """
-        modulation_fns = [
-            modulation_out_fn,
-            modulation_exc_fn,
-            modulation_inh_fn,
-        ]
-        for i, fn in enumerate(modulation_fns):
-            if fn is None:
-                modulation_fns[i] = self._modulation_identity
-            elif not callable(fn):
-                raise ValueError("modulation_fns must be callable or None.")
-
-        return modulation_fns
-
-    def _format_result(self, outs, h_excs, h_inhs, fbs):
+    def _format_result(
+        self,
+        outs: list[list[torch.Tensor]],
+        h_neurons: list[list[list[torch.Tensor]]],
+        fbs: list[list[torch.Tensor | None]],
+    ) -> tuple[
+        list[list[torch.Tensor]],
+        list[list[list[torch.Tensor]]],
+        list[list[torch.Tensor | None]],
+    ]:
         """
         Formats the outputs, hidden states, and feedback inputs.
 
         Args:
             outs (list[list[torch.Tensor]]): Outputs for each layer and time step.
-            h_excs (list[list[torch.Tensor]]): Excitatory cell hidden states for each layer and time step.
-            h_inhs (list[list[torch.Tensor]]): Inhibitory neuron cell hidden states for each layer and time step.
+            h_neurons (list[list[torch.Tensor]]): Neuron hidden states for each layer and time step.
             fbs (list[list[torch.Tensor]]): Feedback inputs for each layer and time step.
 
         Returns:
             tuple(list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]): The formatted outputs, excitatory cell hidden states, inhibitory neuron cell hidden states, and feedback inputs.
         """
+        outs_stack: list[torch.Tensor] = []
+        h_neurons_stack: list[list[torch.Tensor]] = []
+        fbs_stack: list[torch.Tensor | None] | None = []
         for i in range(self.num_layers):
-            outs[i] = torch.stack(outs[i])
-            h_excs[i] = torch.stack(h_excs[i])
-            if self.h_inh_channels[i] and not self.immediate_inhibition:
-                h_inhs[i] = torch.stack(
-                    h_inhs[i]
-                )  # TODO: Check if this is correct
+            outs_stack.append(torch.stack(outs[i]))
+            h_neurons_stack.append(
+                [
+                    torch.stack(
+                        [h_neurons[i][t][j] for t in range(len(h_neurons[i]))]
+                    )
+                    for j in range(self.layers[i].num_neuron_types)
+                ]
+            )
+            if self.layers[i].use_fb:
+                fbs_stack.append(torch.stack(fbs[i]))  # type: ignore
             else:
-                assert not self.h_inh_channels[i] or self.immediate_inhibition
-                assert all(x is None for x in h_inhs[i])
-                h_inhs[i] = None
-            if self.receives_fb[i]:
-                fbs[i] = torch.stack(fbs[i])
-            else:
-                assert all(x is None for x in fbs[i])
-                fbs[i] = None
+                assert all(fb is None for fb in fbs[i])
+                fbs_stack.append(None)
             if self.batch_first:
-                outs[i] = outs[i].transpose(0, 1)
-                h_excs[i] = h_excs[i].transpose(0, 1)
-                if self.h_inh_channels[i] and not self.immediate_inhibition:
-                    h_inhs[i] = h_inhs[i].transpose(0, 1)
-                if self.receives_fb[i]:
-                    fbs[i] = fbs[i].transpose(0, 1)
-        if all(x is None for x in h_inhs):
-            h_inhs = None
-        if all(x is None for x in fbs):
-            fbs = None
+                outs_stack[i] = outs_stack[i].transpose(0, 1)
+                for j in range(self.layers[i].num_neuron_types):
+                    h_neurons_stack[i][j] = h_neurons_stack[i][j].transpose(
+                        0, 1
+                    )
+                if self.layers[i].use_fb:
+                    fbs_stack[i] = fbs_stack[i].transpose(0, 1)  # type: ignore
 
-        return outs, h_excs, h_inhs, fbs
+        return outs, h_neurons, fbs
 
     def forward(
         self,
         x: torch.Tensor,
         num_steps: Optional[int] = None,
-        out_0: Optional[list[torch.Tensor]] = None,
-        h_exc_0: Optional[list[torch.Tensor]] = None,
-        h_inh_0: Optional[list[torch.Tensor]] = None,
-        fb_0: Optional[list[torch.Tensor]] = None,
-        modulation_out_fn: Optional[
-            Callable[[torch.Tensor, int, int], torch.Tensor]
+        out_0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        h_neuron_0: Optional[
+            Sequence[Sequence[Optional[torch.Tensor]]]
         ] = None,
-        modulation_exc_fn: Optional[
-            Callable[[torch.Tensor, int, int], torch.Tensor]
-        ] = None,
-        modulation_inh_fn: Optional[
-            Callable[[torch.Tensor, int, int], torch.Tensor]
-        ] = None,
-    ):
+        fb_0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+    ) -> tuple[
+        list[list[torch.Tensor]],
+        list[list[list[torch.Tensor]]],
+        list[list[torch.Tensor | None]],
+    ]:
         """
         Performs forward pass of the Conv2dEIRNN.
 
@@ -1196,53 +1129,39 @@ class Conv2dEIRNN(nn.Module):
 
         batch_size = x.shape[1]
 
-        outs, h_excs, h_inhs, fbs = self._init_state(
+        outs, h_neurons, fbs = self._init_state(
             out_0,
-            h_exc_0,
-            h_inh_0,
+            h_neuron_0,
             fb_0,
             num_steps,
             batch_size,
             device=device,
         )
 
-        modulation_out_fn, modulation_exc_fn, modulation_inh_fn = (
-            self._format_modulation_fns(
-                modulation_out_fn, modulation_exc_fn, modulation_inh_fn
-            )
-        )
-
         for t in range(num_steps):
             for i, layer in enumerate(self.layers):
-                # Apply additive modulation
-                outs[i][t] = modulation_out_fn(outs[i][t], i, t)
-                h_excs[i][t] = modulation_exc_fn(h_excs[i][t], i, t)
-                h_inhs[i][t] = modulation_inh_fn(h_inhs[i][t], i, t)
-
                 # Compute layer update and output
-                outs[i][t], h_excs[i][t], h_inhs[i][t] = layer(
-                    input=(
-                        x[t]
-                        if i == 0
-                        else (
-                            outs[i - 1][t - 1]
-                            if self.layer_time_delay
-                            else outs[i - 1][t]
-                        )
-                    ),
-                    h_exc=h_excs[i][t - 1],
-                    h_inh=h_inhs[i][t - 1],
+                if i == 0:
+                    layer_in = x[t]
+                elif self.layer_time_delay:
+                    layer_in = outs[i - 1][t - 1]
+                else:
+                    layer_in = outs[i - 1][t]
+
+                layer_in = self.pools[i](layer_in)
+
+                outs[i][t], h_neurons[i][t] = layer(
+                    input=layer_in,
+                    h_neuron=h_neurons[i][t - 1],
                     fb=fbs[i][t - 1],
                 )
 
                 # Apply feedback
-                for j in self.fb_adjacency[i]:
-                    fbs[j][t] = fbs[j][t] + self.fb_convs[f"fb_conv_{i}_{j}"](
-                        outs[i][t]
-                    )
+                for key, conv in self.fb_convs.items():
+                    fb_i, fb_j = key.split("->")
+                    fb_i, fb_j = int(fb_i), int(fb_j)
+                    fbs[fb_j][t] = fbs[fb_j][t] + conv(outs[fb_i][t])
 
-        outs, h_excs, h_inhs, fbs = self._format_result(
-            outs, h_excs, h_inhs, fbs
-        )
+        outs, h_neurons, fbs = self._format_result(outs, h_neurons, fbs)  # type: ignore
 
-        return outs, h_excs, h_inhs, fbs
+        return outs, h_neurons, fbs

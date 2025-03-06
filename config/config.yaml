@@ -8,16 +8,17 @@ defaults:
   - experiment/dimensions: null
 
 optimizer:
-  fn: adamw
+  class_name: AdamW
   lr: 0.0005
   momentum: 0.9
   beta1: 0.9
   beta2: 0.999
-scheduler:
-  fn: null # one_cycle
-  pct_start: 0.2
+scheduler: null
+# scheduler:
+#   class_name: OneCycleLR
+#   pct_start: 0.2
 criterion:
-  fn: ce
+  class_name: CrossEntropyLoss
   all_timesteps: false
 compile:
   disable: true
