@@ -94,10 +94,10 @@ def _train(
         outputs = model(
             x=x,
             num_steps=config.train.num_steps,
-            loss_all_timesteps=config.criterion.all_timesteps,
+            loss_all_timesteps=config.train.loss_all_timesteps,
             return_activations=False,
         )
-        if config.criterion.all_timesteps:
+        if config.train.loss_all_timesteps:
             logits = outputs.permute(1, 2, 0)
             labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
         else:
@@ -117,7 +117,7 @@ def _train(
         # Update statistics
         train_loss += loss.item()
         running_loss += loss.item()
-        if config.criterion.all_timesteps:
+        if config.train.loss_all_timesteps:
             predicted = outputs[-1].argmax(-1)
         else:
             predicted = outputs.argmax(-1)
@@ -196,10 +196,10 @@ def _validate(
             outputs = model(
                 x=x,
                 num_steps=config.train.num_steps,
-                loss_all_timesteps=config.criterion.all_timesteps,
+                loss_all_timesteps=config.train.loss_all_timesteps,
                 return_activations=False,
             )
-            if config.criterion.all_timesteps:
+            if config.train.loss_all_timesteps:
                 logits = outputs.permute(1, 2, 0)
                 labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
@@ -210,7 +210,7 @@ def _validate(
 
             # Update statistics
             val_loss += loss.item()
-            if config.criterion.all_timesteps:
+            if config.train.loss_all_timesteps:
                 predicted = outputs[-1].argmax(-1)
             else:
                 predicted = outputs.argmax(-1)
@@ -235,6 +235,18 @@ def train(dict_config: DictConfig) -> None:
 
     config = OmegaConf.to_container(dict_config, resolve=True)
     config = AttrDict(config)
+
+    # Override parameters
+    try:
+        layer_one_in_channels_override = config.layer_one_in_channels_override
+    except KeyError:
+        pass
+    else:
+        if layer_one_in_channels_override is not None:
+            config.model.rnn_kwargs.layer_kwargs[
+                0
+            ].in_channels = config.layer_one_in_channels_override
+
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))
         yaml.dump(config.to_dict(), open("examples/config_log.yaml", "w+"))
@@ -243,7 +255,7 @@ def train(dict_config: DictConfig) -> None:
         torch.autograd.set_detect_anomaly(True)
 
     if config.wandb.group is None:
-        config.wandb.group = f"{config.model.arch}_{config.data.dataset}"
+        config.wandb.group = f"{config.model.class_name}_{config.data.dataset}"
 
     # Initialize Weights & Biases
     wandb.init(
@@ -280,11 +292,7 @@ def train(dict_config: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize model
-    model = initialize_model(
-        class_name=config.model.arch,
-        dataset=config.data.dataset,
-        **config.model,
-    ).to(device)
+    model = initialize_model(**config.model).to(device)
 
     # Compile the model if requested
     model = torch.compile(model, **config.compile)
@@ -299,16 +307,19 @@ def train(dict_config: DictConfig) -> None:
 
     # Get the data loaders
     train_loader, val_loader = initialize_dataloader(
-        **config.data, seed=config.seed
+        seed=config.seed, **config.data
     )
 
     # Initialize the learning rate scheduler
-    scheduler = initialize_scheduler(
-        optimizer=optimizer,
-        max_lr=config.optimizer.lr,
-        total_steps=len(train_loader) * config.train.epochs,
-        **config.scheduler,
-    )
+    if "scheduler" in config and config.scheduler is not None:
+        scheduler = initialize_scheduler(
+            optimizer=optimizer,
+            max_lr=config.optimizer.lr,
+            total_steps=len(train_loader) * config.train.epochs,
+            **config.scheduler,
+        )
+    else:
+        scheduler = None
 
     for epoch in range(config.train.epochs):
         print(f"Epoch {epoch}/{config.train.epochs}")
@@ -383,7 +394,8 @@ def main(config: DictConfig):
             print_exc(file=sys.stderr)
         else:
             print(e, file=sys.stderr)
-        wandb.log(dict(error=str(e)))
+        if config.wandb.mode != "disabled":
+            wandb.log(dict(error=str(e)))
         raise
     finally:
         sys.stdout.flush()

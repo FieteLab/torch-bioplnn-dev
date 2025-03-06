@@ -2,24 +2,12 @@
 data:
   dataset: mnist
   root: data
-  resolution: [32, 32]
   batch_size: 256
   num_workers: 8
   shuffle_test: true
 model:
   rnn_kwargs:
-    in_size: [32, 32]
-    in_channels: 1
-    exc_kernel_size:
-      - [3, 3]
-      - [3, 3]
-      - [3, 3]
-      - [3, 3]
-    inh_kernel_size:
-      - [3, 3]
-      - [3, 3]
-      - [3, 3]
-      - [3, 3]
-    pool_kernel_size: [3, 3]
     batch_first: false
   num_classes: 10
+
+layer_one_in_channels_override: 1

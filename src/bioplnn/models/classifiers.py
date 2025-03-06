@@ -98,16 +98,13 @@ class CRNNImageClassifier(nn.Module):
     ):
         super().__init__()
 
-        self.rnn = Conv2dEIRNN(**rnn_kwargs)  # type: ignore
+        self.rnn = Conv2dEIRNN(**rnn_kwargs)
 
-        self.num_layers = rnn_kwargs["num_layers"]
-
-        self.out_layer = nn.Sequential(
+        self.readout = nn.Sequential(
             nn.Flatten(1),
+            nn.AdaptiveAvgPool2d(1),
             nn.Linear(
-                self.rnn.layers[-1].out_channels
-                * self.rnn.layers[-1].out_size[0]
-                * self.rnn.layers[-1].out_size[0],
+                self.rnn.layers[-1].out_channels,
                 fc_dim,
             ),
             nn.ReLU(),
@@ -121,25 +118,33 @@ class CRNNImageClassifier(nn.Module):
         num_steps: Optional[int] = None,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
+    ) -> (
+        torch.Tensor
+        | tuple[
+            torch.Tensor,
+            list[torch.Tensor],
+            list[list[torch.Tensor]],
+            list[torch.Tensor],
+        ]
     ):
-        outs, h_pyrs, h_inters, fbs = self.rnn(
+        outs, h_neurons, fbs = self.rnn(
             x,
             num_steps=num_steps,
         )
 
         # Get the output from last layer
-        outs_tmp = outs[-1]
+        outs_last_layer = outs[-1]
         if self.rnn.batch_first:
-            outs_tmp = outs_tmp.transpose(0, 1)
+            outs_last_layer = outs_last_layer.transpose(0, 1)
 
         if loss_all_timesteps:
             pred = torch.stack(
-                [self.out_layer(out.flatten(1)) for out in outs_tmp]
+                [self.readout(out.flatten(1)) for out in outs_last_layer]
             )
         else:
-            pred = self.out_layer(outs_tmp[-1].flatten(1))
+            pred = self.readout(outs_last_layer.flatten(1))
 
         if return_activations:
-            return pred, outs, h_pyrs, h_inters, fbs
+            return pred, outs, h_neurons, fbs
         else:
             return pred

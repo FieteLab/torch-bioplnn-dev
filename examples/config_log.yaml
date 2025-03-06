@@ -2,11 +2,12 @@ activations:
   num_samples: 10
   save_activations: true
   save_root: activations/ei
+  shuffle_test: true
 checkpoint:
   epoch: null
   load: false
   root: checkpoints/ei
-  run: daily-armadillo-3361
+  run: avid-disco-3472
 compile:
   backend: inductor
   disable: true
@@ -14,68 +15,36 @@ compile:
   fullgraph: true
   mode: reduce-overhead
 criterion:
-  all_timesteps: false
-  fn: ce
+  class_name: CrossEntropyLoss
 data:
-  batch_size: 512
-  dataset: mazes
+  batch_size: 256
+  dataset: mnist
   num_workers: 8
-  resolution: null
-  root: ./data/mazes/
+  root: data
+  shuffle_test: true
 debug_level: 1
 debug_num_batches: null
 deterministic: false
+layer_one_in_channels_override: 1
 matmul_precision: high
 model:
-  arch: crnn
-  dropout: 0.5
-  fc_dim: 256
-  num_classes: 2
+  class_name: CRNNImageClassifier
+  num_classes: 10
   rnn_kwargs:
     batch_first: false
-    bias: true
-    exc_kernel_size:
-    - 3
-    - 3
-    exc_rectify: true
-    fb_adjacency: null
-    fb_channels: null
-    fb_init_mode: zeros
-    fb_kernel_size: null
-    h_inter_channels:
-    - 32
-    h_pyr_channels: 32
-    hidden_init_mode: zeros
-    immediate_inhibition: false
-    in_channels: 4
-    in_size:
-    - 48
-    - 48
-    inh_kernel_size:
-    - 3
-    - 3
-    inh_rectify: true
-    inter_mode: same
-    layer_time_delay: false
-    num_layers: 1
-    out_init_mode: zeros
-    pool_global: true
-    pool_kernel_size: null
-    pool_stride: null
-    post_inh_activation: gelu
-    post_integration_activation: null
-    pre_inh_activation: gelu
-    tau_mode: channel
-    use_three_compartments: false
+    layer_kwargs:
+    - in_channels: 1
+      out_channels: 32
+      spatial_size:
+      - 32
+      - 32
 optimizer:
-  beta1: 0.9
-  beta2: 0.999
-  fn: adamw
+  betas:
+  - 0.9
+  - 0.999
+  class_name: AdamW
   lr: 0.0005
-  momentum: 0.9
-scheduler:
-  fn: null
-  pct_start: 0.2
+scheduler: null
 seed: null
 tqdm: true
 train:
@@ -85,14 +54,8 @@ train:
     type: norm
     value: 1.0
   log_freq: 5
-  num_steps: 20
-visualizations:
-  enable: false
-  fps: 4
-  frames:
-  - 0
-  - 20
-  save_dir: visualizations
+  loss_all_timesteps: true
+  num_steps: 5
 wandb:
   group: null
   mode: disabled

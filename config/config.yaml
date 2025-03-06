@@ -10,16 +10,17 @@ defaults:
 optimizer:
   class_name: AdamW
   lr: 0.0005
-  momentum: 0.9
-  beta1: 0.9
-  beta2: 0.999
+  betas: [0.9, 0.999]
+# optimizer:
+#   class_name: SGD
+#   lr: 0.0005
+#   momentum: 0.9
 scheduler: null
 # scheduler:
 #   class_name: OneCycleLR
 #   pct_start: 0.2
 criterion:
   class_name: CrossEntropyLoss
-  all_timesteps: false
 compile:
   disable: true
   fullgraph: true
@@ -30,6 +31,7 @@ train:
   num_steps: 5
   epochs: 100
   log_freq: 5
+  loss_all_timesteps: true
   grad_clip:
     enable: false
     type: norm
@@ -41,7 +43,7 @@ checkpoint:
   epoch: null
 wandb:
   project: bioplnn
-  mode: online
+  mode: disabled
   group: null
 activations:
   save_root: activations/ei

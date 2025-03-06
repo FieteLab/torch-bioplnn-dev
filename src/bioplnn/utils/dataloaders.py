@@ -2,23 +2,23 @@ from typing import Optional
 
 import torch
 import torchvision.transforms as T
-from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
-from bioplnn.utils.common import manual_seed
+from bioplnn.utils import manual_seed
 
 
-def rescale(x):
-    return x * 2 - 1
+def rescale_to_range(x, old_min=0, old_max=1, new_min=-1, new_max=1):
+    return (x - old_min) / (old_max - old_min) * (new_max - new_min) + new_min
 
 
 def get_qclevr_dataloaders(
+    *,
     root: str,
     cue_assets_root: str,
     train_batch_size: int,
     val_batch_size: int,
-    resolution: tuple[int, int] = (128, 128),
+    resolution: Optional[tuple[int, int]] = None,
     mode: str = "color",
     holdout: list = [],
     primitive: bool = True,
@@ -29,18 +29,21 @@ def get_qclevr_dataloaders(
     seed: Optional[int] = None,
     shuffle_test: bool = False,
 ):
-    from bioplnn.datasets.qclevr import QCLEVRDataset
+    from bioplnn.datasets import QCLEVRDataset
 
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Lambda(rescale),
+    transform = [
+        transforms.ToTensor(),
+        transforms.Lambda(rescale_to_range),
+    ]
+    if resolution is not None:
+        transform.append(
             transforms.Resize(
                 resolution,
                 interpolation=transforms.InterpolationMode.NEAREST_EXACT,
-            ),
-        ]
-    )
+            )
+        )
+    transform = transforms.Compose(transform)
+
     train_dataset = QCLEVRDataset(
         root=root,
         cue_assets_root=cue_assets_root,
@@ -115,24 +118,29 @@ def get_qclevr_dataloaders(
 
 
 def get_cabc_dataloaders(
+    *,
     root: str,
-    resolution: tuple[int, int] = (128, 128),
+    resolution: Optional[tuple[int, int]] = None,
     batch_size: int = 16,
     num_workers: int = 0,
     seed: Optional[int] = None,
     shuffle_test: bool = False,
 ):
-    from bioplnn.datasets.cabc import CABCDataset
+    from bioplnn.datasets import CABCDataset
 
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
+    transform = [
+        transforms.ToTensor(),
+        transforms.Lambda(rescale_to_range),
+    ]
+    if resolution is not None:
+        transform.append(
             transforms.Resize(
                 resolution,
                 interpolation=transforms.InterpolationMode.NEAREST_EXACT,
-            ),
-        ]
-    )
+            )
+        )
+    transform = transforms.Compose(transform)
+
     train_dataset = CABCDataset(
         root=root,
         transform=transform,
@@ -143,6 +151,7 @@ def get_cabc_dataloaders(
         transform=transform,
         train=False,
     )
+
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -165,10 +174,12 @@ def get_cabc_dataloaders(
         if seed is not None
         else None,
     )
+
     return train_dataloader, val_dataloader
 
 
 def get_mazes_dataloaders(
+    *,
     root: str,
     resolution: Optional[tuple[int, int]] = None,
     subset: float = 1.0,
@@ -178,17 +189,15 @@ def get_mazes_dataloaders(
     seed: Optional[int] = None,
     shuffle_test: bool = False,
 ):
-    from bioplnn.datasets.mazes import Mazes
+    from bioplnn.datasets import Mazes
 
     if resolution is not None:
-        transform = (
-            transforms.Resize(
-                resolution,
-                interpolation=transforms.InterpolationMode.NEAREST_EXACT,
-            ),
+        transform = transforms.Resize(
+            resolution,
+            interpolation=transforms.InterpolationMode.NEAREST_EXACT,
         )
     else:
-        transform = nn.Identity()
+        transform = None
 
     train_dataset = Mazes(
         root=root,
@@ -289,15 +298,15 @@ def get_correlated_dots_dataloaders(
 
 
 def _image_classification_dataloaders(
-    dataset,
-    root,
-    resolution=None,
-    v1=False,
-    retina_path=None,
-    batch_size=16,
-    num_workers=0,
-    seed=None,
-    shuffle_test=False,
+    dataset: str,
+    root: str,
+    resolution: Optional[tuple[int, int]] = None,
+    v1: bool = False,
+    retina_path: Optional[str] = None,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 
@@ -400,7 +409,7 @@ def _image_classification_dataloaders(
 def get_image_classification_dataloaders(
     dataset="mnist",
     root="data",
-    resolution=None,
+    resolution: Optional[tuple[int, int]] = None,
     batch_size=16,
     num_workers=0,
     seed=None,
@@ -421,7 +430,7 @@ def get_image_classification_dataloaders(
 def get_v1_dataloaders(
     dataset="mnist",
     root="data",
-    resolution=None,
+    resolution: Optional[tuple[int, int]] = None,
     retina_path=None,
     batch_size=16,
     num_workers=0,
@@ -443,7 +452,7 @@ def get_v1_dataloaders(
 
 def get_mnist_dataloaders(
     root="data",
-    resolution=None,
+    resolution: Optional[tuple[int, int]] = None,
     batch_size=16,
     num_workers=0,
     seed=None,
@@ -463,7 +472,7 @@ def get_mnist_dataloaders(
 
 def get_cifar10_dataloaders(
     root="data",
-    resolution=None,
+    resolution: Optional[tuple[int, int]] = None,
     batch_size=16,
     num_workers=0,
     seed=None,
@@ -482,12 +491,12 @@ def get_cifar10_dataloaders(
 
 
 def get_cifar100_dataloaders(
-    root="data",
-    resolution=None,
-    batch_size=16,
-    num_workers=0,
-    seed=None,
-    shuffle_test=False,
+    root: str = "data",
+    resolution: Optional[tuple[int, int]] = None,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar100",
@@ -502,13 +511,13 @@ def get_cifar100_dataloaders(
 
 
 def get_mnist_v1_dataloaders(
-    root="data",
-    resolution=None,
-    retina_path=None,
-    batch_size=16,
-    num_workers=0,
-    seed=None,
-    shuffle_test=False,
+    root: str = "data",
+    resolution: Optional[tuple[int, int]] = None,
+    retina_path: Optional[str] = None,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     return _image_classification_dataloaders(
         dataset="mnist",
@@ -524,13 +533,13 @@ def get_mnist_v1_dataloaders(
 
 
 def get_cifar10_v1_dataloaders(
-    root="data",
-    resolution=None,
-    retina_path=None,
-    batch_size=16,
-    num_workers=0,
-    seed=None,
-    shuffle_test=False,
+    root: str = "data",
+    resolution: Optional[tuple[int, int]] = None,
+    retina_path: Optional[str] = None,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar10",
@@ -546,13 +555,13 @@ def get_cifar10_v1_dataloaders(
 
 
 def get_cifar100_v1_dataloaders(
-    root="data",
-    resolution=None,
-    retina_path=None,
-    batch_size=16,
-    num_workers=0,
-    seed=None,
-    shuffle_test=False,
+    root: str = "data",
+    resolution: Optional[tuple[int, int]] = None,
+    retina_path: Optional[str] = None,
+    batch_size: int = 16,
+    num_workers: int = 0,
+    seed: Optional[int] = None,
+    shuffle_test: bool = False,
 ):
     return _image_classification_dataloaders(
         dataset="cifar100",

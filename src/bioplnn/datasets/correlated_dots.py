@@ -53,7 +53,7 @@ class CorrelatedDots(Dataset):
         correlated_direction = torch.randint(4, (1,)).squeeze()
 
         correlated_dx, correlated_dy = (
-            self.direction_vectors[correlated_direction.item()]
+            self.direction_vectors[correlated_direction.item()]  # type: ignore
             * correlated_speed
         )
 

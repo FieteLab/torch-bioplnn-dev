@@ -1,14 +1,6 @@
-defaults:
-  - default
-  - _self_
-
+class_name: CRNNImageClassifier
 rnn_kwargs:
-  h_inter_channels: null
-  fb_channels: null
-  exc_kernel_size: [3, 3]
-  fb_kernel_size: null
-  fb_adjacency: null
-  num_layers: 1
-  pool_kernel_size: null
-  pool_stride: null
-  pool_global: true
+  layer_kwargs:
+    - spatial_size: [32, 32]
+      in_channels: 3
+      out_channels: 32

@@ -7,8 +7,9 @@ from typing import Any, Optional, TypeVar, Union
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 from numpy.typing import NDArray
+from torch import nn
+from torch.nn import functional as F
 
 from bioplnn.utils import (
     expand_array_2d,
@@ -84,6 +85,43 @@ class Conv2dRectify(nn.Conv2d):
 class Conv2dEIRNNLayerConfig:
     """
     Configuration class for Conv2dEIRNN layers.
+
+    Args:
+        spatial_size (tuple[int, int]): Size of the input data (height, width).
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        num_neuron_types (int, optional): Number of neuron types. Defaults to 1.
+        neuron_channels (Param1dType[int], optional): Number of channels for each
+            neuron type. Defaults to 16.
+        neuron_type (Param1dType[str], optional): Type of neuron. Defaults to
+            "excitatory".
+        neuron_spatial_mode (Param1dType[str], optional): Spatial mode for the
+            neuron. Defaults to "same".
+        fb_channels (int, optional): Number of feedback channels. Defaults to
+            None.
+        conv_connectivity (Param2dType[int | bool], optional): Connectivity
+            matrix for the convolutions. Defaults to [[1, 0], [0, 1]].
+        conv_rectify (Param2dType[bool], optional): Whether to rectify the
+            convolutions. Defaults to False.
+        conv_kernel_size (Param2dType[tuple[int, int]], optional): Kernel size
+            for the convolutions. Defaults to (3, 3).
+        conv_activation (Param2dType[str | ActivationFnType], optional):
+            Activation function for the convolutions. Defaults to None.
+        conv_bias (Param2dType[bool], optional): Whether to add a bias term for
+            the convolutions. Defaults to True.
+        post_agg_activation (Param1dType[str | ActivationFnType], optional):
+            Activation function for the post-aggregation. Defaults to "Tanh".
+        tau_mode (Param1dType[str], optional): Mode for handling membrane time
+            constants. Defaults to "channel".
+        tau_init_mode (Param1dType[str | TensorInitFnType], optional):
+            Initialization mode for the membrane time constants. Defaults to
+            "zeros".
+        default_hidden_init_mode (str | TensorInitFnType, optional):
+            Initialization mode for the hidden state. Defaults to "zeros".
+        default_fb_init_mode (str | TensorInitFnType, optional): Initialization
+            mode for the feedback. Defaults to "zeros".
+        default_out_init_mode (str | TensorInitFnType, optional): Initialization
+            mode for the output. Defaults to "zeros".
     """
 
     spatial_size: tuple[int, int]
@@ -101,7 +139,7 @@ class Conv2dEIRNNLayerConfig:
     conv_kernel_size: Param2dType[tuple[int, int]] = (3, 3)
     conv_activation: Optional[Param2dType[str | ActivationFnType]] = None
     conv_bias: Param2dType[bool] = True
-    post_agg_activation: Optional[Param1dType[str | ActivationFnType]] = "tanh"
+    post_agg_activation: Optional[Param1dType[str | ActivationFnType]] = "Tanh"
     tau_mode: Optional[Param1dType[str]] = "channel"
     tau_init_mode: Param1dType[str | TensorInitFnType] = "zeros"
     default_hidden_init_mode: str | TensorInitFnType = "zeros"
@@ -114,48 +152,30 @@ class Conv2dEIRNNLayerConfig:
 
 class Conv2dEIRNNLayer(nn.Module):
     """
-    Implements a 2D convolutional recurrent neural network cell with excitatory \
+    Implements a 2D convolutional recurrent neural network layer with excitatory
     and inhibitory neurons.
 
+    This layer implements the core computational unit of the EIRNN architecture,
+    supporting multiple neuron types (excitatory and inhibitory) with configurable
+    connectivity patterns, activation functions, and time constants.
+
     Args:
-        in_size (tuple[int, int]): Size of the input data (height, width).
-        in_channels (int): Number of input channels.
-        h_exc_channels (int, optional): Number of channels in the excitatory cell \
-            hidden state. Defaults to 16.
-        h_inh_channels (list[int], optional): List of number of channels for \
-            each inhibitory neuron type. Defaults to [16]. The length can be 0, 1, 2, \
-            or 4, indicating the number of inhibitory neuron types. A length of 0 \
-            indicates no inhibitory neurons.
-        fb_channels (int, optional): Number of channels for the feedback input. \
-            Defaults to 0.
-        inh_mode (str, optional): Mode for handling inhibitory neuron size relative \
-            to input size. Must be 'half' or 'same'. Defaults to 'half'.
-        rectify (bool | list[bool], optional): List of booleans indicating whether to \
-            rectify the corresponding layer. Defaults to False.
-        exc_kernel_size (tuple[int, int], optional): Kernel size for excitatory \
-            convolutions. Defaults to (3, 3).
-        inh_kernel_size (tuple[int, int], optional): Kernel size for inhibitory \
-            convolutions. Defaults to (3, 3).
-        pool_kernel_size (tuple[int, int], optional): Kernel size for the output \
-            pooling layer. Defaults to (3, 3).
-        pool_stride (tuple[int, int], optional): Stride for the output pooling \
-            layer. Defaults to (2, 2).
-        pre_inh_activation (str | list[str], optional): Activation function \
-            applied before inhibition. Defaults to "relu". If a list is \
-            provided, the activations are applied sequentially.
-        post_inh_activation (str | list[str], optional): Activation function \
-            applied after inhibition. Defaults to "tanh". If a list is provided, \
-            the activations are applied sequentially.
-        post_integration_activation (str | list[str], optional): Activation \
-            function applied after integration. Defaults to None. If a list is \
-            provided, the activations are applied sequentially.
-        tau_mode (str, optional): Mode for handling membrane time constants. \
-            Defaults to "channel". Options are None, "channel", "spatial", and "channel_spatial".
-        bias (bool, optional): Whether to add a bias term for convolutions. \
-            Defaults to True.
+        config (Optional[Conv2dEIRNNLayerConfig]): Configuration object that specifies
+            the layer architecture and parameters. See Conv2dEIRNNLayerConfig for details.
+            If None, parameters must be provided as keyword arguments.
+        **kwargs: Keyword arguments that can be used to override or provide parameters
+            not specified in the config object. These will be used to populate the config
+            if one is not provided.
+
+    The layer implements:
+    - Configurable neuron types (excitatory/inhibitory)
+    - Convolutional connectivity between neuron populations
+    - Recurrent dynamics with learnable time constants
+    - Optional feedback connections
+    - Customizable activation functions
 
     Raises:
-        ValueError: If invalid arguments are provided.
+        ValueError: If invalid configuration arguments are provided.
     """
 
     def __init__(
@@ -194,11 +214,11 @@ class Conv2dEIRNNLayer(nn.Module):
             config.neuron_spatial_mode, self.num_neuron_types, depth=1
         )
 
-        if set(self.neuron_type) <= {"excitatory", "inhibitory"}:
+        if not set(self.neuron_type) <= {"excitatory", "inhibitory"}:
             raise ValueError(
                 "neuron_type for each neuron type must be 'excitatory' or 'inhibitory'."
             )
-        if set(self.neuron_spatial_mode) <= {"same", "half"}:
+        if not set(self.neuron_spatial_mode) <= {"same", "half"}:
             raise ValueError(
                 "neuron_spatial_mode for each neuron type must be 'same' or 'half'."
             )
@@ -217,18 +237,16 @@ class Conv2dEIRNNLayer(nn.Module):
 
         # Calculate spatial size for each neuron type based on spatial mode
         self.neuron_spatial_size = [
-            self.spatial_size
-            if self.neuron_spatial_mode == "same"
-            else self.half_spatial_size
-            for self.neuron_spatial_mode in self.neuron_spatial_mode
+            self.spatial_size if mode == "same" else self.half_spatial_size
+            for mode in self.neuron_spatial_mode
         ]
         #####################################################################
         # Circuit motif connectivity
         #####################################################################
 
         # Format circuit connectivity
-        self.connectivity = np.array(config.conv_connectivity)
-        if self.connectivity.shape != (
+        self.conv_connectivity = np.array(config.conv_connectivity)
+        if self.conv_connectivity.shape != (
             self.num_output_types,
             self.num_input_types,
         ):
@@ -301,10 +319,6 @@ class Conv2dEIRNNLayer(nn.Module):
                 if self.conv_connectivity[i, j]:
                     # Handle rectification
                     if self.conv_rectify[i, j]:
-                        if conv_in_type == "input":
-                            warnings.warn(
-                                "Rectification of input neurons may hinder learning."
-                            )
                         Conv2d = Conv2dRectify
                     else:
                         Conv2d = nn.Conv2d
@@ -344,8 +358,8 @@ class Conv2dEIRNNLayer(nn.Module):
                             kernel_size=self.conv_kernel_size[i, j],
                             stride=conv_stride,
                             padding=(
-                                self.conv_kernel_size[i, j, 0] // 2,
-                                self.conv_kernel_size[i, j, 1] // 2,
+                                self.conv_kernel_size[i, j][0] // 2,
+                                self.conv_kernel_size[i, j][1] // 2,
                             ),
                             bias=self.conv_bias[i, j],
                         )
@@ -610,100 +624,66 @@ class Conv2dEIRNNLayer(nn.Module):
 
             conv_outs[j].append(sign * conv(conv_ins[i]))
 
-        h_neuron_new = [torch.cat(conv_out, dim=1) for conv_out in conv_outs]
+        conv_outs = [torch.cat(conv_out, dim=1) for conv_out in conv_outs]
+        h_neuron_new = conv_outs[:-1]
+        out = conv_outs[-1]
 
         # Compute Euler update for excitatory cell hidden state
         for i in range(self.num_neuron_types):
             tau = torch.sigmoid(self.tau[i])
-            h_neuron[i] = tau * h_neuron_new[i] + (1 - tau) * h_neuron[i]
+            h_neuron_new[i] = tau * h_neuron_new[i] + (1 - tau) * h_neuron[i]
 
-        # Pool the output
-        out = self.out_pool(h_neuron)
-
-        return out, h_neuron
+        return out, h_neuron_new
 
 
-# TODO: Update for new block
 class Conv2dEIRNN(nn.Module):
     """
     Implements a deep convolutional recurrent neural network with excitatory-inhibitory
     neurons (EIRNN).
 
+    This module creates a multi-layer convolutional EIRNN network by stacking multiple
+    Conv2dEIRNNLayer instances with optional feedback connections between them.
+
     Args:
-        in_size (tuple[int, int]): Size of the input data (height, width).
-        in_channels (int): Number of input channels.
-        h_exc_channels (int | list[int]): Number of channels in the excitatory cell \
-            hidden state for each layer.
-        h_inh_channels (list[int] | list[list[int]]): Number of channels in the
-            inhibitory neuron hidden state for each layer.
-        fb_channels (int | list[int]): Number of channels for the feedback input for \
-            each layer.
-        exc_kernel_size (tuple[int, int] | tuple[tuple[int, int]]): Kernel size for
-            excitatory convolutions in each layer.
-        inh_kernel_size (tuple[int, int] | tuple[tuple[int, int]]): Kernel size for
-            inhibitory convolutions in each layer.
-        fb_kernel_size (tuple[int, int] | tuple[tuple[int, int]]): Kernel size for
-            feedback convolutions in each layer.
-        use_three_compartments (bool): Whether to use a three-compartment model for
-            excitatory cells.
-        immediate_inhibition (bool): Whether inhibitory neurons provide immediate inhibition.
-        num_layers (int): Number of layers in the RNN.
-        inh_mode (str): Mode for handling inhibitory neuron size relative to input size
-            ('half' or 'same').
-        layer_time_delay (bool): Whether to introduce a time delay between layers.
-        exc_rectify bool: Activation function for excitatory weights (e.g., \
-            'relu').
-        inh_rectify bool: Activation function for inhibitory weights (e.g., \
-            'relu').
-        hidden_init_mode (str): Initialization mode for hidden states ('zeros' or
-            'normal').
-        fb_init_mode (str): Initialization mode for feedback input ('zeros' or \
-            'normal').
-        out_init_mode (str): Initialization mode for output ('zeros' or 'normal').
-        fb_adjacency (Optional[torch.Tensor]): Adjacency matrix for feedback \
-            connections.
-        pool_kernel_size (tuple[int, int] | tuple[tuple[int, int]]): Kernel size for \
-            pooling in each layer.
-        pool_stride (tuple[int, int] | tuple[tuple[int, int]]): Stride for pooling in \
-            each layer.
-        pool_global (bool | tuple[int, int]): Whether to use global pooling in each layer.
-        pre_inh_activation (Optional[str]): Activation function applied before \
-            inhibition.
-        post_inh_activation (Optional[str]): Activation function applied after \
-            inhibition (to excitatory cell).
-        post_integration_activation (Optional[str]): Activation function applied \
-            after integration (to excitatory and inhibitory neurons).
-        tau_mode (Optional[str]): Mode for handling tau values ('channel', 'spatial', 'channel_spatial').
-        fb_activation (Optional[str]): Activation function for feedback connections.
-        bias (bool | tuple[bool]): Whether to add bias for convolutions in each layer.
-        layer_time_delay (bool): Whether to introduce a time delay between layers.
-        fb_adjacency (Optional[tuple[tuple[int | bool]] | torch.Tensor] = None): \
-            Adjacency matrix for feedback connections.
-        hidden_init_mode (str): Initialization mode for hidden states ('zeros' or
-            'normal').
-        fb_init_mode (str): Initialization mode for feedback input ('zeros' or \
-            'normal').
-        out_init_mode (str): Initialization mode for output ('zeros' or 'normal').
-        batch_first (bool): Whether the input tensor has batch dimension as the \
-            first dimension.
+        num_layers (int): Number of EIRNN layers in the network. Defaults to 1.
+        layer_configs (Conv2dEIRNNLayerConfig | list[Conv2dEIRNNLayerConfig], optional):
+            Configuration object(s) for the EIRNN layers. If provided as a list, must match
+            the number of layers. If a single config is provided, it will be used for all layers
+            with appropriate adjustments. Defaults to None.
+        layer_kwargs (Mapping[str, Any] | list[Mapping[str, Any]], optional):
+            Additional keyword arguments for each layer. If provided as a list, must match
+            the number of layers. Defaults to None.
+        common_layer_kwargs (Mapping[str, Any], optional):
+            Keyword arguments to apply to all layers. Defaults to None.
+        fb_connectivity (Param2dType[int | bool], optional):
+            Connectivity matrix for feedback connections between layers. Defaults to None.
+        fb_activations (Param2dType[str], optional):
+            Activation functions for feedback connections. Defaults to None.
+        fb_rectify (Param2dType[bool]):
+            Whether to rectify feedback connections. Defaults to False.
+        fb_kernel_sizes (Param2dType[tuple[int, int]], optional):
+            Kernel sizes for feedback convolutions. Defaults to None.
+        pool_mode (str, optional):
+            Pooling mode for layer outputs. Defaults to "avg".
+        layer_time_delay (bool):
+            Whether to introduce a time delay between layers. Defaults to False.
+        batch_first (bool):
+            Whether the input tensor has batch dimension as the first dimension. Defaults to True.
     """
 
     def __init__(
         self,
         *,
         num_layers: int = 1,
-        layer_configs: Optional[
-            Conv2dEIRNNLayerConfig | list[Conv2dEIRNNLayerConfig]
-        ] = None,
-        layer_kwargs: Optional[
-            Mapping[str, Any] | list[Mapping[str, Any]]
-        ] = None,
+        layer_configs: Optional[list[Conv2dEIRNNLayerConfig]] = None,
+        layer_kwargs: Optional[list[Mapping[str, Any]]] = None,
         common_layer_kwargs: Optional[Mapping[str, Any]] = None,
         fb_connectivity: Optional[Param2dType[int | bool]] = None,
         fb_activations: Optional[Param2dType[str]] = None,
         fb_rectify: Param2dType[bool] = False,
         fb_kernel_sizes: Optional[Param2dType[tuple[int, int]]] = None,
         layer_time_delay: bool = False,
+        pool_mode: Optional[str] = "max",
         batch_first: bool = True,
     ):
         super().__init__()
@@ -720,34 +700,66 @@ class Conv2dEIRNN(nn.Module):
                     "layer_configs cannot be provided if layer_configs_kwargs "
                     "or common_layer_config_kwargs is provided."
                 )
-            if isinstance(layer_configs, Conv2dEIRNNLayerConfig):
-                layer_configs = [layer_configs]
-            elif len(layer_configs) != self.num_layers:
+            if len(layer_configs) != self.num_layers:
                 raise ValueError("layer_configs must be of length num_layers.")
         else:
             if layer_kwargs is None:
-                raise ValueError(
-                    "layer_kwargs must be provided if layer_configs is not provided."
-                )
-            if isinstance(layer_kwargs, Mapping):
-                layer_kwargs = [layer_kwargs]
+                if common_layer_kwargs is None:
+                    raise ValueError(
+                        "layer_kwargs or common_layer_kwargs must be provided if "
+                        "layer_configs is not provided."
+                    )
+                layer_kwargs = [{}] * self.num_layers  # type: ignore
             elif len(layer_kwargs) != self.num_layers:
                 raise ValueError("layer_kwargs must be of length num_layers.")
 
             if common_layer_kwargs is None:
                 common_layer_kwargs = {}
+
             layer_configs = [
                 Conv2dEIRNNLayerConfig(
-                    **common_layer_kwargs, **layer_kwargs[i]
+                    **common_layer_kwargs,
+                    **layer_kwargs[i],  # type: ignore
                 )
                 for i in range(self.num_layers)
             ]
+
+        # Validate layer configurations
+        for i in range(self.num_layers - 1):
+            if (
+                layer_configs[i].out_channels
+                != layer_configs[i + 1].in_channels
+            ):
+                raise ValueError(
+                    f"The output channels of layer {i} must match the input "
+                    f"channels of layer {i + 1}."
+                )
+
+        # Check if the first layer input projections are rectified
+        warn = False
+        if isinstance(layer_configs[0].conv_rectify, bool):
+            if layer_configs[0].conv_rectify:
+                warn = True
+        else:
+            if any(layer_configs[0].conv_rectify):
+                warn = True
+        if warn:
+            warnings.warn(
+                "Rectification of network input may hinder learning! "
+                "Consider setting conv_rectify to False for the input "
+                "projections to the first layer or for the whole first "
+                "layer (i.e. set layer_configs[0].conv_rectify[0,:] or "
+                "layer_configs[0].conv_rectify to False). \n"
+                "If your input to the network is already purely positive, "
+                "you can safely ignore this warning."
+            )
 
         ############################################################
         # RNN parameters
         ############################################################
 
         self.layer_time_delay = layer_time_delay
+        self.pool_mode = pool_mode
         self.batch_first = batch_first
 
         ############################################################
@@ -758,10 +770,6 @@ class Conv2dEIRNN(nn.Module):
         self.layers = nn.ModuleList(
             [Conv2dEIRNNLayer(layer_config) for layer_config in layer_configs]
         )
-
-        self.pools = nn.ModuleList([nn.Identity()])
-        for layer in self.layers[1:]:
-            self.pools.append(nn.AvgPool2d(layer.spatial_size))
 
         ############################################################
         # Initialize feedback connections
@@ -919,6 +927,9 @@ class Conv2dEIRNN(nn.Module):
         fb_0: Optional[Sequence[torch.Tensor | None]],
         num_steps: int,
         batch_size: int,
+        out_init_mode: Optional[str] = None,
+        hidden_init_mode: Optional[str] = None,
+        fb_init_mode: Optional[str] = None,
         device: Optional[torch.device] = None,
     ) -> tuple[
         list[list[torch.Tensor | None]],
@@ -967,12 +978,10 @@ class Conv2dEIRNN(nn.Module):
 
         # Initialize default values
         h_neuron_0_default = self._init_hidden(
-            batch_size, init_mode=self.hidden_init_mode, device=device
+            batch_size, hidden_init_mode, device
         )
-        fb_0_default = self._init_fb(
-            batch_size, init_mode=self.fb_init_mode, device=device
-        )
-        out_0_default = self._init_out(batch_size, device=device)
+        fb_0_default = self._init_fb(batch_size, fb_init_mode, device)
+        out_0_default = self._init_out(batch_size, out_init_mode, device)
 
         # Initialize output, hidden state, and feedback lists
         outs: list[list[torch.Tensor | None]] = [
@@ -1090,6 +1099,28 @@ class Conv2dEIRNN(nn.Module):
 
         return outs, h_neurons, fbs
 
+    def _match_spatial_size(
+        self,
+        x: torch.Tensor,
+        spatial_size: tuple[int, int],
+    ) -> torch.Tensor:
+        """
+        Matches the spatial size of the input tensor to the spatial size of the layer.
+        """
+        if x.shape[-2:] > spatial_size:
+            if self.pool_mode == "avg":
+                return F.avg_pool2d(x, spatial_size)
+            elif self.pool_mode == "max":
+                return F.max_pool2d(x, spatial_size)
+            else:
+                raise ValueError(f"Invalid pool_mode: {self.pool_mode}")
+        elif x.shape[-2:] < spatial_size:
+            return F.interpolate(
+                x, spatial_size, mode="bilinear", align_corners=False
+            )
+        else:
+            return x
+
     def forward(
         self,
         x: torch.Tensor,
@@ -1143,12 +1174,21 @@ class Conv2dEIRNN(nn.Module):
                 # Compute layer update and output
                 if i == 0:
                     layer_in = x[t]
-                elif self.layer_time_delay:
-                    layer_in = outs[i - 1][t - 1]
+                    layer_in = F.interpolate(
+                        layer_in,
+                        self.layers[i].spatial_size,
+                        mode="bilinear",
+                        align_corners=False,
+                    )
                 else:
-                    layer_in = outs[i - 1][t]
-
-                layer_in = self.pools[i](layer_in)
+                    if self.layer_time_delay:
+                        layer_in = outs[i - 1][t - 1]
+                    else:
+                        layer_in = outs[i - 1][t]
+                    assert isinstance(layer_in, torch.Tensor)
+                    layer_in = self._match_spatial_size(
+                        layer_in, self.layers[i].spatial_size
+                    )
 
                 outs[i][t], h_neurons[i][t] = layer(
                     input=layer_in,

@@ -161,6 +161,8 @@ def expand_list(x: Any, n: int, depth: int = 0) -> list[Any]:
     inner = x
     try:
         for _ in range(depth + 1):
+            if isinstance(inner, str):
+                raise TypeError
             inner = inner[0]  # type: ignore
     except TypeError:
         return [x] * n  # type: ignore
@@ -202,7 +204,11 @@ def expand_array_2d(x: Any, m: int, n: int, depth: int = 0) -> np.ndarray:
         for _ in range(depth + 2):
             inner = inner[0]  # type: ignore
     except TypeError:
-        return np.full((m, n), x)
+        array = np.empty((m, n), dtype=object)
+        for i in range(m):
+            for j in range(n):
+                array[i, j] = x
+        return array
 
     if x is None:
         assert depth == -1
