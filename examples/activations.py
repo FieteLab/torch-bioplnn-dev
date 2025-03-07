@@ -12,15 +12,13 @@ from tqdm import tqdm
 from bioplnn.utils import AttrDict, initialize_dataloader, initialize_model
 
 
-def test(config: DictConfig) -> None:
-    config = OmegaConf.to_container(config, resolve=True)
+def test(dict_config: DictConfig) -> None:
+    config = OmegaConf.to_container(dict_config, resolve=True)
     config = AttrDict(config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize model and load checkpoint
-    model = initialize_model(
-        dataset=config.data.dataset, config=config.model
-    ).to(device)
+    model = initialize_model(**config.model).to(device)
     checkpoint_path = os.path.join(
         config.checkpoint.root,
         config.checkpoint.run,
@@ -50,10 +48,10 @@ def test(config: DictConfig) -> None:
     ):
         config.data.shuffle_test = True
 
-    _, test_loader = initialize_dataloader(config.data, config.seed)
+    # Get the data loaders
+    _, test_loader = initialize_dataloader(seed=config.seed, **config.data)
 
     # Record results
-
     save_dict = defaultdict(list)
     bar = tqdm(
         test_loader,
@@ -84,6 +82,7 @@ def test(config: DictConfig) -> None:
             except AttributeError:
                 x = [t.to(device) for t in x]
             label = label.to(device)
+
             # Forward pass
             out = model(
                 x=x,

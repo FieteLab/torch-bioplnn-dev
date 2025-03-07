@@ -90,11 +90,12 @@ class ConnectomeRNN(SparseRNN):
         self.tau = nn.Parameter(
             torch.ones(self.num_neurons), requires_grad=True
         )
-        self._tau_hook(None, None)
+        self._tau_hook(self, None)
         self.register_forward_pre_hook(self._tau_hook)
 
-    def _tau_hook(self, args):
-        self.tau = F.softplus(self.tau) + 1
+    @staticmethod
+    def _tau_hook(module, args):
+        module.tau = F.softplus(module.tau) + 1
 
     def _init_indices(self, input_indices, output_indices):
         if input_indices is not None:
