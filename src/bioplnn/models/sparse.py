@@ -258,32 +258,6 @@ class SparseRNN(nn.Module):
             )
         return x, num_steps
 
-    def _get_x_t_ode(self, x: torch.Tensor, t: torch.Tensor):
-        """
-        Formats the input tensor to match the expected shape.
-
-        Args:
-            x (torch.Tensor): Input tensor.
-            t (torch.Tensor): Time tensor.
-
-        Returns:
-            torch.Tensor: The formatted input tensor.
-        """
-        if x.dim() == 2:
-            x = x.t()
-        elif x.dim() == 3:
-            if self.batch_first:
-                x = x.permute(1, 2, 0)
-            else:
-                x = x.permute(0, 2, 1)
-            x = x[t]
-        else:
-            raise ValueError(
-                f"Input tensor must be 2D or 3D, but got {x.dim()} dimensions."
-            )
-
-        return x
-
     def _format_result(self, hs: list[torch.Tensor]) -> torch.Tensor:
         """
         Formats the hidden states.
@@ -301,6 +275,30 @@ class SparseRNN(nn.Module):
             h = h.permute(0, 2, 1)
 
         return h
+
+    def _format_x_ode(self, x: torch.Tensor):
+        """
+        Formats the input tensor to match the expected shape.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The formatted input tensor.
+        """
+        if x.dim() == 2:
+            x = x.t()
+        elif x.dim() == 3:
+            if self.batch_first:
+                x = x.permute(1, 2, 0)
+            else:
+                x = x.permute(0, 2, 1)
+        else:
+            raise ValueError(
+                f"Input tensor must be 2D or 3D, but got {x.dim()} dimensions."
+            )
+
+        return x
 
     def forward_ode(self, t, y, args):
         h = y

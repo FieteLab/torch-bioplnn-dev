@@ -5,12 +5,13 @@ from warnings import warn
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from bioplnn.models.sparse import SparseRNN
 from bioplnn.utils import idx_1D_to_2D, idx_2D_to_1D
 
 
-class TopographicalRNN(SparseRNN):
+class ConnectomeRNN(SparseRNN):
     """
     Base class for Topographical Recurrent Neural Networks (TRNNs).
 
@@ -89,6 +90,11 @@ class TopographicalRNN(SparseRNN):
         self.tau = nn.Parameter(
             torch.ones(self.num_neurons), requires_grad=True
         )
+        self._tau_hook(None, None)
+        self.register_forward_pre_hook(self._tau_hook)
+
+    def _tau_hook(self, args):
+        self.tau = F.softplus(self.tau) + 1
 
     def _init_indices(self, input_indices, output_indices):
         if input_indices is not None:
@@ -261,17 +267,17 @@ class TopographicalRNN(SparseRNN):
         return connectivity_ih, connectivity_hh
 
     def forward_ode(self, t, y, x):
-        h = y
+        h = y.transpose(0, 1)
 
         x_t = self._get_x_t_ode(x, t)
 
-        h = self.nonlinearity(self.ih(x_t) + self.hh(h))
-        h = self.layernorm(h)
+        h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
+        h_new = self.layernorm(h_new)
 
-        tau = torch.sigmoid(self.tau)
-        h = tau * h + (1 - tau) * h
+        assert self.tau > 1
+        dhdt = 1 / self.tau * (h_new - h)
 
-        return h
+        return dhdt
 
     def forward(
         self,
@@ -306,8 +312,8 @@ class TopographicalRNN(SparseRNN):
         for t in range(num_steps):
             hs[t] = self.nonlinearity(self.ih(x[t]) + self.hh(hs[t - 1]))
             hs[t] = self.layernorm(hs[t])
-            tau = torch.sigmoid(self.tau)
-            hs[t] = tau * hs[t] + (1 - tau) * hs[t - 1]
+            assert self.tau > 1
+            hs[t] = 1 / self.tau * hs[t] + (1 - 1 / self.tau) * hs[t - 1]
 
         # Stack outputs and adjust dimensions if necessary
         hs = self._format_result(hs)

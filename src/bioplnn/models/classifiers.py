@@ -4,11 +4,11 @@ from typing import Any, Optional
 import torch
 from torch import nn
 
+from bioplnn.models.connectome import ConnectomeRNN
 from bioplnn.models.ei_crnn import Conv2dEIRNN
-from bioplnn.models.topography import TopographicalRNN
 
 
-class TopographicalImageClassifierBase(nn.Module):
+class ConnectomeImageClassifierBase(nn.Module):
     def __init__(
         self,
         rnn_kwargs,
@@ -18,7 +18,7 @@ class TopographicalImageClassifierBase(nn.Module):
     ):
         super().__init__()
 
-        self.rnn = TopographicalRNN(**rnn_kwargs)
+        self.rnn = ConnectomeRNN(**rnn_kwargs)
 
         if self.rnn.output_indices is None:
             out_size = self.rnn.num_neurons
@@ -34,7 +34,7 @@ class TopographicalImageClassifierBase(nn.Module):
         )
 
 
-class TopographicalImageClassifier(TopographicalImageClassifierBase):
+class ConnectomeImageClassifier(ConnectomeImageClassifierBase):
     def forward(
         self,
         x: torch.Tensor,
@@ -61,7 +61,7 @@ class TopographicalImageClassifier(TopographicalImageClassifierBase):
             return pred
 
 
-class TopographicalImageClassifierODE(TopographicalImageClassifierBase):
+class ConnectomeImageClassifierODE(ConnectomeImageClassifierBase):
     def forward(
         self,
         x: torch.Tensor,
