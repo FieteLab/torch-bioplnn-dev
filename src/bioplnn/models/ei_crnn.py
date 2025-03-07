@@ -1055,9 +1055,9 @@ class Conv2dEIRNN(nn.Module):
         h_neurons: list[list[list[torch.Tensor]]],
         fbs: list[list[torch.Tensor | None]],
     ) -> tuple[
+        list[torch.Tensor],
         list[list[torch.Tensor]],
-        list[list[list[torch.Tensor]]],
-        list[list[torch.Tensor | None]],
+        list[torch.Tensor | None],
     ]:
         """
         Formats the outputs, hidden states, and feedback inputs.
@@ -1097,7 +1097,7 @@ class Conv2dEIRNN(nn.Module):
                 if self.layers[i].use_fb:
                     fbs_stack[i] = fbs_stack[i].transpose(0, 1)  # type: ignore
 
-        return outs, h_neurons, fbs
+        return outs_stack, h_neurons_stack, fbs_stack
 
     def _match_spatial_size(
         self,
@@ -1131,9 +1131,9 @@ class Conv2dEIRNN(nn.Module):
         ] = None,
         fb_0: Optional[Sequence[Optional[torch.Tensor]]] = None,
     ) -> tuple[
+        list[torch.Tensor],
         list[list[torch.Tensor]],
-        list[list[list[torch.Tensor]]],
-        list[list[torch.Tensor | None]],
+        list[torch.Tensor | None],
     ]:
         """
         Performs forward pass of the Conv2dEIRNN.

@@ -15,7 +15,6 @@ optimizer:
 #   class_name: SGD
 #   lr: 0.0005
 #   momentum: 0.9
-scheduler: null
 # scheduler:
 #   class_name: OneCycleLR
 #   pct_start: 0.2

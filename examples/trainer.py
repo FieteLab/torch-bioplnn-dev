@@ -99,12 +99,13 @@ def _train(
         )
         if config.train.loss_all_timesteps:
             logits = outputs.permute(1, 2, 0)
-            labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
+            loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
         else:
             logits = outputs
+            loss_labels = labels
 
         # Compute the loss
-        loss = criterion(logits, labels)
+        loss = criterion(logits, loss_labels)
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -185,8 +186,13 @@ def _validate(
     )
     with torch.no_grad():
         for i, (x, labels) in enumerate(bar):
-            if config.debug_forward and i >= 20:
+            if (
+                config.debug_num_batches is not None
+                and i >= config.debug_num_batches
+            ):
                 break
+
+            # Move data to device
             try:
                 x = x.to(device)
             except AttributeError:
@@ -201,12 +207,13 @@ def _validate(
             )
             if config.train.loss_all_timesteps:
                 logits = outputs.permute(1, 2, 0)
-                labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
+                loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
                 logits = outputs
+                loss_labels = labels
 
             # Compute the loss
-            loss = criterion(logits, labels)
+            loss = criterion(logits, loss_labels)
 
             # Update statistics
             val_loss += loss.item()

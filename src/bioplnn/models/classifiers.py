@@ -93,6 +93,7 @@ class CRNNImageClassifier(nn.Module):
         self,
         rnn_kwargs: Mapping[str, Any],
         num_classes: int,
+        pool_size: tuple[int, int] = (1, 1),
         fc_dim: int = 512,
         dropout: float = 0.2,
     ):
@@ -100,11 +101,12 @@ class CRNNImageClassifier(nn.Module):
 
         self.rnn = Conv2dEIRNN(**rnn_kwargs)
 
+        self.pool = nn.AdaptiveAvgPool2d(pool_size)
+
         self.readout = nn.Sequential(
             nn.Flatten(1),
-            nn.AdaptiveAvgPool2d(1),
             nn.Linear(
-                self.rnn.layers[-1].out_channels,
+                self.rnn.layers[-1].out_channels * pool_size[0] * pool_size[1],
                 fc_dim,
             ),
             nn.ReLU(),
@@ -134,15 +136,16 @@ class CRNNImageClassifier(nn.Module):
 
         # Get the output from last layer
         outs_last_layer = outs[-1]
+
         if self.rnn.batch_first:
             outs_last_layer = outs_last_layer.transpose(0, 1)
 
+        outs_last_layer = self.pool(outs_last_layer)
+
         if loss_all_timesteps:
-            pred = torch.stack(
-                [self.readout(out.flatten(1)) for out in outs_last_layer]
-            )
+            pred = torch.stack([self.readout(out) for out in outs_last_layer])
         else:
-            pred = self.readout(outs_last_layer.flatten(1))
+            pred = self.readout(outs_last_layer[-1])
 
         if return_activations:
             return pred, outs, h_neurons, fbs

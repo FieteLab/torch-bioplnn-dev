@@ -199,7 +199,7 @@ class TopographicalRNN(SparseRNN):
             self_recurrence (bool): Whether to include self-recurrent connections.
 
         Returns:
-            tuple[torch.Tensor, torcvvvvvvvh.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
+            tuple[torch.Tensor, torch.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
         """
         # Generate random connectivity for hidden-to-hidden connections
         num_neurons = sheet_size[0] * sheet_size[1]

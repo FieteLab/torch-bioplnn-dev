@@ -1,4 +1,4 @@
-## BioPlNN: Biologically Plausible Neural Network Package
+# BioPlNN: Biologically Plausible Neural Network Package
 
 **BioPlNN** is a PyTorch package designed to bridge the gap between traditional Artificial Neural Networks (ANNs) and biologically-inspired models. It provides modules that allow researchers to:
 
@@ -6,22 +6,22 @@
 * Explore the impact of network topology on neural function.
 * Train models using standard machine learning techniques while incorporating biological constraints.
 
-### Key Features
+## Key Features
 
 * **TopographicalRNN:** This module simulates a population of rate-based neurons with arbitrary connectivity patterns. It utilizes sparse tensors for efficient memory usage, enabling simulations of large-scale networks.
 * **Conv2dEIRNN:** This module builds upon PyTorch's existing Conv2d and RNN modules by introducing separate excitatory and inhibitory neural populations within each layer. It allows users to define the connectivity between these populations within and across layers.
 
-### Installation
+## Installation
 
-**Using pip:**
+### Using pip
 
-The recommended installation method is via pip:
+The recommended installation method is via pip (not yet available):
 
 ```bash
 pip install bioplnn
 ```
 
-**Building from source:**
+### Building from source
 
 1. Clone the BioPlNN repository:
 
@@ -40,60 +40,71 @@ cd bioplnn
 ```bash
 pip install [-e] .
 ```
+where `-e` is optional and will install the package in editable mode.
 
-### Usage
+## Usage
 
-**TopographicalRNN:**
+### Using the CLI
+
+Provided in the `examples` directory is a script for training the models.
+The model, data, and training parameters are configured using Hydra configs,
+which are stored in the `config` directory. See Hydra's
+[docs](https://hydra.cc/docs/intro) for more information on the directory
+structure and syntax.
+Suppose we want to use the `e1l.yaml` model config in `config/model` and
+the `mnist.yaml` data config in `config/data`. To specify these from the
+command line, run
+```bash
+python examples/trainer.py model=e1l data=mnist
+```
+This relies on the `config/config.yaml` file, which contains
+the following:
+```yaml
+defaults:
+  - model: null
+  - data: null
+  ...
+```
+There means that the `model` and `data` keys must be overridden in the command
+line, as shown above. If you want to set these to the default values, you can
+edit the `config/config.yaml` file as follows:
+```yaml
+defaults:
+  - model: e1l
+  - data: mnist
+  ...
+```
+
+### Using the API
+
+#### TopographicalRNN
 
 ```python
 import torch
 from bioplnn.models import TopographicalRNN
 
-# Create RNN layer
-rnn = TopographicalRNN(
-    num_classes=10,
-    connectivity_hh="connectivity_hh.pt",
-    connectivity_ih="connectivity_ih.pt",
-    input_indices="input_indices.pt",
-    output_indices="output_indices.pt",
-    batch_first=True,
-)
+config = # Get config dictionary using yaml, hydra, etc.
 
-# Define input data (num_neurons must match the number of neurons in the connectivity
-# matrices or the number of neurons in the input_indices tensor)
+# Create RNN layer
+rnn = TopographicalRNN(**config)
+
+# Define input data
 inputs = torch.rand(batch_size, num_neurons)
 
-# Run simulation
+# Run forward pass
 outputs = rnn(inputs)
 ```
 
-**Conv2dEIRNN:**
+#### Conv2dEIRNN
 
 ```python
 import torch
-from bioplnn import Conv2dEIRNN
+from bioplnn.models import Conv2dEIRNN
 
-# Define excitatory and inhibitory kernel sizes
-in_size = (32, 32)
-in_channels = 3
-h_pyr_channels = [16, 32]
-h_inter_channels = [[16, 16], [32, 32]]
-fb_channels = [16, 32]
-fb_adjacency = [[0, 0], [1, 0]]
-num_layers = 2
-batch_first = True
+config = # Get config dictionary using yaml, hydra, etc.
 
 # Create Conv2dEIRNN layer
-rnn = Conv2dEIRNN(
-    in_size=in_size,
-    in_channels=in_channels,
-    h_pyr_channels=h_pyr_channels,
-    h_inter_channels=h_inter_channels,
-    fb_channels=fb_channels,
-    fb_adjacency=fb_adjacency,
-    num_layers=num_layers,
-    batch_first=batch_first,
-)
+rnn = Conv2dEIRNN(**config)
 
 # Define input data
 inputs = torch.rand(batch_size, in_channels, height, width)

@@ -19,7 +19,7 @@ criterion:
 data:
   batch_size: 256
   dataset: mnist
-  num_workers: 8
+  num_workers: 0
   root: data
   shuffle_test: true
 debug_level: 1
@@ -44,7 +44,6 @@ optimizer:
   - 0.999
   class_name: AdamW
   lr: 0.0005
-scheduler: null
 seed: null
 tqdm: true
 train:
