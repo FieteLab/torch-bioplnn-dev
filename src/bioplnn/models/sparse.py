@@ -300,18 +300,6 @@ class SparseRNN(nn.Module):
 
         return x
 
-    def forward_ode(self, t, y, args):
-        h = y
-
-        x = args["x"]
-
-        x = self._format_x_ode(x)
-
-        h = self.nonlinearity(self.ih(x[t]) + self.hh(h))
-        h = self.layernorm(h)
-
-        return h
-
     def forward(
         self,
         x: torch.Tensor,
@@ -350,3 +338,15 @@ class SparseRNN(nn.Module):
         hs = self._format_result(hs)
 
         return hs
+
+
+class SparseRNNBaseODE(SparseRNN):
+    def _forward(self, t, h, x):
+        h = h.transpose(0, 1)
+
+        x = self._format_x_ode(x)
+
+        h = self.nonlinearity(self.ih(x[t]) + self.hh(h))
+        h = self.layernorm(h)
+
+        return h

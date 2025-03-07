@@ -6,6 +6,7 @@ from warnings import warn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchode as to
 
 from bioplnn.models.sparse import SparseRNN
 from bioplnn.utils import idx_1D_to_2D, idx_2D_to_1D
@@ -267,19 +268,6 @@ class ConnectomeRNN(SparseRNN):
 
         return connectivity_ih, connectivity_hh
 
-    def forward_ode(self, t, y, x):
-        h = y.transpose(0, 1)
-
-        x_t = self._get_x_t_ode(x, t)
-
-        h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
-        h_new = self.layernorm(h_new)
-
-        assert self.tau > 1
-        dhdt = 1 / self.tau * (h_new - h)
-
-        return dhdt
-
     def forward(
         self,
         x: torch.Tensor,
@@ -287,15 +275,15 @@ class ConnectomeRNN(SparseRNN):
         h_0: Optional[torch.Tensor] = None,
     ):
         """
-        Forward pass of the SparseRNN layer.
+         Forward pass of the SparseRNN layer.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, sequence_length, input_size) if batch_first, else (sequence_length, batch_size, input_size)
-            num_steps (int, optional): Number of time steps. Defaults to None.
-            h_0 (torch.Tensor, optional): Initial hidden state of shape (batch_size, hidden_size). Defaults to None.
+             x (torch.Tensor): Input tensor of shape (batch_size, sequence_length, input_size) if batch_first, else (sequence_length, batch_size, input_size)
+             num_steps (int, optional): Number of time steps. Defaults to None.
+             h_0 (torch.Tensor, optional): Initial hidden state of shape (batch_size, hidden_size). Defaults to None.
 
-        Returns:
-            torch.Tensor: Output tensor.
+         Returns:
+             torch.Tensor: Output tensor.
         """
         device = x.device
 
@@ -324,3 +312,42 @@ class ConnectomeRNN(SparseRNN):
             outs = hs[..., self.output_indices]
 
         return outs, hs
+
+
+class ConnectomeRNNODE(ConnectomeRNN):
+    def _forward(self, t, h, x):
+        h = h.transpose(0, 1)
+
+        x_t = self._get_x_t_ode(x, t)
+
+        h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
+        h_new = self.layernorm(h_new)
+
+        assert self.tau > 1
+        dhdt = 1 / self.tau * (h_new - h)
+
+        return dhdt
+
+    def forward(self, x, h0):
+        device = x.device
+
+        t_eval = torch.linspace(0, 10, 20).unsqueeze(0).to(device)
+
+        term = to.ODETerm(self._forward, with_args=True)
+        step_method = to.Dopri5(term=term)
+        step_size_controller = to.IntegralController(
+            atol=1e-6, rtol=1e-3, term=term
+        )
+        solver = to.AutoDiffAdjoint(step_method, step_size_controller).to(
+            device
+        )
+        # Solve ODE
+        problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)
+        sol = solver.solve(
+            problem,
+            args={
+                "x": x,
+            },
+        )
+
+        return sol.ys
