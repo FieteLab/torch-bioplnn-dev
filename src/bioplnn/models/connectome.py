@@ -328,10 +328,21 @@ class ConnectomeRNNODE(ConnectomeRNN):
 
         return dhdt
 
-    def forward(self, x, h0):
+    def forward(
+        self,
+        x: torch.Tensor,
+        h0: torch.Tensor,
+        start_time: float = 0,
+        end_time: float = 10,
+        num_steps: int = 20,
+    ):
         device = x.device
 
-        t_eval = torch.linspace(0, 10, 20).unsqueeze(0).to(device)
+        t_eval = (
+            torch.linspace(start_time, end_time, num_steps)
+            .unsqueeze(0)
+            .to(device)
+        )
 
         term = to.ODETerm(self._forward, with_args=True)
         step_method = to.Dopri5(term=term)
