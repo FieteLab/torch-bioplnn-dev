@@ -1,8 +1,9 @@
 from .classifiers import (
+    ConnectomeImageClassifier,
+    ConnectomeODEImageClassifier,
     CRNNImageClassifier,
-    TopographicalImageClassifier,
 )
-from .connectome import TopographicalRNN
+from .connectome import ConnectomeODERNN, ConnectomeRNN
 from .ei_crnn import Conv2dEIRNN, Conv2dEIRNNLayer, Conv2dEIRNNLayerConfig
 from .sparse import SparseLinear, SparseRNN
 
@@ -13,6 +14,8 @@ __all__ = [
     "CRNNImageClassifier",
     "SparseLinear",
     "SparseRNN",
-    "TopographicalImageClassifier",
-    "TopographicalRNN",
+    "ConnectomeImageClassifier",
+    "ConnectomeODEImageClassifier",
+    "ConnectomeRNN",
+    "ConnectomeODERNN",
 ]

@@ -1,3 +1,4 @@
+class_name: ConnectomeRNN
 rnn_kwargs:
   sheet_size: [150, 300]
   synapse_std: 10
@@ -11,7 +12,6 @@ rnn_kwargs:
   nonlinearity: tanh
   use_layernorm: false
   bias: true
-arch: topographical_rnn
 num_classes: 10
 fc_dim: 256
 dropout: 0.5

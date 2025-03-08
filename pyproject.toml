@@ -35,6 +35,8 @@ dev = [
   "scikit-learn",
   "tqdm",
   "wandb",
+  "ipykernel",
+  "seaborn",
 ]
 
 [project.urls]

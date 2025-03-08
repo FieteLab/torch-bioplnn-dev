@@ -4,11 +4,11 @@ from typing import Any, Optional
 import torch
 from torch import nn
 
-from bioplnn.models.connectome import ConnectomeRNN
+from bioplnn.models.connectome import ConnectomeODERNN, ConnectomeRNN
 from bioplnn.models.ei_crnn import Conv2dEIRNN
 
 
-class ConnectomeImageClassifierBase(nn.Module):
+class ConnectomeImageClassifier(nn.Module):
     def __init__(
         self,
         rnn_kwargs,
@@ -33,8 +33,6 @@ class ConnectomeImageClassifierBase(nn.Module):
             nn.Linear(fc_dim, num_classes),
         )
 
-
-class ConnectomeImageClassifier(ConnectomeImageClassifierBase):
     def forward(
         self,
         x: torch.Tensor,
@@ -61,16 +59,44 @@ class ConnectomeImageClassifier(ConnectomeImageClassifierBase):
             return pred
 
 
-class ConnectomeImageClassifierODE(ConnectomeImageClassifierBase):
+class ConnectomeODEImageClassifier(nn.Module):
+    def __init__(
+        self,
+        rnn_kwargs,
+        num_classes,
+        fc_dim=512,
+        dropout=0.2,
+    ):
+        super().__init__()
+
+        self.rnn = ConnectomeODERNN(**rnn_kwargs)
+
+        if self.rnn.output_indices is None:
+            out_size = self.rnn.num_neurons
+        else:
+            out_size = len(self.rnn.output_indices)
+
+        self.out_layer = nn.Sequential(
+            nn.Flatten(1),
+            nn.Linear(out_size, fc_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_dim, num_classes),
+        )
+
     def forward(
         self,
         x: torch.Tensor,
-        num_steps: Optional[int] = None,
+        start_time: float,
+        end_time: float,
+        num_steps: int,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
     ):
         outs, hs = self.rnn(
             x,
+            start_time=start_time,
+            end_time=end_time,
             num_steps=num_steps,
         )
 

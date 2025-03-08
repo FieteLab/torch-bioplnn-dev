@@ -1,12 +1,12 @@
-defaults:
-  - topo
-  - _self_
-
+class_name: ConnectomeODEImageClassifier
 rnn_kwargs:
-  sheet_size: null
-  synapse_std: null
-  synapses_per_neuron: null
-  self_recurrence: null
   connectivity_hh: connectivity/sunny/connectivity_hh.pt
   connectivity_ih: connectivity/sunny/connectivity_ih.pt
   input_indices: connectivity/sunny/input_indices.pt
+  hidden_init_mode: zeros
+  nonlinearity: Tanh
+  use_layernorm: false
+  bias: true
+num_classes: 10
+fc_dim: 256
+dropout: 0.5

@@ -1,10 +1,6 @@
 numpy
-torch
-torchvision
 torchode
 opencv-python
 matplotlib
 pandas
 addict
-torch-scatter
-torch-sparse

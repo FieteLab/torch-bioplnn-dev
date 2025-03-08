@@ -1,4 +1,3 @@
--r common.txt
 hydra-core
 hydra-submitit-launcher
 pre-commit
@@ -7,3 +6,5 @@ ruff
 scikit-learn
 tqdm
 wandb
+ipykernel
+seaborn

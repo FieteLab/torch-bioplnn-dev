@@ -96,7 +96,7 @@ class ConnectomeRNN(SparseRNN):
 
     @staticmethod
     def _tau_hook(module, args):
-        module.tau = F.softplus(module.tau) + 1
+        module.tau.data = F.softplus(module.tau) + 1
 
     def _init_indices(self, input_indices, output_indices):
         if input_indices is not None:
@@ -314,7 +314,7 @@ class ConnectomeRNN(SparseRNN):
         return outs, hs
 
 
-class ConnectomeRNNODE(ConnectomeRNN):
+class ConnectomeODERNN(ConnectomeRNN):
     def _forward(self, t, h, x):
         h = h.transpose(0, 1)
 
@@ -356,9 +356,14 @@ class ConnectomeRNNODE(ConnectomeRNN):
         problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)
         sol = solver.solve(
             problem,
-            args={
-                "x": x,
-            },
+            args=x,
         )
 
-        return sol.ys
+        # Stack outputs and adjust dimensions if necessary
+        hs = self._format_result(sol.ys)
+
+        # Select output indices if provided
+        if self.output_indices is not None:
+            outs = hs[..., self.output_indices]
+
+        return outs, hs
