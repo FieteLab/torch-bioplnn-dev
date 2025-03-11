@@ -27,10 +27,11 @@ compile:
   backend: inductor
   mode: reduce-overhead
 train:
-  num_steps: 5
   epochs: 100
   log_freq: 5
-  loss_all_timesteps: true
+  forward_kwargs:
+    num_steps: 5
+    loss_all_timesteps: false
   grad_clip:
     enable: false
     type: norm

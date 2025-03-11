@@ -1,7 +1,5 @@
-import math
 from os import PathLike
 from typing import Optional
-from warnings import warn
 
 import torch
 import torch.nn as nn
@@ -9,7 +7,6 @@ import torch.nn.functional as F
 import torchode as to
 
 from bioplnn.models.sparse import SparseRNN
-from bioplnn.utils import idx_1D_to_2D, idx_2D_to_1D
 
 
 class ConnectomeRNN(SparseRNN):
@@ -35,57 +32,30 @@ class ConnectomeRNN(SparseRNN):
 
     def __init__(
         self,
-        sheet_size: tuple[int, int] = (150, 300),
-        synapse_std: float = 10,
-        synapses_per_neuron: int = 32,
-        self_recurrence: bool = True,
-        connectivity_hh: Optional[PathLike | torch.Tensor] = None,
+        in_size: int,
+        num_neurons: int,
+        connectivity_hh: PathLike | torch.Tensor,
         connectivity_ih: Optional[PathLike | torch.Tensor] = None,
-        batch_first: bool = True,
-        input_indices: Optional[PathLike | torch.Tensor] = None,
-        output_indices: Optional[PathLike | torch.Tensor] = None,
-        hidden_init_mode: str = "zeros",
+        output_neurons: Optional[torch.Tensor | PathLike] = None,
+        default_hidden_init_mode: str = "zeros",
         nonlinearity: str = "tanh",
         use_layernorm: bool = False,
+        batch_first: bool = True,
         bias: bool = True,
     ):
-        self.sheet_size = sheet_size
-        self.batch_first = batch_first
-
-        # Handle input and output indices
-        self.input_indices, self.output_indices = self._init_indices(
-            input_indices, output_indices
-        )
-
-        self.input_size = (
-            len(self.input_indices)
-            if self.input_indices is not None
-            else self.num_neurons
-        )
-
-        self.connectivity_ih, self.connectivity_hh = self._init_connectivity(
-            connectivity_ih,
-            connectivity_hh,
-            sheet_size,
-            synapse_std,
-            synapses_per_neuron,
-            self_recurrence,
-        )
-        # Check for consistency in connectivity matrix usage
-
-        self.num_neurons = self.connectivity_hh.shape[0]
-
         super().__init__(
-            input_size=self.input_size,
-            hidden_size=self.num_neurons,
-            connectivity_ih=self.connectivity_ih,
-            connectivity_hh=self.connectivity_hh,
-            hidden_init_mode=hidden_init_mode,
+            in_size=in_size,
+            hidden_size=num_neurons,
+            connectivity_ih=connectivity_ih,
+            connectivity_hh=connectivity_hh,
             use_layernorm=use_layernorm,
             nonlinearity=nonlinearity,
+            default_hidden_init_mode=default_hidden_init_mode,
             batch_first=batch_first,
             bias=bias,
         )
+
+        self.output_neurons = self._init_output_neurons(output_neurons)
 
         # Time constant
         self.tau = nn.Parameter(
@@ -98,181 +68,32 @@ class ConnectomeRNN(SparseRNN):
     def _tau_hook(module, args):
         module.tau.data = F.softplus(module.tau) + 1
 
-    def _init_indices(self, input_indices, output_indices):
-        if input_indices is not None:
-            try:
-                input_indices = torch.load(
-                    input_indices, weights_only=True
+    def _init_output_neurons(
+        self,
+        output_neurons: Optional[torch.Tensor | PathLike] = None,
+    ) -> torch.Tensor | None:
+        output_neurons_tensor: torch.Tensor
+        if output_neurons is not None:
+            if isinstance(output_neurons, torch.Tensor):
+                output_neurons_tensor = output_neurons
+            else:
+                output_neurons_tensor = torch.load(
+                    output_neurons, weights_only=True
                 ).squeeze()
-            except AttributeError:
-                pass
-            if input_indices.dim() > 1:
-                raise ValueError("Input indices must be a 1D tensor")
-        if output_indices is not None:
-            try:
-                output_indices = torch.load(
-                    output_indices, weights_only=True
-                ).squeeze()
-            except AttributeError:
-                pass
-            if output_indices.dim() > 1:
+
+            if output_neurons_tensor.dim() > 1:
                 raise ValueError("Output indices must be a 1D tensor")
 
-        return input_indices, output_indices
-
-    def _init_connectivity(
-        self,
-        connectivity_ih,
-        connectivity_hh,
-        sheet_size,
-        synapse_std,
-        synapses_per_neuron,
-        self_recurrence,
-    ):
-        if (connectivity_ih is None) != (connectivity_hh is None):
-            raise ValueError(
-                "Both connectivity matrices must be provided if one is provided"
-            )
-
-        # Initialize connectivity or randomize based on arguments
-        use_random = (
-            sheet_size is not None
-            and synapse_std is not None
-            and synapses_per_neuron is not None
-        )
-        use_connectivity = (
-            connectivity_ih is not None and connectivity_hh is not None
-        )
-
-        if use_connectivity:
-            if use_random:
-                warn(
-                    "Both random initialization and connectivity initialization are provided. Using connectivity initialization."
-                )
-            try:
-                connectivity_ih = torch.load(
-                    connectivity_ih, weights_only=True
-                )
-            except AttributeError:
-                pass
-            try:
-                connectivity_hh = torch.load(
-                    connectivity_hh, weights_only=True
-                )
-            except AttributeError:
-                pass
-            if (
-                connectivity_ih.layout != torch.sparse_coo
-                or connectivity_hh.layout != torch.sparse_coo
-            ):
-                raise ValueError("Connectivity matrices must be in COO format")
-        elif use_random:
-            connectivity_ih, connectivity_hh = self.random_connectivity(
-                sheet_size, synapse_std, synapses_per_neuron, self_recurrence
-            )
+            return output_neurons_tensor
         else:
-            raise ValueError(
-                "Either connectivity or random initialization must be provided"
-            )
-
-        # Validate connectivity matrix format
-        if (
-            self.input_indices is not None
-            and connectivity_ih.shape[1] != self.input_indices.shape[0]
-        ):
-            raise ValueError(
-                "connectivity_ih.shape[1] and input_indices.shape[0] do not match"
-            )
-        if not (
-            connectivity_ih.shape[0]
-            == connectivity_hh.shape[0]
-            == connectivity_hh.shape[1]
-        ):
-            raise ValueError(
-                "connectivity_ih.shape[0], connectivity_hh.shape[0], and connectivity_hh.shape[1] must be equal"
-            )
-
-        return connectivity_ih, connectivity_hh
-
-    def random_connectivity(
-        self, sheet_size, synapse_std, synapses_per_neuron, self_recurrence
-    ):
-        """
-        Generates random connectivity matrices for the TRNN.
-
-        Args:
-            sheet_size (tuple[int, int]): Size of the sheet-like topology.
-            synapse_std (float): Standard deviation for random synapse initialization.
-            synapses_per_neuron (int): Number of synapses per neuron.
-            self_recurrence (bool): Whether to include self-recurrent connections.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
-        """
-        # Generate random connectivity for hidden-to-hidden connections
-        num_neurons = sheet_size[0] * sheet_size[1]
-
-        idx_1d = torch.arange(num_neurons)
-        idx = idx_1D_to_2D(idx_1d, sheet_size[0], sheet_size[1]).t()
-
-        synapses = (
-            torch.randn(num_neurons, 2, synapses_per_neuron) * synapse_std
-            + idx.unsqueeze(-1)
-        ).long()
-
-        if self_recurrence:
-            synapses = torch.cat([synapses, idx.unsqueeze(-1)], dim=2)
-
-        synapses = synapses.clamp(
-            torch.zeros(2).view(1, 2, 1),
-            torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1)).view(1, 2, 1),
-        )
-        synapses = idx_2D_to_1D(
-            synapses.transpose(0, 1).flatten(1), sheet_size[0], sheet_size[1]
-        ).view(num_neurons, -1)
-
-        synapse_root = idx_1d.unsqueeze(-1).expand(-1, synapses.shape[1])
-
-        indices_hh = torch.stack((synapses, synapse_root)).flatten(1)
-
-        ## He initialization of values (synapses_per_neuron is the fan_in)
-        values_hh = torch.randn(indices_hh.shape[1]) * math.sqrt(
-            2 / synapses_per_neuron
-        )
-
-        connectivity_hh = torch.sparse_coo_tensor(
-            indices_hh,
-            values_hh,
-            (num_neurons, num_neurons),
-            check_invariants=True,
-        ).coalesce()
-
-        # Generate random connectivity for input-to-hidden connections
-        indices_ih = torch.stack(
-            (
-                self.input_indices
-                if self.input_indices is not None
-                else torch.arange(self.input_size),
-                torch.arange(self.input_size),
-            )
-        )
-
-        values_ih = torch.ones(indices_ih.shape[1])
-
-        connectivity_ih = torch.sparse_coo_tensor(
-            indices_ih,
-            values_ih,
-            (num_neurons, self.input_size),
-            check_invariants=True,
-        ).coalesce()
-
-        return connectivity_ih, connectivity_hh
+            return None
 
     def forward(
         self,
         x: torch.Tensor,
         num_steps: Optional[int] = None,
         h_0: Optional[torch.Tensor] = None,
+        loss_all_timesteps: bool = False,
     ):
         """
          Forward pass of the SparseRNN layer.
@@ -308,17 +129,24 @@ class ConnectomeRNN(SparseRNN):
         hs = self._format_result(hs)
 
         # Select output indices if provided
-        if self.output_indices is not None:
-            outs = hs[..., self.output_indices]
+        if self.output_neurons is not None:
+            outs = hs[..., self.output_neurons]
+        else:
+            outs = hs
 
-        return outs, hs
+        if loss_all_timesteps:
+            return outs, hs
+        elif self.batch_first:
+            return outs[:, -1], hs
+        else:
+            return outs[-1], hs
 
 
 class ConnectomeODERNN(ConnectomeRNN):
-    def _forward(self, t, h, x):
+    def _forward(self, t: torch.Tensor, h: torch.Tensor, x: torch.Tensor):
         h = h.transpose(0, 1)
 
-        x_t = self._get_x_t_ode(x, t)
+        x_t = self._format_x_ode(x)
 
         h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
         h_new = self.layernorm(h_new)
@@ -332,38 +160,55 @@ class ConnectomeODERNN(ConnectomeRNN):
         self,
         x: torch.Tensor,
         h0: torch.Tensor,
-        start_time: float = 0,
-        end_time: float = 10,
-        num_steps: int = 20,
+        num_steps: int,
+        start_time: float = 0.0,
+        end_time: float = 1.0,
+        return_activations: bool = False,
+        loss_all_timesteps: bool = False,
     ):
         device = x.device
 
-        t_eval = (
-            torch.linspace(start_time, end_time, num_steps)
-            .unsqueeze(0)
-            .to(device)
-        )
+        if num_steps == 1:
+            t_eval = torch.tensor(end_time, device=device).unsqueeze(0)
+        else:
+            t_eval = (
+                torch.linspace(start_time, end_time, num_steps)
+                .unsqueeze(0)
+                .to(device)
+            )
 
-        term = to.ODETerm(self._forward, with_args=True)
+        term = to.ODETerm(self._forward, with_args=True)  # type: ignore
         step_method = to.Dopri5(term=term)
         step_size_controller = to.IntegralController(
             atol=1e-6, rtol=1e-3, term=term
         )
-        solver = to.AutoDiffAdjoint(step_method, step_size_controller).to(
+        solver = to.AutoDiffAdjoint(step_method, step_size_controller).to(  # type: ignore
             device
         )
         # Solve ODE
-        problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)
+        problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)  # type: ignore
         sol = solver.solve(
             problem,
             args=x,
         )
+        ys = sol.ys.transpose(0, 1)
 
         # Stack outputs and adjust dimensions if necessary
-        hs = self._format_result(sol.ys)
+        hs = self._format_result(ys)  # type: ignore
 
         # Select output indices if provided
-        if self.output_indices is not None:
-            outs = hs[..., self.output_indices]
+        if self.output_neurons is not None:
+            outs = hs[..., self.output_neurons]
+        else:
+            outs = hs
 
-        return outs, hs
+        if not loss_all_timesteps:
+            if self.batch_first:
+                outs = outs[:, -1]
+            else:
+                outs = outs[-1]
+
+        if return_activations:
+            return outs, hs
+        else:
+            return outs

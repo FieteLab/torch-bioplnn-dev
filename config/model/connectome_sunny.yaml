@@ -10,3 +10,8 @@ rnn_kwargs:
 num_classes: 10
 fc_dim: 256
 dropout: 0.5
+
+# @package _global_
+train:
+  forward_kwargs:
+    num_steps: 1

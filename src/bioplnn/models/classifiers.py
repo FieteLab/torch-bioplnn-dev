@@ -11,10 +11,10 @@ from bioplnn.models.ei_crnn import Conv2dEIRNN
 class ConnectomeImageClassifier(nn.Module):
     def __init__(
         self,
-        rnn_kwargs,
-        num_classes,
-        fc_dim=512,
-        dropout=0.2,
+        rnn_kwargs: Mapping[str, Any],
+        num_classes: int,
+        fc_dim: int = 512,
+        dropout: float = 0.2,
     ):
         super().__init__()
 
@@ -62,10 +62,10 @@ class ConnectomeImageClassifier(nn.Module):
 class ConnectomeODEImageClassifier(nn.Module):
     def __init__(
         self,
-        rnn_kwargs,
-        num_classes,
-        fc_dim=512,
-        dropout=0.2,
+        rnn_kwargs: Mapping[str, Any],
+        num_classes: int,
+        fc_dim: int = 512,
+        dropout: float = 0.2,
     ):
         super().__init__()
 
@@ -87,9 +87,9 @@ class ConnectomeODEImageClassifier(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        start_time: float,
-        end_time: float,
         num_steps: int,
+        start_time: float = 0.0,
+        end_time: float = 1.0,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
     ):

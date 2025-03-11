@@ -4,8 +4,7 @@ data:
   root: data
   retina_path: connectivity/V1_indices.pt
   resolution: null
-  batch_size: 256
+  batch_size: 32
   num_workers: 8
 model:
-  rnn_kwargs:
-    batch_first: false
+  num_classes: 10

@@ -1,7 +1,9 @@
+import math
 import os
 import random
 from collections.abc import Mapping
-from typing import Any
+from os import PathLike
+from typing import Any, Optional
 
 import numpy as np
 import torch
@@ -247,3 +249,89 @@ def profile_fn(fn, kwargs, sort_by="cuda_time_total", row_limit=50):
     ) as prof:
         fn(kwargs)
     return prof.key_averages.table(sort_by=sort_by, row_limit=row_limit)
+
+
+def create_random_topographic_hh_connectivity(
+    sheet_size: tuple[int, int],
+    synapse_std: float,
+    synapses_per_neuron: int,
+    self_recurrence: bool,
+) -> torch.Tensor:
+    """
+    Generates random connectivity matrices for the TRNN.
+
+    Args:
+        sheet_size (tuple[int, int]): Size of the sheet-like topology.
+        synapse_std (float): Standard deviation for random synapse initialization.
+        synapses_per_neuron (int): Number of synapses per neuron.
+        self_recurrence (bool): Whether to include self-recurrent connections.
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: Connectivity matrices for input-to-hidden and hidden-to-hidden connections.
+    """
+    # Generate random connectivity for hidden-to-hidden connections
+    num_neurons = sheet_size[0] * sheet_size[1]
+
+    idx_1d = torch.arange(num_neurons)
+    idx = idx_1D_to_2D(idx_1d, sheet_size[0], sheet_size[1]).t()
+
+    synapses = (
+        torch.randn(num_neurons, 2, synapses_per_neuron) * synapse_std
+        + idx.unsqueeze(-1)
+    ).long()
+
+    if self_recurrence:
+        synapses = torch.cat([synapses, idx.unsqueeze(-1)], dim=2)
+
+    synapses = synapses.clamp(
+        torch.zeros(2).view(1, 2, 1),
+        torch.tensor((sheet_size[0] - 1, sheet_size[1] - 1)).view(1, 2, 1),
+    )
+    synapses = idx_2D_to_1D(
+        synapses.transpose(0, 1).flatten(1), sheet_size[0], sheet_size[1]
+    ).view(num_neurons, -1)
+
+    synapse_root = idx_1d.unsqueeze(-1).expand(-1, synapses.shape[1])
+
+    indices_hh = torch.stack((synapses, synapse_root)).flatten(1)
+
+    ## He initialization of values (synapses_per_neuron is the fan_in)
+    values_hh = torch.randn(indices_hh.shape[1]) * math.sqrt(
+        2 / synapses_per_neuron
+    )
+
+    connectivity_hh = torch.sparse_coo_tensor(
+        indices_hh,
+        values_hh,
+        (num_neurons, num_neurons),
+        check_invariants=True,
+    ).coalesce()
+
+    return connectivity_hh
+
+
+def create_identity_ih_connectivity(
+    input_size: int,
+    num_neurons: int,
+    input_indices: Optional[torch.Tensor | PathLike] = None,
+) -> torch.Tensor:
+    # Generate identity connectivity for input-to-hidden connections
+    indices_ih = torch.stack(
+        (
+            input_indices
+            if input_indices is not None
+            else torch.arange(input_size),
+            torch.arange(input_size),
+        )  # type: ignore
+    )
+
+    values_ih = torch.ones(indices_ih.shape[1])
+
+    connectivity_ih = torch.sparse_coo_tensor(
+        indices_ih,
+        values_ih,
+        (num_neurons, input_size),
+        check_invariants=True,
+    ).coalesce()
+
+    return connectivity_ih

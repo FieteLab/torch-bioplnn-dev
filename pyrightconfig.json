@@ -1,0 +1,10 @@
+{
+    "include": [
+        "src"
+    ],
+    "exclude": [],
+    "ignore": [],
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "reportMissingImports": true
+}
