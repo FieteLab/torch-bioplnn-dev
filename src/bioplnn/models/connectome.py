@@ -32,7 +32,7 @@ class ConnectomeRNN(SparseRNN):
 
     def __init__(
         self,
-        in_size: int,
+        input_size: int,
         num_neurons: int,
         connectivity_hh: PathLike | torch.Tensor,
         connectivity_ih: Optional[PathLike | torch.Tensor] = None,
@@ -44,7 +44,7 @@ class ConnectomeRNN(SparseRNN):
         bias: bool = True,
     ):
         super().__init__(
-            in_size=in_size,
+            input_size=input_size,
             hidden_size=num_neurons,
             connectivity_ih=connectivity_ih,
             connectivity_hh=connectivity_hh,
