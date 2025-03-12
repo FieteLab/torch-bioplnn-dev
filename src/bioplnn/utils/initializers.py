@@ -3,8 +3,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-import bioplnn.models
-from bioplnn.utils import dataloaders
+import bioplnn.utils.dataloaders as dataloaders
 
 
 def initialize_dataloader(
@@ -39,6 +38,7 @@ def initialize_model(*, class_name: str, **kwargs) -> nn.Module:
     Returns:
         nn.Module: The initialized model.
     """
+    import bioplnn.models
 
     return getattr(bioplnn.models, class_name)(**kwargs)
 

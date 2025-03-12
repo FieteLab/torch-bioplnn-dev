@@ -119,4 +119,4 @@ This README provides a basic introduction to BioPlNN. More detailed documentatio
 
 **Contributing:**
 
-We welcome contributions to BioPlNN! Please refer to the CONTRIBUTING.md file for guidelines on submitting code and documentation changes.
+We welcome contributions to BioPlNN! Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on submitting code and documentation changes.
