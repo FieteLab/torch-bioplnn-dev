@@ -39,11 +39,8 @@ class ConnectomeImageClassifier(nn.Module):
         num_steps: Optional[int] = None,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
-    ):
-        outs, hs = self.rnn(
-            x,
-            num_steps=num_steps,
-        )
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        outs, hs = self.rnn(x, num_steps=num_steps)
 
         if self.rnn.batch_first:
             outs = outs.transpose(0, 1)
@@ -92,8 +89,8 @@ class ConnectomeODEImageClassifier(nn.Module):
         end_time: float = 1.0,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
-    ):
-        outs, hs = self.rnn(
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        outs, hs, ts = self.rnn(
             x,
             start_time=start_time,
             end_time=end_time,
@@ -109,7 +106,7 @@ class ConnectomeODEImageClassifier(nn.Module):
             pred = self.out_layer(outs[-1])
 
         if return_activations:
-            return pred, outs, hs
+            return pred, hs, ts
         else:
             return pred
 
@@ -155,17 +152,11 @@ class CRNNImageClassifier(nn.Module):
             list[torch.Tensor],
         ]
     ):
-        outs, h_neurons, fbs = self.rnn(
-            x,
-            num_steps=num_steps,
-        )
+        outs, h_neurons, fbs = self.rnn(x, num_steps=num_steps)
 
-        # Get the output from last layer
         outs_last_layer = outs[-1]
-
         if self.rnn.batch_first:
             outs_last_layer = outs_last_layer.transpose(0, 1)
-
         outs_last_layer = self.pool(outs_last_layer)
 
         if loss_all_timesteps:

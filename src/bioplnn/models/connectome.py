@@ -1,20 +1,21 @@
+from collections.abc import Mapping
 from os import PathLike
-from typing import Optional
+from typing import Any, Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import torchode as to
 
-from bioplnn.models.sparse import SparseRNN
+from bioplnn.models.sparse import SparseODERNN, SparseRNN
+from bioplnn.typing import TensorInitFnType
+from bioplnn.utils import init_tensor
 
 
 class ConnectomeRNN(SparseRNN):
     """
-    Base class for Topographical Recurrent Neural Networks (TRNNs).
+    Connectome Recurrent Neural Network
 
-    TRNNs are a type of recurrent neural network designed to model spatial dependencies on a sheet-like topology.
-    This base class provides common functionalities for all TRNN variants.
+    ConnectomeRNN is a recurrent neural network designed to
+    This base class provides common functionalities for all ConnectomeRNN variants.
 
     Args:
         sheet_size (tuple[int, int]): Size of the sheet-like topology (height, width).
@@ -32,35 +33,17 @@ class ConnectomeRNN(SparseRNN):
 
     def __init__(
         self,
-        input_size: int,
-        num_neurons: int,
-        connectivity_hh: PathLike | torch.Tensor,
-        connectivity_ih: Optional[PathLike | torch.Tensor] = None,
+        *args,
         output_neurons: Optional[torch.Tensor | PathLike] = None,
-        default_hidden_init_mode: str = "zeros",
-        nonlinearity: str = "tanh",
-        use_layernorm: bool = False,
-        batch_first: bool = True,
-        bias: bool = True,
+        tau_init_fn: str | TensorInitFnType = "ones",
+        **kwargs,
     ):
-        super().__init__(
-            input_size=input_size,
-            hidden_size=num_neurons,
-            connectivity_ih=connectivity_ih,
-            connectivity_hh=connectivity_hh,
-            use_layernorm=use_layernorm,
-            nonlinearity=nonlinearity,
-            default_hidden_init_mode=default_hidden_init_mode,
-            batch_first=batch_first,
-            bias=bias,
-        )
+        super().__init__(*args, **kwargs)
 
         self.output_neurons = self._init_output_neurons(output_neurons)
 
         # Time constant
-        self.tau = nn.Parameter(
-            torch.ones(self.num_neurons), requires_grad=True
-        )
+        self.tau = init_tensor(tau_init_fn, 1, self.num_neurons)
         self._tau_hook(self, None)
         self.register_forward_pre_hook(self._tau_hook)
 
@@ -72,6 +55,10 @@ class ConnectomeRNN(SparseRNN):
         self,
         output_neurons: Optional[torch.Tensor | PathLike] = None,
     ) -> torch.Tensor | None:
+        """
+        Initialize the output neurons.
+        """
+
         output_neurons_tensor: torch.Tensor
         if output_neurons is not None:
             if isinstance(output_neurons, torch.Tensor):
@@ -88,45 +75,35 @@ class ConnectomeRNN(SparseRNN):
         else:
             return None
 
-    def forward(
-        self,
-        x: torch.Tensor,
-        num_steps: Optional[int] = None,
-        h_0: Optional[torch.Tensor] = None,
-        loss_all_timesteps: bool = False,
-    ):
+    def update_fn(
+        self, x_t: torch.Tensor, h_t_minus_1: torch.Tensor
+    ) -> torch.Tensor:
         """
-         Forward pass of the SparseRNN layer.
+        Update function for the ConnectomeRNN.
+        """
+        h_t = self.layernorm(
+            self.nonlinearity(self.ih(x_t) + self.hh(h_t_minus_1))
+        )
+        assert (self.tau > 1).all()
+        return 1 / self.tau * h_t + (1 - 1 / self.tau) * h_t_minus_1
+
+    def forward(self, *args, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the ConnectomeRNN layer.
+
+        Passes all arguments and keyword arguments to SparseRNN's forward
+        method.
 
         Args:
-             x (torch.Tensor): Input tensor of shape (batch_size, sequence_length, input_size) if batch_first, else (sequence_length, batch_size, input_size)
-             num_steps (int, optional): Number of time steps. Defaults to None.
-             h_0 (torch.Tensor, optional): Initial hidden state of shape (batch_size, hidden_size). Defaults to None.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
 
-         Returns:
-             torch.Tensor: Output tensor.
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Output and hidden state for each
+                time step.
         """
-        device = x.device
 
-        x, num_steps = self._format_x(x, num_steps)
-
-        batch_size = x.shape[-1]
-
-        hs = self._init_state(
-            h_0,
-            num_steps,
-            batch_size,
-            device=device,
-        )
-        # Process input sequence
-        for t in range(num_steps):
-            hs[t] = self.nonlinearity(self.ih(x[t]) + self.hh(hs[t - 1]))
-            hs[t] = self.layernorm(hs[t])
-            assert self.tau > 1
-            hs[t] = 1 / self.tau * hs[t] + (1 - 1 / self.tau) * hs[t - 1]
-
-        # Stack outputs and adjust dimensions if necessary
-        hs = self._format_result(hs)
+        hs = super().forward(*args, **kwargs)
 
         # Select output indices if provided
         if self.output_neurons is not None:
@@ -134,67 +111,59 @@ class ConnectomeRNN(SparseRNN):
         else:
             outs = hs
 
-        if loss_all_timesteps:
-            return outs, hs
-        elif self.batch_first:
-            return outs[:, -1], hs
-        else:
-            return outs[-1], hs
+        return outs, hs
 
 
-class ConnectomeODERNN(ConnectomeRNN):
-    def _forward(self, t: torch.Tensor, h: torch.Tensor, x: torch.Tensor):
-        h = h.transpose(0, 1)
+class ConnectomeODERNN(SparseODERNN):
+    def update_fn(
+        self, t: torch.Tensor, h: torch.Tensor, args: Mapping[str, Any]
+    ) -> torch.Tensor:
+        """
+        ODE term for the ConnectomeODERNN.
 
-        x_t = self._format_x_ode(x)
+        Args:
+            t (torch.Tensor): Time points.
+            h (torch.Tensor): Hidden states.
+            args (Mapping[str, Any]): Additional arguments.
 
-        h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
+        Returns:
+            torch.Tensor: dh/dt
+        """
+
+        h = h.t()
+        x = args["x"]
+        start_time = args["start_time"]
+        end_time = args["end_time"]
+
+        idx = self._index_from_time(t, x, start_time, end_time)
+
+        h_new = self.nonlinearity(self.ih(x[idx]) + self.hh(h))
         h_new = self.layernorm(h_new)
 
-        assert self.tau > 1
-        dhdt = 1 / self.tau * (h_new - h)
+        assert (self.tau > 1).all()
+        dhdt = (h_new - h) / self.tau
 
         return dhdt
 
     def forward(
-        self,
-        x: torch.Tensor,
-        h0: torch.Tensor,
-        num_steps: int,
-        start_time: float = 0.0,
-        end_time: float = 1.0,
-        return_activations: bool = False,
-        loss_all_timesteps: bool = False,
-    ):
-        device = x.device
+        self, *args, **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the ConnectomeODERNN layer.
 
-        if num_steps == 1:
-            t_eval = torch.tensor(end_time, device=device).unsqueeze(0)
-        else:
-            t_eval = (
-                torch.linspace(start_time, end_time, num_steps)
-                .unsqueeze(0)
-                .to(device)
-            )
+        Passes all arguments and keyword arguments to SparseODERNN's forward
+        method.
 
-        term = to.ODETerm(self._forward, with_args=True)  # type: ignore
-        step_method = to.Dopri5(term=term)
-        step_size_controller = to.IntegralController(
-            atol=1e-6, rtol=1e-3, term=term
-        )
-        solver = to.AutoDiffAdjoint(step_method, step_size_controller).to(  # type: ignore
-            device
-        )
-        # Solve ODE
-        problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)  # type: ignore
-        sol = solver.solve(
-            problem,
-            args=x,
-        )
-        ys = sol.ys.transpose(0, 1)
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
 
-        # Stack outputs and adjust dimensions if necessary
-        hs = self._format_result(ys)  # type: ignore
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Output, hidden
+                state and time steps.
+        """
+
+        hs, ts = super().forward(*args, **kwargs)
 
         # Select output indices if provided
         if self.output_neurons is not None:
@@ -202,13 +171,4 @@ class ConnectomeODERNN(ConnectomeRNN):
         else:
             outs = hs
 
-        if not loss_all_timesteps:
-            if self.batch_first:
-                outs = outs[:, -1]
-            else:
-                outs = outs[-1]
-
-        if return_activations:
-            return outs, hs
-        else:
-            return outs
+        return outs, hs, ts

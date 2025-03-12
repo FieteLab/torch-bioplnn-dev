@@ -1,15 +1,15 @@
 import warnings
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from math import ceil
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
 import torch
-from numpy.typing import NDArray
 from torch import nn
 from torch.nn import functional as F
+
 
 from bioplnn.utils import (
     expand_array_2d,
@@ -17,12 +17,12 @@ from bioplnn.utils import (
     get_activation,
     init_tensor,
 )
-
-TensorInitFnType = Callable[..., torch.Tensor]
-ActivationFnType = Callable[[torch.Tensor], torch.Tensor]
-T = TypeVar("T", bound=Any)
-Param1dType = Union[T, list[T], NDArray[T]]
-Param2dType = Union[T, list[list[T]], NDArray[T]]
+from bioplnn.typing import (
+    ActivationFnType,
+    Param1dType,
+    Param2dType,
+    TensorInitFnType,
+)
 
 
 def circuit_connectivity_df(
@@ -83,45 +83,45 @@ class Conv2dRectify(nn.Conv2d):
 
 @dataclass(kw_only=True, slots=True)
 class Conv2dEIRNNLayerConfig:
-    """
-    Configuration class for Conv2dEIRNN layers.
+    """Configuration class for Conv2dEIRNN layers.
 
     Args:
         spatial_size (tuple[int, int]): Size of the input data (height, width).
         in_channels (int): Number of input channels.
         out_channels (int): Number of output channels.
         num_neuron_types (int, optional): Number of neuron types. Defaults to 1.
-        neuron_channels (Param1dType[int], optional): Number of channels for each
-            neuron type. Defaults to 16.
+        neuron_channels (Param1dType[int], optional):
+            Number of channels for each neuron type. Defaults to 16.
         neuron_type (Param1dType[str], optional): Type of neuron. Defaults to
             "excitatory".
-        neuron_spatial_mode (Param1dType[str], optional): Spatial mode for the
-            neuron. Defaults to "same".
+        neuron_spatial_mode (Param1dType[str], optional):
+            Spatial mode for the neuron. Defaults to "same".
         fb_channels (int, optional): Number of feedback channels. Defaults to
             None.
-        conv_connectivity (Param2dType[int | bool], optional): Connectivity
-            matrix for the convolutions. Defaults to [[1, 0], [0, 1]].
+        conv_connectivity (Param2dType[int | bool], optional):
+            Connectivity matrix for the convolutions. Defaults to [[1, 0],
+            [0, 1]].
         conv_rectify (Param2dType[bool], optional): Whether to rectify the
             convolutions. Defaults to False.
-        conv_kernel_size (Param2dType[tuple[int, int]], optional): Kernel size
-            for the convolutions. Defaults to (3, 3).
+        conv_kernel_size (Param2dType[tuple[int, int]], optional):
+            Kernel size for the convolutions. Defaults to (3, 3).
         conv_activation (Param2dType[str | ActivationFnType], optional):
             Activation function for the convolutions. Defaults to None.
-        conv_bias (Param2dType[bool], optional): Whether to add a bias term for
-            the convolutions. Defaults to True.
+        conv_bias (Param2dType[bool], optional):
+            Whether to add a bias term for the convolutions. Defaults to True.
         post_agg_activation (Param1dType[str | ActivationFnType], optional):
             Activation function for the post-aggregation. Defaults to "Tanh".
         tau_mode (Param1dType[str], optional): Mode for handling membrane time
             constants. Defaults to "channel".
-        tau_init_mode (Param1dType[str | TensorInitFnType], optional):
+        tau_init_fn (Param1dType[str | TensorInitFnType], optional):
             Initialization mode for the membrane time constants. Defaults to
             "zeros".
-        default_hidden_init_mode (str | TensorInitFnType, optional):
+        default_hidden_init_fn (str | TensorInitFnType, optional):
             Initialization mode for the hidden state. Defaults to "zeros".
-        default_fb_init_mode (str | TensorInitFnType, optional): Initialization
-            mode for the feedback. Defaults to "zeros".
-        default_out_init_mode (str | TensorInitFnType, optional): Initialization
-            mode for the output. Defaults to "zeros".
+        default_fb_init_fn (str | TensorInitFnType, optional):
+            Initialization mode for the feedback. Defaults to "zeros".
+        default_out_init_fn (str | TensorInitFnType, optional):
+            Initialization mode for the output. Defaults to "zeros".
     """
 
     spatial_size: tuple[int, int]
@@ -141,31 +141,32 @@ class Conv2dEIRNNLayerConfig:
     conv_bias: Param2dType[bool] = True
     post_agg_activation: Optional[Param1dType[str | ActivationFnType]] = "Tanh"
     tau_mode: Optional[Param1dType[str]] = "channel"
-    tau_init_mode: Param1dType[str | TensorInitFnType] = "zeros"
-    default_hidden_init_mode: str | TensorInitFnType = "zeros"
-    default_fb_init_mode: str | TensorInitFnType = "zeros"
-    default_out_init_mode: str | TensorInitFnType = "zeros"
+    tau_init_fn: Param1dType[str | TensorInitFnType] = "ones"
+    default_hidden_init_fn: str | TensorInitFnType = "zeros"
+    default_fb_init_fn: str | TensorInitFnType = "zeros"
+    default_out_init_fn: str | TensorInitFnType = "zeros"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class Conv2dEIRNNLayer(nn.Module):
-    """
-    Implements a 2D convolutional recurrent neural network layer with excitatory
-    and inhibitory neurons.
+    """Implements a 2D convolutional recurrent neural network layer with
+    excitatory and inhibitory neurons.
 
-    This layer implements the core computational unit of the EIRNN architecture,
-    supporting multiple neuron types (excitatory and inhibitory) with configurable
-    connectivity patterns, activation functions, and time constants.
+    This layer implements the core computational unit of the EIRNN
+    architecture, supporting multiple neuron types (excitatory and inhibitory)
+    with configurable connectivity patterns, activation functions, and time
+    constants.
 
     Args:
-        config (Optional[Conv2dEIRNNLayerConfig]): Configuration object that specifies
-            the layer architecture and parameters. See Conv2dEIRNNLayerConfig for details.
-            If None, parameters must be provided as keyword arguments.
-        **kwargs: Keyword arguments that can be used to override or provide parameters
-            not specified in the config object. These will be used to populate the config
-            if one is not provided.
+        config (Optional[Conv2dEIRNNLayerConfig]): Configuration object that
+            specifies the layer architecture and parameters. See
+            Conv2dEIRNNLayerConfig for details. If None, parameters must be
+            provided as keyword arguments.
+        **kwargs: Keyword arguments that can be used to override or provide
+            parameters not specified in the config object. These will be used to
+            populate the config if one is not provided.
 
     The layer implements:
     - Configurable neuron types (excitatory/inhibitory)
@@ -378,8 +379,8 @@ class Conv2dEIRNNLayer(nn.Module):
 
         # Initialize membrane time constants
         self.tau_mode = expand_list(config.tau_mode, self.num_neuron_types)
-        self.tau_init_mode = expand_list(
-            config.tau_init_mode, self.num_neuron_types
+        self.tau_init_fn = expand_list(
+            config.tau_init_fn, self.num_neuron_types
         )
 
         self.tau = nn.ParameterList()
@@ -404,7 +405,7 @@ class Conv2dEIRNNLayer(nn.Module):
             self.tau.append(
                 nn.Parameter(
                     init_tensor(
-                        self.tau_init_mode[i],
+                        self.tau_init_fn[i],
                         1,
                         tau_channels,
                         *tau_spatial_size,
@@ -416,9 +417,9 @@ class Conv2dEIRNNLayer(nn.Module):
         # Tensor initialization
         #####################################################################
 
-        self.default_hidden_init_mode = config.default_hidden_init_mode
-        self.default_fb_init_mode = config.default_fb_init_mode
-        self.default_out_init_mode = config.default_out_init_mode
+        self.default_hidden_init_fn = config.default_hidden_init_fn
+        self.default_fb_init_fn = config.default_fb_init_fn
+        self.default_out_init_fn = config.default_out_init_fn
 
     def input_type_from_idx(self, idx: int) -> str:
         if idx == 0:
@@ -437,21 +438,21 @@ class Conv2dEIRNNLayer(nn.Module):
     def init_hidden(
         self,
         batch_size: int,
-        init_mode: Optional[str | TensorInitFnType] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> list[torch.Tensor]:
-        """
-        Initializes the neuron hidden states.
+        """Initializes the neuron hidden states.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros',
-                'ones', 'randn', 'rand', a function, or None. If None, the
-                default initialization mode will be used. If a function, it
-                must take a variable number of positional arguments corresponding
-                to the shape of the tensor to initialize, as well as a
-                `device` keyword argument that send.
-            device (torch.device, optional): Device to allocate the hidden
+            init_fn (str | TensorInitFnType, optional): Initialization mode.
+                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None.
+                If None, the default initialization mode will be used. If a
+                function, it must take a variable number of positional arguments
+                corresponding to the shape of the tensor to initialize, as well
+                as a `device` keyword argument that sends the device to allocate
+                the tensor on.
+            device (torch.device | str, optional): Device to allocate the hidden
                 states on. Defaults to None.
 
         Returns:
@@ -459,98 +460,65 @@ class Conv2dEIRNNLayer(nn.Module):
                 hidden states.
         """
 
-        init_mode = (
-            init_mode
-            if init_mode is not None
-            else self.default_hidden_init_mode
+        init_fn = (
+            init_fn if init_fn is not None else self.default_hidden_init_fn
         )
-        if isinstance(init_mode, str):
-            return [
-                init_tensor(
-                    init_mode,
-                    batch_size,
-                    self.neuron_channels[i],
-                    *self.spatial_size,
-                    device=device,
-                )
-                for i in range(self.num_neuron_types)
-            ]
-        else:
-            try:
-                return [
-                    init_mode(
-                        batch_size,
-                        self.neuron_channels[i],
-                        *self.spatial_size,
-                        device=device,
-                    )
-                    for i in range(self.num_neuron_types)
-                ]
-            except TypeError:
-                return [
-                    init_mode(
-                        batch_size,
-                        self.neuron_channels[i],
-                        *self.spatial_size,
-                    ).to(device)
-                    for i in range(self.num_neuron_types)
-                ]
+
+        return [
+            init_tensor(
+                init_fn,
+                batch_size,
+                self.neuron_channels[i],
+                *self.spatial_size,
+                device=device,
+            )
+            for i in range(self.num_neuron_types)
+        ]
 
     def init_out(
         self,
         batch_size: int,
-        init_mode: Optional[str | TensorInitFnType] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> torch.Tensor:
-        """
-        Initializes the output.
+        """Initializes the output.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros',
-                'ones', 'randn', 'rand', a function, or None. If None, the
-                default initialization mode will be used.
-            device (torch.device, optional): Device to allocate the hidden
+            init_fn (str | TensorInitFnType, optional): Initialization function.
+                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None. If
+                None, the default initialization mode will be used.
+            device (torch.device | str, optional): Device to allocate the hidden
                 states on. Defaults to None.
 
         Returns:
             torch.Tensor: The initialized output.
         """
 
-        init_mode = (
-            init_mode if init_mode is not None else self.default_out_init_mode
+        init_fn = init_fn if init_fn is not None else self.default_out_init_fn
+
+        return init_tensor(
+            init_fn,
+            batch_size,
+            self.out_channels,
+            *self.spatial_size,
+            device=device,
         )
-        if isinstance(init_mode, str):
-            return init_tensor(
-                init_mode,
-                batch_size,
-                self.out_channels,
-                *self.spatial_size,
-                device=device,
-            )
-        else:
-            return init_mode(
-                batch_size,
-                self.out_channels,
-                *self.spatial_size,
-                device=device,
-            )
 
     def init_fb(
         self,
         batch_size: int,
-        init_mode: Optional[str | TensorInitFnType] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> torch.Tensor | None:
-        """
-        Initializes the feedback input.
+        """Initializes the feedback input.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode. Must be 'zeros',
-                'ones', 'randn', 'rand', a function, or None. If None, the
-                default initialization mode will be used.
-            device (torch.device, optional): Device to allocate the hidden
+            init_fn (str | TensorInitFnType, optional): Initialization function.
+                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None. If
+                None, the default initialization mode will be used.
+            device (torch.device | str, optional): Device to allocate the hidden
                 states on. Defaults to None.
 
         Returns:
@@ -561,24 +529,15 @@ class Conv2dEIRNNLayer(nn.Module):
         if not self.use_fb:
             return None
 
-        init_mode = (
-            init_mode if init_mode is not None else self.default_fb_init_mode
+        init_fn = init_fn if init_fn is not None else self.default_fb_init_fn
+
+        return init_tensor(
+            init_fn,
+            batch_size,
+            self.fb_channels,
+            *self.spatial_size,
+            device=device,
         )
-        if isinstance(init_mode, str):
-            return init_tensor(
-                init_mode,
-                batch_size,
-                self.fb_channels,
-                *self.spatial_size,
-                device=device,
-            )
-        else:
-            return init_mode(
-                batch_size,
-                self.fb_channels,
-                *self.spatial_size,
-                device=device,
-            )
 
     def forward(
         self,
@@ -586,16 +545,20 @@ class Conv2dEIRNNLayer(nn.Module):
         h_neuron: torch.Tensor | list[torch.Tensor],
         fb: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]:
-        """
-        Forward pass of the EIRNN layer.
+        """Forward pass of the EIRNN layer.
 
         Args:
-            input (torch.Tensor): Input tensor of shape (batch_size, in_channels, in_size[0], in_size[1]).
-            h_neuron (torch.Tensor | list[torch.Tensor]): List of neuron hidden states of shape (batch_size, neuron_channels[i], in_size[0], in_size[1]) for each neuron type i.
-            fb (Optional[torch.Tensor]): Feedback input of shape (batch_size, fb_channels, in_size[0], in_size[1]).
+            input (torch.Tensor): Input tensor of shape (batch_size, in_channels,
+                in_size[0], in_size[1]).
+            h_neuron (torch.Tensor | list[torch.Tensor]): List of neuron hidden
+                states of shape (batch_size, neuron_channels[i], in_size[0],
+                in_size[1]) for each neuron type i.
+            fb (Optional[torch.Tensor]): Feedback input of shape (batch_size,
+                fb_channels, in_size[0], in_size[1]).
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]: A tuple containing the output and new neuron hidden state.
+            tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]: A tuple
+                containing the output and new neuron hidden state.
         """
         # Expand h_neuron to match the number of neuron channels
         if isinstance(h_neuron, torch.Tensor):
@@ -638,37 +601,39 @@ class Conv2dEIRNNLayer(nn.Module):
 
 class Conv2dEIRNN(nn.Module):
     """
-    Implements a deep convolutional recurrent neural network with excitatory-inhibitory
-    neurons (EIRNN).
+    Implements a 2D Convolutional Recurrent Neural Network with
+    Excitatory-Inhibitory Neurons.
 
-    This module creates a multi-layer convolutional EIRNN network by stacking multiple
-    Conv2dEIRNNLayer instances with optional feedback connections between them.
+    This module stacks multiple Conv2dEIRNNLayer instances with optional
+    feedback connections between them.
+    It handles spatial dimension matching between layers and provides a
+    flexible interface for configuring the network.
 
     Args:
         num_layers (int): Number of EIRNN layers in the network. Defaults to 1.
-        layer_configs (Conv2dEIRNNLayerConfig | list[Conv2dEIRNNLayerConfig], optional):
-            Configuration object(s) for the EIRNN layers. If provided as a list, must match
-            the number of layers. If a single config is provided, it will be used for all layers
-            with appropriate adjustments. Defaults to None.
+        layer_configs (Conv2dEIRNNLayerConfig | list[Conv2dEIRNNLayerConfig],
+            optional): Configuration object(s) for the EIRNN layers. If provided as a
+            list, must match the number of layers. If a single config is provided,
+            it will be used for all layers with appropriate adjustments. Defaults
+            to None.
         layer_kwargs (Mapping[str, Any] | list[Mapping[str, Any]], optional):
-            Additional keyword arguments for each layer. If provided as a list, must match
-            the number of layers. Defaults to None.
-        common_layer_kwargs (Mapping[str, Any], optional):
-            Keyword arguments to apply to all layers. Defaults to None.
-        fb_connectivity (Param2dType[int | bool], optional):
-            Connectivity matrix for feedback connections between layers. Defaults to None.
-        fb_activations (Param2dType[str], optional):
-            Activation functions for feedback connections. Defaults to None.
-        fb_rectify (Param2dType[bool]):
-            Whether to rectify feedback connections. Defaults to False.
-        fb_kernel_sizes (Param2dType[tuple[int, int]], optional):
-            Kernel sizes for feedback convolutions. Defaults to None.
-        pool_mode (str, optional):
-            Pooling mode for layer outputs. Defaults to "avg".
-        layer_time_delay (bool):
-            Whether to introduce a time delay between layers. Defaults to False.
-        batch_first (bool):
-            Whether the input tensor has batch dimension as the first dimension. Defaults to True.
+            Additional keyword arguments for each layer. If provided as a list,
+            must match the number of layers. Defaults to None.
+        common_layer_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
+            to all layers. Defaults to None.
+        fb_connectivity (Param2dType[int | bool], optional): Connectivity matrix
+            for feedback connections between layers. Defaults to None.
+        fb_activations (Param2dType[str], optional): Activation functions for
+            feedback connections. Defaults to None.
+        fb_rectify (Param2dType[bool]): Whether to rectify feedback connections.
+            Defaults to False.
+        fb_kernel_sizes (Param2dType[tuple[int, int]], optional): Kernel sizes for
+            feedback convolutions. Defaults to None.
+        pool_mode (str, optional): Pooling mode for layer outputs. Defaults to "avg".
+        layer_time_delay (bool): Whether to introduce a time delay between layers.
+            Defaults to False.
+        batch_first (bool): Whether the input tensor has batch dimension as the first
+            dimension. Defaults to True.
     """
 
     def __init__(
@@ -854,134 +819,140 @@ class Conv2dEIRNN(nn.Module):
                         get_activation(fb_activations[i, j]),
                     )
 
-    def _init_hidden(
+    def init_hidden(
         self,
         batch_size: int,
-        init_mode: Optional[str] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> list[list[torch.Tensor]]:
-        """
-        Initializes the hidden states for all layers.
+        """Initializes the hidden states for all layers.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode ('zeros' or 'normal').
-            device (torch.device, optional): Device to allocate tensors.
+            init_fn (str | TensorInitFnType, optional): Initialization
+                function.
+            device (torch.device | str, optional): Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list containing the initialized neuron hidden states for each layer.
+            list[torch.Tensor]: A list containing the initialized neuron hidden
+                states for each layer.
         """
+
         return [
-            layer.init_hidden(batch_size, init_mode, device)
+            layer.init_hidden(batch_size, init_fn, device)
             for layer in self.layers
         ]
 
-    def _init_fb(
+    def init_fb(
         self,
         batch_size: int,
-        init_mode: Optional[str] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> list[Optional[torch.Tensor]]:
-        """
-        Initializes the feedback inputs for all layers.
+        """Initializes the feedback inputs for all layers.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode ('zeros' or 'normal').
-            device (torch.device, optional): Device to allocate tensors.
+            init_fn (str | TensorInitFnType, optional): Initialization
+                function.
+            device (torch.device | str, optional): Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list of initialized feedback inputs for each layer.
+            list[torch.Tensor]: A list of initialized feedback inputs for each
+                layer.
         """
         return [
-            layer.init_fb(batch_size, init_mode, device)
-            for layer in self.layers
+            layer.init_fb(batch_size, init_fn, device) for layer in self.layers
         ]
 
-    def _init_out(
+    def init_out(
         self,
         batch_size: int,
-        init_mode: Optional[str] = None,
-        device: Optional[torch.device] = None,
+        init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> list[torch.Tensor]:
-        """
-        Initializes the outputs for all layers.
+        """Initializes the outputs for all layers.
 
         Args:
             batch_size (int): Batch size.
-            init_mode (str, optional): Initialization mode ('zeros' or 'normal').
-            device (torch.device, optional): Device to allocate tensors.
+            init_fn (str | TensorInitFnType, optional): Initialization
+                function.
+            device (torch.device | str, optional): Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list of initialized outputs for each layer.
+            list[torch.Tensor]: A list of initialized outputs for each
+                layer.
         """
+
         return [
-            layer.init_out(batch_size, init_mode, device)
+            layer.init_out(batch_size, init_fn, device)
             for layer in self.layers
         ]
 
-    def _init_state(
+    def init_state(
         self,
-        out_0: Optional[Sequence[torch.Tensor | None]],
-        h_neuron_0: Optional[Sequence[Sequence[torch.Tensor | None]]],
-        fb_0: Optional[Sequence[torch.Tensor | None]],
+        out0: Optional[Sequence[torch.Tensor | None]],
+        h_neuron0: Optional[Sequence[Sequence[torch.Tensor | None]]],
+        fb0: Optional[Sequence[torch.Tensor | None]],
         num_steps: int,
         batch_size: int,
-        out_init_mode: Optional[str] = None,
-        hidden_init_mode: Optional[str] = None,
-        fb_init_mode: Optional[str] = None,
-        device: Optional[torch.device] = None,
+        out_init_fn: Optional[str | TensorInitFnType] = None,
+        hidden_init_fn: Optional[str | TensorInitFnType] = None,
+        fb_init_fn: Optional[str | TensorInitFnType] = None,
+        device: Optional[torch.device | str] = None,
     ) -> tuple[
         list[list[torch.Tensor | None]],
         list[list[list[torch.Tensor | None]]],
         list[list[torch.Tensor | int | None]],
     ]:
-        """
-        Initializes the state of the network.
+        """Initializes the state of the network.
 
         Args:
-            out_0 (Optional[list[torch.Tensor]]): Initial outputs for each layer.
-            h_neuron_0 (Optional[list[torch.Tensor]]): Initial neuron hidden states for each layer.
-            fb_0 (Optional[list[torch.Tensor]]): Initial feedback inputs for each layer.
+            out0 (Optional[list[torch.Tensor]]): Initial outputs for each
+                layer.
+            h_neuron0 (Optional[list[torch.Tensor]]): Initial neuron hidden
+                states for each layer.
+            fb0 (Optional[list[torch.Tensor]]): Initial feedback inputs for
+                each layer.
             num_steps (int): Number of time steps.
             batch_size (int): Batch size.
-            device (torch.device, optional): Device to allocate tensors.
+            device (torch.device | str, optional): Device to allocate tensors.
 
         Returns:
-            tuple(NDArray[np.object_], NDArray[np.object_], NDArray[np.object_]): A tuple
-                containing the initialized outputs, neuron hidden states, and
-                feedback inputs for each layer and time step.
+            tuple(NDArray[np.object_], NDArray[np.object_], NDArray[np.object_]):
+                A tuple containing the initialized outputs, neuron hidden states,
+                and feedback inputs for each layer and time step.
         """
 
-        # Validate input shapes of out_0, h_neuron_0, fb_0
-        if out_0 is None:
-            out_0 = [None] * self.num_layers
-        elif len(out_0) != self.num_layers:
+        # Validate input shapes of out0, h_neuron0, fb0
+        if out0 is None:
+            out0 = [None] * self.num_layers
+        elif len(out0) != self.num_layers:
             raise ValueError(
-                "The length of out_0 must be equal to the number of layers."
+                "The length of out0 must be equal to the number of layers."
             )
-        if h_neuron_0 is None:
-            h_neuron_0 = [
+        if h_neuron0 is None:
+            h_neuron0 = [
                 [None] * self.layers[i].num_neuron_types
                 for i in range(self.num_layers)
             ]
-        elif len(h_neuron_0) != self.num_layers:
+        elif len(h_neuron0) != self.num_layers:
             raise ValueError(
-                "The length of h_neuron_0 must be equal to the number of layers."
+                "The length of h_neuron0 must be equal to the number of layers."
             )
-        if fb_0 is None:
-            fb_0 = [None] * self.num_layers
-        elif len(fb_0) != self.num_layers:
+        if fb0 is None:
+            fb0 = [None] * self.num_layers
+        elif len(fb0) != self.num_layers:
             raise ValueError(
-                "The length of fb_0 must be equal to the number of layers."
+                "The length of fb0 must be equal to the number of layers."
             )
 
         # Initialize default values
-        h_neuron_0_default = self._init_hidden(
-            batch_size, hidden_init_mode, device
+        h_neuron0_default = self.init_hidden(
+            batch_size, hidden_init_fn, device
         )
-        fb_0_default = self._init_fb(batch_size, fb_init_mode, device)
-        out_0_default = self._init_out(batch_size, out_init_mode, device)
+        fb0_default = self.init_fb(batch_size, fb_init_fn, device)
+        out0_default = self.init_out(batch_size, out_init_fn, device)
 
         # Initialize output, hidden state, and feedback lists
         outs: list[list[torch.Tensor | None]] = [
@@ -1001,15 +972,13 @@ class Conv2dEIRNN(nn.Module):
 
         # Fill time step -1 with the initial values
         for i in range(self.num_layers):
-            outs[i][-1] = (
-                out_0[i] if out_0[i] is not None else out_0_default[i]
-            )
-            fbs[i][-1] = fb_0[i] if fb_0[i] is not None else fb_0_default[i]
+            outs[i][-1] = out0[i] if out0[i] is not None else out0_default[i]
+            fbs[i][-1] = fb0[i] if fb0[i] is not None else fb0_default[i]
             for k in range(self.layers[i].num_neuron_types):
                 h_neurons[i][-1][k] = (
-                    h_neuron_0[i][k]
-                    if h_neuron_0[i][k] is not None
-                    else h_neuron_0_default[i][k]
+                    h_neuron0[i][k]
+                    if h_neuron0[i][k] is not None
+                    else h_neuron0_default[i][k]
                 )
 
         return outs, h_neurons, fbs
@@ -1019,15 +988,15 @@ class Conv2dEIRNN(nn.Module):
         x: torch.Tensor,
         num_steps: Optional[int] = None,
     ) -> tuple[torch.Tensor, int]:
-        """
-        Formats the input tensor to match the expected shape.
+        """Formats the input tensor to match the expected shape.
 
         Args:
             x (torch.Tensor): Input tensor.
             num_steps (Optional[int]): Number of time steps.
 
         Returns:
-            tuple(torch.Tensor, int): The formatted input tensor and the number of time steps.
+            tuple(torch.Tensor, int): The formatted input tensor and the number
+                of time steps.
         """
         if x.dim() == 4:
             if num_steps is None or num_steps < 1:
@@ -1059,16 +1028,19 @@ class Conv2dEIRNN(nn.Module):
         list[list[torch.Tensor]],
         list[torch.Tensor | None],
     ]:
-        """
-        Formats the outputs, hidden states, and feedback inputs.
+        """Formats the outputs, hidden states, and feedback inputs.
 
         Args:
-            outs (list[list[torch.Tensor]]): Outputs for each layer and time step.
-            h_neurons (list[list[torch.Tensor]]): Neuron hidden states for each layer and time step.
-            fbs (list[list[torch.Tensor]]): Feedback inputs for each layer and time step.
+            outs (list[list[torch.Tensor]]): Outputs for each layer and time
+                step.
+            h_neurons (list[list[list[torch.Tensor]]]): Neuron hidden states for each
+                layer and time step.
+            fbs (list[list[torch.Tensor | None]]): Feedback inputs for each layer and
+                time step.
 
         Returns:
-            tuple(list[torch.Tensor], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]): The formatted outputs, excitatory cell hidden states, inhibitory neuron cell hidden states, and feedback inputs.
+            tuple[list[torch.Tensor], list[list[torch.Tensor]], list[torch.Tensor | None]]:
+                The formatted outputs, neuron hidden states, and feedback inputs.
         """
         outs_stack: list[torch.Tensor] = []
         h_neurons_stack: list[list[torch.Tensor]] = []
@@ -1104,8 +1076,14 @@ class Conv2dEIRNN(nn.Module):
         x: torch.Tensor,
         spatial_size: tuple[int, int],
     ) -> torch.Tensor:
-        """
-        Matches the spatial size of the input tensor to the spatial size of the layer.
+        """Matches the spatial size of the input tensor to the spatial size of the layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            spatial_size (tuple[int, int]): Target spatial size.
+
+        Returns:
+            torch.Tensor: Resized tensor matching the target spatial size.
         """
         if x.shape[-2:] > spatial_size:
             if self.pool_mode == "avg":
@@ -1125,33 +1103,30 @@ class Conv2dEIRNN(nn.Module):
         self,
         x: torch.Tensor,
         num_steps: Optional[int] = None,
-        out_0: Optional[Sequence[Optional[torch.Tensor]]] = None,
-        h_neuron_0: Optional[
-            Sequence[Sequence[Optional[torch.Tensor]]]
-        ] = None,
-        fb_0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        out0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        h_neuron0: Optional[Sequence[Sequence[Optional[torch.Tensor]]]] = None,
+        fb0: Optional[Sequence[Optional[torch.Tensor]]] = None,
     ) -> tuple[
         list[torch.Tensor],
         list[list[torch.Tensor]],
         list[torch.Tensor | None],
     ]:
-        """
-        Performs forward pass of the Conv2dEIRNN.
+        """Performs forward pass of the Conv2dEIRNN.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, in_channels, in_size[0], in_size[1]).
+            x (torch.Tensor): Input tensor of shape (batch_size,
+                in_channels, in_size[0], in_size[1]).
             num_steps (Optional[int]): Number of time steps.
-            out_0 (Optional[list[torch.Tensor]]): Initial outputs for each layer.
-            h_exc_0 (Optional[list[torch.Tensor]]): Initial excitatory cell hidden states for each layer.
-            h_inh_0 (Optional[list[torch.Tensor]]): Initial inhibitory neuron cell hidden states for each layer.
-            fb_0 (Optional[list[torch.Tensor]]): Initial feedback inputs for each layer.
-            modulation_out_fn (Optional[Callable[[torch.Tensor, int, int], torch.Tensor]]): Modulation function for outputs.
-            modulation_exc_fn (Optional[Callable[[torch.Tensor, int, int], torch.Tensor]]): Modulation function for excitatory cell hidden states.
-            modulation_inh_fn (Optional[Callable[[torch.Tensor, int, int], torch.Tensor]]): Modulation function for inhibitory neuron cell hidden states.
-            return_all_layers_out (bool): Whether to return outputs for all layers.
+            out0 (Optional[list[torch.Tensor]]): Initial outputs for each layer.
+            h_neuron0 (Optional[list[torch.Tensor]]): Initial neuron hidden states
+                for each layer.
+            fb0 (Optional[list[torch.Tensor]]): Initial feedback inputs for each
+                layer.
 
         Returns:
-            tuple(torch.Tensor, list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]): The output tensor, excitatory cell hidden states, inhibitory neuron cell hidden states, and feedback inputs.
+            tuple[list[torch.Tensor], list[list[torch.Tensor]], list[torch.Tensor | None]]:
+                The outputs for each layer, neuron hidden states for each layer,
+                and feedback inputs for each layer.
         """
 
         device = x.device
@@ -1161,9 +1136,9 @@ class Conv2dEIRNN(nn.Module):
         batch_size = x.shape[1]
 
         outs, h_neurons, fbs = self._init_state(
-            out_0,
-            h_neuron_0,
-            fb_0,
+            out0,
+            h_neuron0,
+            fb0,
             num_steps,
             batch_size,
             device=device,
