@@ -25,36 +25,6 @@ from bioplnn.typing import (
 )
 
 
-def circuit_connectivity_df(
-    num_exc: int,
-    num_inh: int,
-    use_fb: bool,
-    circuit_connectivity: Optional[Param2dType] = None,
-):
-    row_labels = (
-        ["input"]
-        + (["fb"] if use_fb else [])
-        + [f"exc_{i}" for i in range(num_exc)]
-        + [f"inh_{i}" for i in range(num_inh)]
-    )
-    column_labels = (
-        [f"exc_{i}" for i in range(num_exc)]
-        + [f"inh_{i}" for i in range(num_inh)]
-        + ["output"]
-    )
-
-    if circuit_connectivity is None:
-        circuit_connectivity = [[0] * len(column_labels)] * len(row_labels)
-
-    df = pd.DataFrame(
-        circuit_connectivity, index=row_labels, columns=column_labels
-    )
-    df.index.name = "from"
-    df.columns.name = "to"
-
-    return df
-
-
 class Conv2dRectify(nn.Conv2d):
     """
     A convolutional layer that ensures positive weights and biases.
@@ -129,24 +99,29 @@ class Conv2dEIRNNLayerConfig:
     out_channels: int
     num_neuron_types: int = 1
     neuron_channels: Param1dType[int] = 16
-    neuron_type: Param1dType[str] = "excitatory"
+    neuron_type: Param1dType[Optional[str]] = "excitatory"
     neuron_spatial_mode: Param1dType[str] = "same"
     fb_channels: Optional[int] = None
     conv_connectivity: Param2dType[int | bool] = field(
         default_factory=lambda: [[1, 0], [0, 1]]
     )
     conv_rectify: Param2dType[bool] = False
-    conv_kernel_size: Param2dType[tuple[int, int]] = (3, 3)
-    conv_activation: Optional[Param2dType[str | ActivationFnType]] = None
+    conv_kernel_size: Param2dType[Optional[tuple[int, int]]] = (3, 3)
+    conv_activation: Param2dType[Optional[str | ActivationFnType]] = None
     conv_bias: Param2dType[bool] = True
-    post_agg_activation: Optional[Param1dType[str | ActivationFnType]] = "Tanh"
-    tau_mode: Optional[Param1dType[str]] = "channel"
+    post_agg_activation: Param1dType[Optional[str | ActivationFnType]] = "Tanh"
+    tau_mode: Param1dType[Optional[str]] = "channel"
     tau_init_fn: Param1dType[str | TensorInitFnType] = "ones"
     default_hidden_init_fn: str | TensorInitFnType = "zeros"
     default_fb_init_fn: str | TensorInitFnType = "zeros"
     default_out_init_fn: str | TensorInitFnType = "zeros"
 
-    def as_dict(self) -> dict[str, Any]:
+    def asdict(self) -> dict[str, Any]:
+        """Converts the configuration object to a dictionary.
+
+        Returns:
+            dict[str, Any]: Dictionary representation of the configuration.
+        """
         return asdict(self)
 
 
@@ -421,7 +396,22 @@ class Conv2dEIRNNLayer(nn.Module):
         self.default_fb_init_fn = config.default_fb_init_fn
         self.default_out_init_fn = config.default_out_init_fn
 
+        #####################################################################
+        # Print conv connectivity dataframe
+        #####################################################################
+
+        print(self.conv_connectivity_df().to_string())
+
     def input_type_from_idx(self, idx: int) -> str:
+        """Converts an input index to the corresponding neuron type.
+
+        Args:
+            idx (int): Input index in the circuit connectivity matrix.
+
+        Returns:
+            str: The neuron type associated with the index. Can be "input",
+                "feedback", "excitatory", or "inhibitory".
+        """
         if idx == 0:
             return "input"
         elif self.use_fb and idx == 1:
@@ -430,6 +420,15 @@ class Conv2dEIRNNLayer(nn.Module):
             return self.neuron_type[idx - 1 - int(self.use_fb)]
 
     def output_type_from_idx(self, idx: int) -> str:
+        """Converts an output index to the corresponding neuron type.
+
+        Args:
+            idx (int): Output index in the circuit connectivity matrix.
+
+        Returns:
+            str: The neuron type associated with the index. Can be "excitatory",
+                "inhibitory", or "output".
+        """
         if idx < self.num_output_types - 1:
             return self.neuron_type[idx]
         else:
@@ -538,6 +537,114 @@ class Conv2dEIRNNLayer(nn.Module):
             *self.spatial_size,
             device=device,
         )
+
+    def conv_connectivity_str(self) -> str:
+        """Creates a string representing connectivity between neural populations.
+
+        Returns:
+            str: String with rows representing source populations ("from") and
+                columns representing target populations ("to").
+        """
+        row_labels = (
+            ["input"]
+            + (["fb"] if self.use_fb else [])
+            + [f"neuron_{i}" for i in range(self.num_neurons)]
+        )
+        column_labels = [f"neuron_{i}" for i in range(self.num_neurons)] + [
+            "output"
+        ]
+
+        assert len(row_labels) == self.num_input_types
+        assert len(column_labels) == self.num_output_types
+
+        array = np.empty((len(row_labels), len(column_labels)), dtype=object)
+        for i in range(self.num_input_types):
+            for j in range(self.num_output_types):
+                content = []
+                content.append(f"{int(self.conv_connectivity[i, j])}")
+                content.append(f"{int(self.conv_rectify[i, j])}")
+                content.append(f"{bool(self.conv_bias[i, j])}")
+                content.append(f"{self.conv_activation[i, j]}")
+                array[i, j] = ",".join(content)
+
+        df = pd.DataFrame(array, index=row_labels, columns=column_labels)
+        df.index.name = "from"
+        df.columns.name = "to"
+
+        return df.to_string()
+
+    def neuron_description_str(self) -> str:
+        """Creates a string representing the neuron types.
+
+        Returns:
+            str: String with each element representing a neuron type.
+        """
+        neuron_type_descriptions = "Neuron Descriptions:\n"
+        for i in range(self.num_neuron_types):
+            neuron_type_description = f"Neuron {i}: "
+            neuron_type_description += f"(type={self.neuron_type[i]},"
+            neuron_type_description += (
+                f"spatial_mode={self.neuron_spatial_mode[i]},"
+            )
+            neuron_type_description += f"channels={self.neuron_channels[i]})"
+            neuron_type_description += "\n"
+            neuron_type_descriptions += neuron_type_description
+
+        return neuron_type_descriptions
+
+    def conv_connectivity_df(self) -> pd.DataFrame:
+        """Creates a DataFrame representing connectivity between neural populations.
+
+        Returns:
+            pd.DataFrame: DataFrame with rows representing source populations
+                ("from") and columns representing target populations ("to").
+        """
+        row_labels = (
+            ["input"]
+            + (["fb"] if self.use_fb else [])
+            + [f"neuron_{i}" for i in range(self.num_neurons)]
+        )
+        column_labels = [f"neuron_{i}" for i in range(self.num_neurons)] + [
+            "output"
+        ]
+
+        assert len(row_labels) == self.num_input_types
+        assert len(column_labels) == self.num_output_types
+
+        array = np.empty((len(row_labels), len(column_labels)), dtype=object)
+        for i in range(self.num_input_types):
+            for j in range(self.num_output_types):
+                if self.conv_connectivity[i, j]:
+                    content = {}
+                    content["connectivity"] = int(self.conv_connectivity[i, j])
+                    content["rectify"] = int(self.conv_rectify[i, j])
+                    content["bias"] = bool(self.conv_bias[i, j])
+                    content["activation"] = self.conv_activation[i, j]
+                    array[i, j] = content
+                else:
+                    array[i, j] = ""
+
+        df = pd.DataFrame(
+            array.tolist(), index=row_labels, columns=column_labels
+        )
+        df.index.name = "from"
+        df.columns.name = "to"
+
+        return df
+
+    def __repr__(self) -> str:
+        """Returns a string representation of the EIRNN layer.
+
+        Returns:
+            str: String representation of the EIRNN layer.
+        """
+        repr_str = "Conv2dEIRNNLayer:\n"
+
+        repr_str += self.conv_connectivity_str()
+        repr_str += "\n"
+        repr_str += self.neuron_description_str()
+
+        return repr_str
 
     def forward(
         self,
@@ -908,20 +1015,37 @@ class Conv2dEIRNN(nn.Module):
         """Initializes the state of the network.
 
         Args:
-            out0 (Optional[list[torch.Tensor]]): Initial outputs for each
-                layer.
-            h_neuron0 (Optional[list[torch.Tensor]]): Initial neuron hidden
-                states for each layer.
-            fb0 (Optional[list[torch.Tensor]]): Initial feedback inputs for
-                each layer.
+            out0 (Optional[Sequence[torch.Tensor | None]]): Initial outputs for
+                each layer. If None, default initialization is used.
+            h_neuron0 (Optional[Sequence[Sequence[torch.Tensor | None]]]):
+                Initial neuron hidden states for each layer. If None, default
+                initialization is used.
+            fb0 (Optional[Sequence[torch.Tensor | None]]): Initial feedback
+                inputs for each layer. If None, default initialization is used.
             num_steps (int): Number of time steps.
             batch_size (int): Batch size.
-            device (torch.device | str, optional): Device to allocate tensors.
+            out_init_fn (Optional[str | TensorInitFnType]): Initialization
+                function for outputs if out0 is None. Defaults to None.
+            hidden_init_fn (Optional[str | TensorInitFnType]): Initialization
+                function for hidden states if h_neuron0 is None. Defaults to None.
+            fb_init_fn (Optional[str | TensorInitFnType]): Initialization
+                function for feedback inputs if fb0 is None. Defaults to None.
+            device (Optional[torch.device | str]): Device to allocate tensors on.
+                Defaults to None.
 
         Returns:
-            tuple(NDArray[np.object_], NDArray[np.object_], NDArray[np.object_]):
-                A tuple containing the initialized outputs, neuron hidden states,
-                and feedback inputs for each layer and time step.
+            tuple[list[list[torch.Tensor | None]],
+                  list[list[list[torch.Tensor | None]]],
+                  list[list[torch.Tensor | int | None]]]:
+                A tuple containing:
+                - Initialized outputs for each layer and time step
+                - Initialized neuron hidden states for each layer, time step, and
+                  neuron type
+                - Initialized feedback inputs for each layer and time step
+
+        Raises:
+            ValueError: If the length of out0, h_neuron0, or fb0 doesn't match
+                the number of layers.
         """
 
         # Validate input shapes of out0, h_neuron0, fb0
@@ -990,13 +1114,30 @@ class Conv2dEIRNN(nn.Module):
     ) -> tuple[torch.Tensor, int]:
         """Formats the input tensor to match the expected shape.
 
+        This method handles both single-step (4D) and multi-step (5D) input tensors,
+        converting them to a consistent format with seq_len as the first dimension.
+        For 4D inputs, it replicates the input across all time steps.
+
         Args:
-            x (torch.Tensor): Input tensor.
-            num_steps (Optional[int]): Number of time steps.
+            x (torch.Tensor): Input tensor, can be:
+                - 4D tensor of shape (batch_size, channels, height, width) for a
+                  single time step. Will be expanded to all time steps.
+                - 5D tensor of shape (seq_len, batch_size, channels, height, width) or
+                  (batch_size, seq_len, channels, height, width) if batch_first=True.
+            num_steps (Optional[int]): Number of time steps. Required if x is 4D.
+                If x is 5D, it will be inferred from the sequence dimension unless
+                explicitly provided.
 
         Returns:
-            tuple(torch.Tensor, int): The formatted input tensor and the number
-                of time steps.
+            tuple[torch.Tensor, int]: A tuple containing:
+                - The formatted input tensor with shape (seq_len, batch_size,
+                  channels, height, width)
+                - The number of time steps
+
+        Raises:
+            ValueError: If x has invalid dimensions (not 4D or 5D), if num_steps is
+                not provided for 4D inputs, or if num_steps is inconsistent with
+                the sequence length of 5D inputs.
         """
         if x.dim() == 4:
             if num_steps is None or num_steps < 1:
@@ -1028,19 +1169,31 @@ class Conv2dEIRNN(nn.Module):
         list[list[torch.Tensor]],
         list[torch.Tensor | None],
     ]:
-        """Formats the outputs, hidden states, and feedback inputs.
+        """Formats the outputs, hidden states, and feedback inputs for return.
+
+        This method stacks tensors across time steps and applies batch_first
+        transposition if needed.
 
         Args:
             outs (list[list[torch.Tensor]]): Outputs for each layer and time
-                step.
-            h_neurons (list[list[list[torch.Tensor]]]): Neuron hidden states for each
-                layer and time step.
-            fbs (list[list[torch.Tensor | None]]): Feedback inputs for each layer and
-                time step.
+                step. Shape: [num_layers][num_steps], with each tensor of shape
+                (batch_size, channels, height, width).
+            h_neurons (list[list[list[torch.Tensor]]]): Neuron hidden states for
+                each layer, time step, and neuron type. Shape:
+                [num_layers][num_steps][num_neuron_types].
+            fbs (list[list[torch.Tensor | None]]): Feedback inputs for each layer
+                and time step. Shape: [num_layers][num_steps].
 
         Returns:
             tuple[list[torch.Tensor], list[list[torch.Tensor]], list[torch.Tensor | None]]:
-                The formatted outputs, neuron hidden states, and feedback inputs.
+                A tuple containing:
+                - List of stacked outputs per layer. Each tensor has shape:
+                  (seq_len, batch_size, channels, height, width) or
+                  (batch_size, seq_len, channels, height, width) if batch_first=True.
+                - List of lists of stacked hidden states per layer and neuron type.
+                  Same shape pattern as outputs.
+                - List of stacked feedback inputs per layer (or None if not used).
+                  Same shape pattern as outputs.
         """
         outs_stack: list[torch.Tensor] = []
         h_neurons_stack: list[list[torch.Tensor]] = []
@@ -1076,14 +1229,21 @@ class Conv2dEIRNN(nn.Module):
         x: torch.Tensor,
         spatial_size: tuple[int, int],
     ) -> torch.Tensor:
-        """Matches the spatial size of the input tensor to the spatial size of the layer.
+        """Adjusts the spatial dimensions of the input tensor.
+
+        This method ensures that tensors have compatible spatial dimensions when
+        passing between layers. It uses either pooling (when downsampling) or
+        interpolation (when upsampling).
 
         Args:
-            x (torch.Tensor): Input tensor.
-            spatial_size (tuple[int, int]): Target spatial size.
+            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).
+            spatial_size (tuple[int, int]): Target spatial size (height, width).
 
         Returns:
             torch.Tensor: Resized tensor matching the target spatial size.
+
+        Raises:
+            ValueError: If self.pool_mode is not 'avg' or 'max'.
         """
         if x.shape[-2:] > spatial_size:
             if self.pool_mode == "avg":
@@ -1114,19 +1274,39 @@ class Conv2dEIRNN(nn.Module):
         """Performs forward pass of the Conv2dEIRNN.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size,
-                in_channels, in_size[0], in_size[1]).
-            num_steps (Optional[int]): Number of time steps.
-            out0 (Optional[list[torch.Tensor]]): Initial outputs for each layer.
-            h_neuron0 (Optional[list[torch.Tensor]]): Initial neuron hidden states
-                for each layer.
-            fb0 (Optional[list[torch.Tensor]]): Initial feedback inputs for each
-                layer.
+            x (torch.Tensor): Input tensor. Can be either:
+                - 4D tensor of shape (batch_size, in_channels, height, width)
+                  representing a single time step. In this case, num_steps must be
+                  provided.
+                - 5D tensor of shape (seq_len, batch_size, in_channels, height, width)
+                  or (batch_size, seq_len, in_channels, height, width) if
+                  batch_first=True.
+            num_steps (Optional[int]): Number of time steps. Required if x is 4D.
+                If x is 5D, this must match the sequence length dimension in x.
+            out0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial outputs for
+                each layer. Length should match the number of layers. Each element
+                can be None to use default initialization.
+            h_neuron0 (Optional[Sequence[Sequence[Optional[torch.Tensor]]]]):
+                Initial neuron hidden states for each layer and neuron type. Length
+                should match the number of layers, and each inner sequence length
+                should match the number of neuron types in that layer.
+            fb0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial feedback inputs
+                for each layer. Length should match the number of layers.
 
         Returns:
             tuple[list[torch.Tensor], list[list[torch.Tensor]], list[torch.Tensor | None]]:
-                The outputs for each layer, neuron hidden states for each layer,
-                and feedback inputs for each layer.
+                A tuple containing:
+                - list[torch.Tensor]: Outputs for each layer. Each tensor has shape:
+                  (seq_len, batch_size, out_channels, height, width) or
+                  (batch_size, seq_len, out_channels, height, width) if batch_first=True.
+                - list[list[torch.Tensor]]: Hidden states for each layer and neuron type.
+                  Same shape pattern as outputs but with neuron_channels.
+                - list[torch.Tensor | None]: Feedback inputs for each layer (None if the
+                  layer doesn't use feedback).
+
+        Raises:
+            ValueError: If input shape is invalid or num_steps is inconsistent with
+                the input shape.
         """
 
         device = x.device

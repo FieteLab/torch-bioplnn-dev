@@ -26,7 +26,7 @@ from bioplnn.utils import (
 )
 
 
-def _train(
+def train_epoch(
     config: AttrDict,
     model: nn.Module | Callable,
     optimizer: torch.optim.Optimizer,
@@ -91,12 +91,7 @@ def _train(
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(
-            x=x,
-            num_steps=config.train.num_steps,
-            loss_all_timesteps=config.train.loss_all_timesteps,
-            return_activations=False,
-        )
+        outputs = model(x=x, **config.train.forward_kwargs)
         if config.train.loss_all_timesteps:
             logits = outputs.permute(1, 2, 0)
             loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
@@ -154,7 +149,7 @@ def _train(
     return train_loss, train_acc, global_step
 
 
-def _validate(
+def validate_epoch(
     config: AttrDict,
     model: nn.Module | Callable,
     criterion: torch.nn.Module,
@@ -332,7 +327,7 @@ def train(dict_config: DictConfig) -> None:
         print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log({"epoch": epoch}, step=global_step)
         # Train the model
-        train_loss, train_acc, global_step = _train(
+        train_loss, train_acc, global_step = train_epoch(
             config=config,
             model=model,
             optimizer=optimizer,
@@ -348,7 +343,7 @@ def train(dict_config: DictConfig) -> None:
         )
 
         # Evaluate the model on the validation set
-        val_loss, val_acc = _validate(
+        val_loss, val_acc = validate_epoch(
             config=config,
             model=model,
             criterion=criterion,
@@ -390,7 +385,7 @@ def train(dict_config: DictConfig) -> None:
 
 @hydra.main(
     version_base=None,
-    config_path="/om2/user/valmiki/bioplnn/config",
+    config_path=os.path.join(os.path.dirname(__file__), "../config"),
     config_name="config",
 )
 def main(config: DictConfig):

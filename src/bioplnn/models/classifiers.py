@@ -36,11 +36,12 @@ class ConnectomeImageClassifier(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        num_steps: Optional[int] = None,
+        *,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
+        **rnn_forward_kwargs: Any,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        outs, hs = self.rnn(x, num_steps=num_steps)
+        outs, hs = self.rnn(x, **rnn_forward_kwargs)
 
         if self.rnn.batch_first:
             outs = outs.transpose(0, 1)
@@ -84,6 +85,7 @@ class ConnectomeODEImageClassifier(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
+        *,
         num_steps: int,
         start_time: float = 0.0,
         end_time: float = 1.0,
@@ -140,6 +142,7 @@ class CRNNImageClassifier(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
+        *,
         num_steps: Optional[int] = None,
         loss_all_timesteps: bool = False,
         return_activations: bool = False,

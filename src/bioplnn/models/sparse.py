@@ -442,8 +442,7 @@ class SparseODERNN(SparseRNN):
         self.solver = to.AutoDiffAdjoint(step_method, step_size_controller)  # type: ignore
 
     def _format_x(self, x: torch.Tensor):
-        """
-        Formats the input tensor to match the expected shape.
+        """Formats the input tensor to match the expected shape.
 
         Args:
             x (torch.Tensor): Input tensor. If 2-dimensional, it is assumed
@@ -453,7 +452,8 @@ class SparseODERNN(SparseRNN):
                 input_size).
 
         Returns:
-            torch.Tensor: The formatted input tensor.
+            torch.Tensor: The formatted input tensor of shape
+                (sequence_length, input_size, batch_size).
         """
 
         if x.dim() == 2:
@@ -563,6 +563,12 @@ class SparseODERNN(SparseRNN):
         x = x.flatten(2)
         batch_size = x.shape[-1]
         device = x.device
+
+        # Check input tensor shape
+        if x.shape[2] != batch_size * self.input_size:
+            raise ValueError(
+                f"Input tensor must have shape (batch_size, sequence_length, {self.input_size}), but got {x.shape}"
+            )
 
         # Define evaluation time points
         if num_steps == 1:
