@@ -1,6 +1,7 @@
-# Welcome to MkDocs
+# `torch-neuronets` 
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+## Overview
+The neuroscience community has different modeling needs. While the more functional deep-learning based models are less biologically aligned, and testing specific hypotheses of interest requires technical proficiency in programming/deep learning.
 
 ## Commands
 

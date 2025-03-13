@@ -1,19 +1,20 @@
-site_name: bioplnn-zoo
+site_name: torch-neuronets
 site_url: https://sitename.example
 
 nav:
   - Home: index.md
-  - Tutorials and Examples: tutorials/index.md
-  - API Reference: reference/index.md
-  - FAQ: faq.md
-  - Contributing:
-    - How to contribute: contribute.md
-    - Code of Conduct: code_of_conduct.md
-  - Citation: citation.md
-  - Credits: credits.md
+  - Installation: install.md
+  - API Reference:
+    - Spatially embedded networks: reference/eirnn.md
+    - Connectome-constrained models: reference/connectome.md
+    - Sparse utilities: reference/sparse.md
+    - Misc utilities: reference/misc.md
 
 theme:
   name: material
+  features:
+    - content.code.copy
+    - navigation.expand
   font:
     text: Roboto
     code: Red Hat Mono
@@ -47,3 +48,33 @@ plugins:
             show_symbol_type_toc: true
             show_root_full_path: false
             show_root_heading: true
+
+# markdown_extensions:
+#   # - extra
+#   # - smarty
+#   - admonition
+#   - attr_list
+#   - md_in_html
+#   - codehilite:
+#       guess_lang: false
+#   - toc:
+#       permalink: true
+#       toc_depth: 3
+#   - markdown_include.include:
+#       base_path: ../
+#   - pymdownx.arithmatex:
+#       generic: true
+#   - pymdownx.betterem:
+#       smart_enable: all
+#   - pymdownx.caret
+#   - pymdownx.critic
+#   - pymdownx.details
+#   - pymdownx.emoji
+#   - pymdownx.inlinehilite
+#   - pymdownx.magiclink
+#   - pymdownx.mark
+#   - pymdownx.smartsymbols
+#   - pymdownx.superfences
+#   - pymdownx.tasklist:
+#       custom_checkbox: true
+#   - pymdownx.tilde

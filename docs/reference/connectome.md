@@ -1,3 +1,3 @@
 # Spatially embedded cortical networks
 
-::: src.bioplnn.models.ei_crnn
+::: src.bioplnn.models.connectome
