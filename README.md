@@ -26,7 +26,7 @@ pip install bioplnn
 1. Clone the BioPlNN repository:
 
 ```bash
-git clone https://github.com/hpvok13/bioplnn.git
+git clone https://github.com/valmikikothare/bioplnn.git
 ```
 
 2. Navigate to the cloned directory:

@@ -1,0 +1,15 @@
+# @package _global_
+data:
+  dataset: mnist
+  root: data
+  batch_size: 8
+  num_workers: 8
+  shuffle_test: true
+model:
+  rnn_kwargs:
+    input_size: 784
+    connectivity_ih: connectivity/sunny/connectivity_ih_mnist.pt
+    output_neurons: connectivity/sunny/output_indices_mnist.pt
+  num_classes: 10
+optimizer:
+  lr: 0.005

@@ -1,24 +1,67 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from addict import Dict
+from numpy.typing import NDArray
+
+from bioplnn.typing import Param1dType, Param2dType, T
 
 
 class AttrDict(Dict):
+    """A non-default version of the `addict.Dict` class that raises a `KeyError`
+    when a key is not found in the dictionary.
+
+    Args:
+        *args: Any positional arguments.
+        **kwargs: Any keyword arguments.
+    """
+
     def __missing__(self, key: Any):
+        """Override the default behavior of `addict.Dict` to raise a `KeyError`
+        when a key is not found in the dictionary.
+
+        Args:
+            key: The key that was not found.
+
+        Raises:
+            KeyError: Always raised.
+        """
         raise KeyError(key)
 
 
 def pass_fn(*args, **kwargs):
+    """A no-op function that accepts any arguments and does nothing.
+
+    Args:
+        *args: Any positional arguments.
+        **kwargs: Any keyword arguments.
+    """
     pass
 
 
 def without_keys(d: Mapping, keys: list[str]) -> dict:
+    """Creates a new dictionary without specified keys.
+
+    Args:
+        d (Mapping): Input dictionary.
+        keys (list[str]): List of keys to exclude.
+
+    Returns:
+        dict: A new dictionary without the specified keys.
+    """
     return {x: d[x] for x in d if x not in keys}
 
 
 def is_list_like(x: Any) -> bool:
+    """Determines if an object is list-like (iterable but not a string or mapping).
+
+    Args:
+        x (Any): Object to check.
+
+    Returns:
+        bool: True if the object is list-like, False otherwise.
+    """
     if isinstance(x, (str, Mapping)):
         return False
     try:
@@ -31,6 +74,23 @@ def is_list_like(x: Any) -> bool:
 
 
 def dict_flatten(d, delimiter=".", key=None):
+    """Flattens a nested dictionary into a single-level dictionary.
+
+    Keys of the flattened dictionary will be the path to the value, with path
+    components joined by delimiter.
+
+    Args:
+        d (dict): Dictionary to flatten.
+        delimiter (str, optional): String to join key path components.
+            Defaults to ".".
+        key (str, optional): Current key prefix. Defaults to None.
+
+    Returns:
+        dict: Flattened dictionary.
+
+    Raises:
+        ValueError: If flattening would result in duplicate keys.
+    """
     key = f"{key}{delimiter}" if key is not None else ""
     non_dicts = {
         f"{key}{k}": v for k, v in d.items() if not isinstance(v, dict)
@@ -42,22 +102,27 @@ def dict_flatten(d, delimiter=".", key=None):
         for k, v in dict_flatten(_v, delimiter=delimiter, key=_k).items()
     }
 
-    if in_both := set(dicts.keys()) & set(non_dicts.keys()):
+    if in_both := dicts.keys() & non_dicts.keys():
         if len(in_both) > 1:
             raise ValueError(
                 f"flattened keys {list(in_both)} used more than once in dict"
             )
         else:
             raise ValueError(
-                f"Key {in_both.pop()} used more than once in dict"
+                f"flattened key {list(in_both)[0]} used more than once in dict"
             )
-    return non_dicts | dicts
+
+    return {**non_dicts, **dicts}
 
 
-def expand_list(x: Any, n: int, depth: int = 0) -> list[Any]:
-    """
-    Expand a variable x of type T to a list of x of length n, iff the variable
-    is not already an iterable of T of length n.
+def expand_list(
+    x: Optional[Param1dType[T]], n: int, depth: int = 0
+) -> list[T] | NDArray[Any]:
+    """Expands a value to a list of length n.
+
+    If x is already a list, then the list is returned unchanged.
+
+    If x is not a list, then x is expanded to a list of length n.
 
     Use depth > 0 if the intended type T can be indexed recursively, where
     depth is the maximum number of times x can be recursively indexed if of
@@ -65,11 +130,13 @@ def expand_list(x: Any, n: int, depth: int = 0) -> list[Any]:
     list of lists or an array or tensor, then depth = 2.
 
     Args:
-        x: The variable to expand.
-        n: The number of lists or tuples to expand to.
-        depth: The depth x can be recursively indexed. A depth of -1 will
-            assume x is of type list[T] and check if x is already of the
-            correct length.
+        x (Any): The variable to expand.
+        n (int): The number of lists or tuples to expand to.
+        depth (int, optional): The depth x can be recursively indexed. A depth
+            of -1 will assume x is of type list[T] and check if x is already of
+            the correct length. Defaults to 0.
+    Returns:
+        list[Any]: Expanded list.
     """
 
     if n < 1:
@@ -88,16 +155,16 @@ def expand_list(x: Any, n: int, depth: int = 0) -> list[Any]:
         assert depth == -1
         raise ValueError("x cannot be None if depth is -1.")
 
-    if len(x) != n:
+    if len(x) != n:  # type: ignore
         raise ValueError(f"x must have length {n}.")
 
-    return x
+    return x  # type: ignore
 
 
-def expand_array_2d(x: Any, m: int, n: int, depth: int = 0) -> np.ndarray:
-    """
-    Expand a variable x of type T to a 2D array of shape (m, n) if the
-    variable is not already an array of T of shape (m, n).
+def expand_array_2d(
+    x: Optional[Param2dType[T]], m: int, n: int, depth: int = 0
+) -> NDArray[Any]:
+    """Expands a value to a 2D numpy array of shape (m, n).
 
     Use depth > 0 if the intended type T can be indexed recursively, where
     depth is the maximum number of times x can be recursively indexed if of
@@ -105,12 +172,15 @@ def expand_array_2d(x: Any, m: int, n: int, depth: int = 0) -> np.ndarray:
     list of lists or an array or tensor, then depth = 2.
 
     Args:
-        x: The variable to expand.
-        m: The number of rows in the expanded array.
-        n: The number of columns in the expanded array.
-        depth: The depth x can be recursively indexed. A depth of -1 will
-            assume x is of type list[T] and check if x is already of the
-            correct shape.
+        x (Any): The variable to expand.
+        m (int): The number of rows in the expanded array.
+        n (int): The number of columns in the expanded array.
+        depth (int, optional): The depth x can be recursively indexed. A depth
+            of -1 will assume x is of type list[T] and check if x is already of
+            the correct shape.
+
+    Returns:
+        np.ndarray: Expanded 2D numpy array.
     """
 
     if m < 1 or n < 1:

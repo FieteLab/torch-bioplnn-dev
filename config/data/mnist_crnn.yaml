@@ -9,5 +9,6 @@ model:
   rnn_kwargs:
     batch_first: false
   num_classes: 10
-
 layer_one_in_channels_override: 1
+optimizer:
+  lr: 0.005

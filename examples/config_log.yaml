@@ -9,17 +9,13 @@ checkpoint:
   root: checkpoints/ei
   run: avid-disco-3472
 compile:
-  backend: inductor
   disable: true
-  dynamic: null
-  fullgraph: true
-  mode: reduce-overhead
 criterion:
   class_name: CrossEntropyLoss
 data:
   batch_size: 256
   dataset: mnist
-  num_workers: 0
+  num_workers: 8
   root: data
   shuffle_test: true
 debug_level: 1
@@ -43,18 +39,19 @@ optimizer:
   - 0.9
   - 0.999
   class_name: AdamW
-  lr: 0.0005
+  lr: 0.005
 seed: null
 tqdm: true
 train:
   epochs: 100
+  forward_kwargs:
+    loss_all_timesteps: false
+    num_steps: 5
   grad_clip:
     enable: false
     type: norm
     value: 1.0
   log_freq: 5
-  loss_all_timesteps: true
-  num_steps: 5
 wandb:
   group: null
   mode: disabled

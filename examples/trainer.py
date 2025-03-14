@@ -76,7 +76,7 @@ def train_epoch(
         desc=(f"Training | Epoch: {epoch} | Loss: {0:.4f} | Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-    for i, (x, labels) in enumerate(iterable=bar):
+    for i, (x, labels) in enumerate(bar):
         if (
             config.debug_num_batches is not None
             and i >= config.debug_num_batches
@@ -92,7 +92,10 @@ def train_epoch(
 
         # Forward pass
         outputs = model(x=x, **config.train.forward_kwargs)
-        if config.train.loss_all_timesteps:
+        if (
+            "loss_all_timesteps" in config.train.forward_kwargs
+            and config.train.forward_kwargs.loss_all_timesteps
+        ):
             logits = outputs.permute(1, 2, 0)
             loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
         else:
@@ -113,7 +116,10 @@ def train_epoch(
         # Update statistics
         train_loss += loss.item()
         running_loss += loss.item()
-        if config.train.loss_all_timesteps:
+        if (
+            "loss_all_timesteps" in config.train.forward_kwargs
+            and config.train.forward_kwargs.loss_all_timesteps
+        ):
             predicted = outputs[-1].argmax(-1)
         else:
             predicted = outputs.argmax(-1)
@@ -194,13 +200,11 @@ def validate_epoch(
                 x = [t.to(device) for t in x]
             labels = labels.to(device)
             # Forward pass
-            outputs = model(
-                x=x,
-                num_steps=config.train.num_steps,
-                loss_all_timesteps=config.train.loss_all_timesteps,
-                return_activations=False,
-            )
-            if config.train.loss_all_timesteps:
+            outputs = model(x=x, **config.train.forward_kwargs)
+            if (
+                "loss_all_timesteps" in config.train.forward_kwargs
+                and config.train.forward_kwargs.loss_all_timesteps
+            ):
                 logits = outputs.permute(1, 2, 0)
                 loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
@@ -212,7 +216,10 @@ def validate_epoch(
 
             # Update statistics
             val_loss += loss.item()
-            if config.train.loss_all_timesteps:
+            if (
+                "loss_all_timesteps" in config.train.forward_kwargs
+                and config.train.forward_kwargs.loss_all_timesteps
+            ):
                 predicted = outputs[-1].argmax(-1)
             else:
                 predicted = outputs.argmax(-1)

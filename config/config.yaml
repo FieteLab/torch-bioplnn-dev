@@ -22,10 +22,10 @@ criterion:
   class_name: CrossEntropyLoss
 compile:
   disable: true
-  fullgraph: true
-  dynamic: null
-  backend: inductor
-  mode: reduce-overhead
+  # fullgraph: false
+  # dynamic: null
+  # backend: inductor
+  # mode: default
 train:
   epochs: 100
   log_freq: 5
