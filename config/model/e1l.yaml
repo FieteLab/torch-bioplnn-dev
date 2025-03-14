@@ -1,4 +1,4 @@
-class_name: CRNNImageClassifier
+class_name: SpatiallyEmbeddedClassifier
 rnn_kwargs:
   layer_kwargs:
     - spatial_size: [32, 32]

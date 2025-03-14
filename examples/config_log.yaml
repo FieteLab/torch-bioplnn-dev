@@ -24,7 +24,7 @@ deterministic: false
 layer_one_in_channels_override: 1
 matmul_precision: high
 model:
-  class_name: CRNNImageClassifier
+  class_name: SpatiallyEmbeddedClassifier
   num_classes: 10
   rnn_kwargs:
     batch_first: false

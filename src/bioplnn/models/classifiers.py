@@ -5,10 +5,10 @@ import torch
 from torch import nn
 
 from bioplnn.models.connectome import ConnectomeODERNN, ConnectomeRNN
-from bioplnn.models.ei_crnn import Conv2dEIRNN
+from bioplnn.models.ei_crnn import SpatiallyEmbeddedRNN
 
 
-class ConnectomeImageClassifier(nn.Module):
+class ConnectomeClassifier(nn.Module):
     """Connectome-based image classifier.
 
     Uses a connectome RNN as the feature extractor followed by a linear
@@ -55,7 +55,7 @@ class ConnectomeImageClassifier(nn.Module):
         return_activations: bool = False,
         **rnn_forward_kwargs: Any,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Forward pass of the ConnectomeImageClassifier.
+        """Forward pass of the ConnectomeClassifier.
 
         Args:
             x (torch.Tensor): Input tensor of shape [batch_size, channels, ...].
@@ -94,7 +94,7 @@ class ConnectomeImageClassifier(nn.Module):
             return pred
 
 
-class ConnectomeODEImageClassifier(nn.Module):
+class ConnectomeODEClassifier(nn.Module):
     """Connectome ODE-based image classifier.
 
     Uses a connectome ODE RNN as the feature extractor followed by a linear
@@ -143,7 +143,7 @@ class ConnectomeODEImageClassifier(nn.Module):
         loss_all_timesteps: bool = False,
         return_activations: bool = False,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Forward pass of the ConnectomeODEImageClassifier.
+        """Forward pass of the ConnectomeODEClassifier.
 
         Args:
             x (torch.Tensor): Input tensor of shape [batch_size, channels, ...].
@@ -190,15 +190,15 @@ class ConnectomeODEImageClassifier(nn.Module):
             return pred
 
 
-class CRNNImageClassifier(nn.Module):
-    """Convolutional RNN-based image classifier.
+class SpatiallyEmbeddedClassifier(nn.Module):
+    """Spatially embedded RNN-based image classifier.
 
     Uses a convolutional E/I RNN as the feature extractor followed by a linear
     classifier.
 
     Args:
         rnn_kwargs (Mapping[str, Any]): Keyword arguments to pass to the
-            Conv2dEIRNN constructor.
+            SpatiallyEmbeddedRNN constructor.
         num_classes (int): Number of output classes.
         pool_size (tuple[int, int], optional): Spatial dimensions after pooling.
             Defaults to (1, 1).
@@ -217,7 +217,7 @@ class CRNNImageClassifier(nn.Module):
     ):
         super().__init__()
 
-        self.rnn = Conv2dEIRNN(**rnn_kwargs)
+        self.rnn = SpatiallyEmbeddedRNN(**rnn_kwargs)
 
         self.pool = nn.AdaptiveAvgPool2d(pool_size)
 
@@ -248,7 +248,7 @@ class CRNNImageClassifier(nn.Module):
             List[torch.Tensor],
         ],
     ]:
-        """Forward pass of the CRNNImageClassifier.
+        """Forward pass of the SpatiallyEmbeddedClassifier.
 
         Args:
             x (torch.Tensor): Input tensor of shape

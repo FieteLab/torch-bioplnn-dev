@@ -1,4 +1,5 @@
 import warnings
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from math import ceil
@@ -51,8 +52,8 @@ class Conv2dRectify(nn.Conv2d):
 
 
 @dataclass
-class Conv2dEIRNNLayerConfig:
-    """Configuration class for Conv2dEIRNN layers.
+class SpatiallyEmbeddedAreaConfig:
+    """Configuration class for SpatiallyEmbeddedRNN layers.
 
     Args:
         spatial_size (tuple[int, int]): Size of the input data (height, width).
@@ -126,7 +127,7 @@ class Conv2dEIRNNLayerConfig:
         return asdict(self)
 
 
-class Conv2dEIRNNLayer(nn.Module):
+class SpatiallyEmbeddedArea(nn.Module):
     """Implements a 2D convolutional recurrent neural network layer with
     excitatory and inhibitory neurons.
 
@@ -136,9 +137,9 @@ class Conv2dEIRNNLayer(nn.Module):
     constants.
 
     Args:
-        config (Optional[Conv2dEIRNNLayerConfig]): Configuration object that
+        config (Optional[SpatiallyEmbeddedAreaConfig]): Configuration object that
             specifies the layer architecture and parameters. See
-            Conv2dEIRNNLayerConfig for details. If None, parameters must be
+            SpatiallyEmbeddedAreaConfig for details. If None, parameters must be
             provided as keyword arguments.
         **kwargs: Keyword arguments that can be used to override or provide
             parameters not specified in the config object. These will be used to
@@ -156,7 +157,7 @@ class Conv2dEIRNNLayer(nn.Module):
     """
 
     def __init__(
-        self, config: Optional[Conv2dEIRNNLayerConfig] = None, **kwargs
+        self, config: Optional[SpatiallyEmbeddedAreaConfig] = None, **kwargs
     ):
         super().__init__()
 
@@ -165,7 +166,7 @@ class Conv2dEIRNNLayer(nn.Module):
         #####################################################################
 
         if config is None:
-            config = Conv2dEIRNNLayerConfig(**kwargs)
+            config = SpatiallyEmbeddedAreaConfig(**kwargs)
 
         self.spatial_size = config.spatial_size
         self.in_channels = config.in_channels
@@ -402,7 +403,13 @@ class Conv2dEIRNNLayer(nn.Module):
         # Print conv connectivity dataframe
         #####################################################################
 
+        # TODO: Make this prettier
+        print("Neuron types:")
+        print(self.neuron_description_df().to_string())
+        print("-" * 80)
+        print("Connectivity:")
         print(self.conv_connectivity_df().to_string())
+        print("-" * 80)
 
     def input_type_from_idx(self, idx: int) -> Optional[str]:
         """Converts an input index to the corresponding neuron type.
@@ -540,59 +547,22 @@ class Conv2dEIRNNLayer(nn.Module):
             device=device,
         )
 
-    def conv_connectivity_str(self) -> str:
-        """Creates a string representing connectivity between neural populations.
-
-        Returns:
-            str: String with rows representing source populations ("from") and
-                columns representing target populations ("to").
-        """
-        row_labels = (
-            ["input"]
-            + (["fb"] if self.use_fb else [])
-            + [f"neuron_{i}" for i in range(self.num_neuron_types)]
-        )
-        column_labels = [
-            f"neuron_{i}" for i in range(self.num_neuron_types)
-        ] + ["output"]
-
-        assert len(row_labels) == self.num_input_types
-        assert len(column_labels) == self.num_output_types
-
-        array = np.empty((len(row_labels), len(column_labels)), dtype=object)
-        for i in range(self.num_input_types):
-            for j in range(self.num_output_types):
-                content = []
-                content.append(f"{int(self.conv_connectivity[i, j])}")
-                content.append(f"{int(self.conv_rectify[i, j])}")
-                content.append(f"{bool(self.conv_bias[i, j])}")
-                content.append(f"{self.conv_activation[i, j]}")
-                array[i, j] = ",".join(content)
-
-        df = pd.DataFrame(array, index=row_labels, columns=column_labels)
-        df.index.name = "from"
-        df.columns.name = "to"
-
-        return df.to_string()
-
-    def neuron_description_str(self) -> str:
-        """Creates a string representing the neuron types.
+    def neuron_description_df(self) -> pd.DataFrame:
+        """Creates a DataFrame representing the neuron types.
 
         Returns:
             str: String with each element representing a neuron type.
         """
-        neuron_type_descriptions = "Neuron Descriptions:\n"
-        for i in range(self.num_neuron_types):
-            neuron_type_description = f"Neuron {i}: "
-            neuron_type_description += f"(type={self.neuron_type[i]},"
-            neuron_type_description += (
-                f"spatial_mode={self.neuron_spatial_mode[i]},"
-            )
-            neuron_type_description += f"channels={self.neuron_channels[i]})"
-            neuron_type_description += "\n"
-            neuron_type_descriptions += neuron_type_description
 
-        return neuron_type_descriptions
+        df_columns = defaultdict(list)
+        for i in range(self.num_neuron_types):
+            df_columns["type"].append(self.neuron_type[i])
+            df_columns["spatial_mode"].append(self.neuron_spatial_mode[i])
+            df_columns["channels"].append(self.neuron_channels[i])
+
+        df = pd.DataFrame(df_columns)
+
+        return df
 
     def conv_connectivity_df(self) -> pd.DataFrame:
         """Creates a DataFrame representing connectivity between neural populations.
@@ -617,12 +587,14 @@ class Conv2dEIRNNLayer(nn.Module):
         for i in range(self.num_input_types):
             for j in range(self.num_output_types):
                 if self.conv_connectivity[i, j]:
-                    content = {}
-                    content["connectivity"] = int(self.conv_connectivity[i, j])
-                    content["rectify"] = int(self.conv_rectify[i, j])
-                    content["bias"] = bool(self.conv_bias[i, j])
-                    content["activation"] = self.conv_activation[i, j]
-                    array[i, j] = content
+                    content = []
+                    if self.conv_rectify[i, j]:
+                        content.append("r")
+                    if self.conv_bias[i, j]:
+                        content.append("b")
+                    if self.conv_activation[i, j]:
+                        content.append(self.conv_activation[i, j][:2])
+                    array[i, j] = ",".join(content)
                 else:
                     array[i, j] = ""
 
@@ -640,7 +612,7 @@ class Conv2dEIRNNLayer(nn.Module):
         Returns:
             str: String representation of the EIRNN layer.
         """
-        repr_str = "Conv2dEIRNNLayer:\n"
+        repr_str = "SpatiallyEmbeddedArea:\n"
 
         repr_str += self.conv_connectivity_str()
         repr_str += "\n"
@@ -708,19 +680,19 @@ class Conv2dEIRNNLayer(nn.Module):
         return out, h_neuron_new
 
 
-class Conv2dEIRNN(nn.Module):
+class SpatiallyEmbeddedRNN(nn.Module):
     """
     Implements a 2D Convolutional Recurrent Neural Network with
     Excitatory-Inhibitory Neurons.
 
-    This module stacks multiple Conv2dEIRNNLayer instances with optional
+    This module stacks multiple SpatiallyEmbeddedArea instances with optional
     feedback connections between them.
     It handles spatial dimension matching between layers and provides a
     flexible interface for configuring the network.
 
     Args:
         num_layers (int): Number of EIRNN layers in the network. Defaults to 1.
-        layer_configs (list[Conv2dEIRNNLayerConfig], optional): Configuration object(s)
+        layer_configs (list[SpatiallyEmbeddedAreaConfig], optional): Configuration object(s)
             for the EIRNN layers. If provided as a list, must match the number of
             layers. If a single config is provided, it will be used for all layers
             with appropriate adjustments. Defaults to None.
@@ -748,7 +720,7 @@ class Conv2dEIRNN(nn.Module):
         self,
         *,
         num_layers: int = 1,
-        layer_configs: Optional[list[Conv2dEIRNNLayerConfig]] = None,
+        layer_configs: Optional[list[SpatiallyEmbeddedAreaConfig]] = None,
         layer_kwargs: Optional[list[Mapping[str, Any]]] = None,
         common_layer_kwargs: Optional[Mapping[str, Any]] = None,
         fb_connectivity: Optional[Param2dType[Union[int, bool]]] = None,
@@ -790,7 +762,7 @@ class Conv2dEIRNN(nn.Module):
                 common_layer_kwargs = {}
 
             layer_configs = [
-                Conv2dEIRNNLayerConfig(
+                SpatiallyEmbeddedAreaConfig(
                     **common_layer_kwargs,
                     **layer_kwargs[i],  # type: ignore
                 )
@@ -841,7 +813,10 @@ class Conv2dEIRNN(nn.Module):
 
         # Create layers
         self.layers = nn.ModuleList(
-            [Conv2dEIRNNLayer(layer_config) for layer_config in layer_configs]
+            [
+                SpatiallyEmbeddedArea(layer_config)
+                for layer_config in layer_configs
+            ]
         )
 
         ############################################################
@@ -1273,7 +1248,7 @@ class Conv2dEIRNN(nn.Module):
         list[list[torch.Tensor]],
         list[Union[torch.Tensor, None]],
     ]:
-        """Performs forward pass of the Conv2dEIRNN.
+        """Performs forward pass of the SpatiallyEmbeddedRNN.
 
         Args:
             x (torch.Tensor): Input tensor. Can be either:
@@ -1353,11 +1328,11 @@ class Conv2dEIRNN(nn.Module):
                     fb=fbs[i][t - 1],
                 )
 
-                # Apply feedback
-                for key, conv in self.fb_convs.items():
-                    fb_i, fb_j = key.split("->")
-                    fb_i, fb_j = int(fb_i), int(fb_j)
-                    fbs[fb_j][t] = fbs[fb_j][t] + conv(outs[fb_i][t])
+            # Apply feedback
+            for key, conv in self.fb_convs.items():
+                fb_i, fb_j = key.split("->")
+                fb_i, fb_j = int(fb_i), int(fb_j)
+                fbs[fb_j][t] = fbs[fb_j][t] + conv(outs[fb_i][t])
 
         outs, h_neurons, fbs = self._format_result(outs, h_neurons, fbs)  # type: ignore
 

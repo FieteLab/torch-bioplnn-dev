@@ -1,6 +1,6 @@
 # @package _global_
 model:
-  class_name: ConnectomeODEImageClassifier
+  class_name: ConnectomeODEClassifier
   rnn_kwargs:
     input_size: 4751
     hidden_size: 47521
