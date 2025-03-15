@@ -1,0 +1,25 @@
+[data-md-color-scheme="mcgovern"] {
+    --md-primary-fg-color:        #573881;
+    --md-primary-fg-color--light: #ECB7B7;
+    --md-primary-fg-color--dark:  #90030C;
+  }
+
+.md-typeset h1 {
+  font-size: 1.5625em;
+  line-height: 1.4;
+  margin: 4em 0 .64em;
+  margin-top: 1.6em;
+  margin-right: 0px;
+  margin-bottom: 0.64em;
+  margin-left: 0px;
+}
+
+.md-typeset h2 {
+  font-size: 1.3em;
+  line-height: 1.4;
+  margin: 4em 0 .64em;
+  margin-top: 1.6em;
+  margin-right: 0px;
+  margin-bottom: 0.64em;
+  margin-left: 0px;
+}
