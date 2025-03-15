@@ -1,3 +1,3 @@
-# Spatially embedded cortical networks
+# Utilities for efficient sparse matrix operations
 
 ::: src.bioplnn.models.sparse

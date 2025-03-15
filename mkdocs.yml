@@ -3,7 +3,7 @@ site_url: https://sitename.example
 
 nav:
   - Home: index.md
-  - Installation: install.md
+  - Quick start guide: install.md
   - Examples:
     - Single layer network: examples/ex01.md
   - API Reference:
@@ -41,6 +41,20 @@ theme:
 
 plugins:
   - search
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: auto
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      caption_position: bottom
+      background: white
+      shadow: true
+      manual: false
   - mkdocstrings:
       default_handler: python
       handlers:

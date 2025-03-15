@@ -1,3 +1,3 @@
-# Spatially embedded cortical networks
+# Connectome-constrained model utilities
 
 ::: src.bioplnn.models.connectome

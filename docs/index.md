@@ -16,37 +16,54 @@ In this package, we provide a basic set of features that will enable to user to 
 
 <div class="grid cards" markdown>
 
--   :material-clock-fast:{ .lg .middle } __Set up in 5 minutes__
+-   __Cell-type specification__
 
     ---
 
-    Install [`mkdocs-material`](#) with [`pip`](#) and get up
-    and running in minutes
+    <figure markdown="span">
+    ![celltypes](images/celltype-thumb.png){ width="300" }
+    <figcaption>Synapses can adhere to Dale's law. Specify synapse- vs neuron-specific nonlinearities.</figcaption>
+    </figure>
+    [:octicons-arrow-right-24: Example](#)
 
-    [:octicons-arrow-right-24: Getting started](#)
-
--   :fontawesome-brands-markdown:{ .lg .middle } __It's just Markdown__
-
-    ---
-
-    Focus on your content and generate a responsive and searchable static site
-
-    [:octicons-arrow-right-24: Reference](#)
-
--   :material-format-font:{ .lg .middle } __Made to measure__
+-   __Spatially embedded populations__
 
     ---
 
-    Change the colors, fonts, language, icons, logo and more with a few lines
+    <figure markdown="span">
+    ![spatial](images/spatial-thumb.png){ width="300" }
+    <figcaption>Construct hierarchical populations of spatially embedded neurons.</figcaption>
+    </figure>
+    [:octicons-arrow-right-24: Example](#)
 
-    [:octicons-arrow-right-24: Customization](#)
-
--   :material-scale-balance:{ .lg .middle } __Open Source, MIT__
+-   __Microcircuit archetypes__
 
     ---
 
-    Material for MkDocs is licensed under MIT and available on [GitHub]
+    <figure markdown="span">
+    ![microcircuits](images/microcircuits-thumb.png){ width="300" }
+    <figcaption>Learnable scaffolds for local "microcircuit" patterns of connectivity.</figcaption>
+    </figure>
+    [:octicons-arrow-right-24: Example](#)
 
-    [:octicons-arrow-right-24: License](#)
+-   __Diverse feedback wiring__
+
+    ---
+
+    <figure markdown="span">
+    ![feedback](images/feedback-thumb.png){ width="300" }
+    <figcaption>Various specifications for inter-areal feedback projections.</figcaption>
+    </figure>
+    [:octicons-arrow-right-24: Example](#)
+
+-   __Connectome constrained modelling__
+
+    ---
+
+    <figure markdown="span">
+    ![connectome](images/connectome-thumb.png){ width="300" }
+    <figcaption>Efficient implementation of sparse-matrix arithmetic for forward and backpropagation.</figcaption>
+    </figure>
+    [:octicons-arrow-right-24: Example](#)
 
 </div>
