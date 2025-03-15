@@ -1,0 +1,19 @@
+# @package _global_
+model:
+  class_name: ConnectomeODEClassifier
+  rnn_kwargs:
+    input_size: 4751
+    hidden_size: 47521
+    connectivity_hh: connectivity/sunny/connectivity_hh.pt
+    connectivity_ih: connectivity/sunny/connectivity_ih.pt
+    nonlinearity: Sigmoid
+    batch_first: false
+    compile_solver_kwargs:
+      mode: max-autotune
+      dynamic: false
+      fullgraph: true
+  fc_dim: 256
+  dropout: 0.5
+train:
+  forward_kwargs:
+    num_steps: 2

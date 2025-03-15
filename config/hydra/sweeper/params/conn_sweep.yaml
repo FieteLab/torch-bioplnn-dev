@@ -1,0 +1,2 @@
+optimizer.lr: choice(0.001, 0.0005, 0.0001)
+train.forward_kwargs.loss_all_timesteps: choice(true, false)

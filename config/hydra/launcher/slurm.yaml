@@ -7,6 +7,6 @@ cpus_per_task: 8
 nodes: 1
 max_num_timeout: 0
 array_parallelism: 100
-mem_gb: 20
+mem_gb: 80
 gres: gpu:a100:1
 stderr_to_stdout: true

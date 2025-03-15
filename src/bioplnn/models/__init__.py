@@ -1,21 +1,25 @@
 from .classifiers import (
-    ConnectomeImageClassifier,
-    ConnectomeODEImageClassifier,
-    CRNNImageClassifier,
+    ConnectomeClassifier,
+    ConnectomeODEClassifier,
+    SpatiallyEmbeddedClassifier,
 )
 from .connectome import ConnectomeODERNN, ConnectomeRNN
-from .ei_crnn import Conv2dEIRNN, Conv2dEIRNNLayer, Conv2dEIRNNLayerConfig
+from .ei_crnn import (
+    SpatiallyEmbeddedArea,
+    SpatiallyEmbeddedAreaConfig,
+    SpatiallyEmbeddedRNN,
+)
 from .sparse import SparseLinear, SparseRNN
 
 __all__ = [
-    "Conv2dEIRNN",
-    "Conv2dEIRNNLayer",
-    "Conv2dEIRNNLayerConfig",
-    "CRNNImageClassifier",
+    "SpatiallyEmbeddedRNN",
+    "SpatiallyEmbeddedArea",
+    "SpatiallyEmbeddedAreaConfig",
     "SparseLinear",
     "SparseRNN",
-    "ConnectomeImageClassifier",
-    "ConnectomeODEImageClassifier",
+    "SpatiallyEmbeddedClassifier",
+    "ConnectomeClassifier",
+    "ConnectomeODEClassifier",
     "ConnectomeRNN",
     "ConnectomeODERNN",
 ]

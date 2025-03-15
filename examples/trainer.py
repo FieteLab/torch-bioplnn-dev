@@ -26,7 +26,7 @@ from bioplnn.utils import (
 )
 
 
-def _train(
+def train_epoch(
     config: AttrDict,
     model: nn.Module | Callable,
     optimizer: torch.optim.Optimizer,
@@ -76,7 +76,7 @@ def _train(
         desc=(f"Training | Epoch: {epoch} | Loss: {0:.4f} | Acc: {0:.2%}"),
         disable=not config.tqdm,
     )
-    for i, (x, labels) in enumerate(iterable=bar):
+    for i, (x, labels) in enumerate(bar):
         if (
             config.debug_num_batches is not None
             and i >= config.debug_num_batches
@@ -91,13 +91,11 @@ def _train(
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(
-            x=x,
-            num_steps=config.train.num_steps,
-            loss_all_timesteps=config.train.loss_all_timesteps,
-            return_activations=False,
-        )
-        if config.train.loss_all_timesteps:
+        outputs = model(x=x, **config.train.forward_kwargs)
+        if (
+            "loss_all_timesteps" in config.train.forward_kwargs
+            and config.train.forward_kwargs.loss_all_timesteps
+        ):
             logits = outputs.permute(1, 2, 0)
             loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
         else:
@@ -118,7 +116,10 @@ def _train(
         # Update statistics
         train_loss += loss.item()
         running_loss += loss.item()
-        if config.train.loss_all_timesteps:
+        if (
+            "loss_all_timesteps" in config.train.forward_kwargs
+            and config.train.forward_kwargs.loss_all_timesteps
+        ):
             predicted = outputs[-1].argmax(-1)
         else:
             predicted = outputs.argmax(-1)
@@ -154,7 +155,7 @@ def _train(
     return train_loss, train_acc, global_step
 
 
-def _validate(
+def validate_epoch(
     config: AttrDict,
     model: nn.Module | Callable,
     criterion: torch.nn.Module,
@@ -199,13 +200,12 @@ def _validate(
                 x = [t.to(device) for t in x]
             labels = labels.to(device)
             # Forward pass
-            outputs = model(
-                x=x,
-                num_steps=config.train.num_steps,
-                loss_all_timesteps=config.train.loss_all_timesteps,
-                return_activations=False,
-            )
-            if config.train.loss_all_timesteps:
+            torch.compiler.cudagraph_mark_step_begin()
+            outputs = model(x=x, **config.train.forward_kwargs)
+            if (
+                "loss_all_timesteps" in config.train.forward_kwargs
+                and config.train.forward_kwargs.loss_all_timesteps
+            ):
                 logits = outputs.permute(1, 2, 0)
                 loss_labels = labels.unsqueeze(-1).expand(-1, outputs.shape[0])
             else:
@@ -217,7 +217,10 @@ def _validate(
 
             # Update statistics
             val_loss += loss.item()
-            if config.train.loss_all_timesteps:
+            if (
+                "loss_all_timesteps" in config.train.forward_kwargs
+                and config.train.forward_kwargs.loss_all_timesteps
+            ):
                 predicted = outputs[-1].argmax(-1)
             else:
                 predicted = outputs.argmax(-1)
@@ -332,7 +335,7 @@ def train(dict_config: DictConfig) -> None:
         print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log({"epoch": epoch}, step=global_step)
         # Train the model
-        train_loss, train_acc, global_step = _train(
+        train_loss, train_acc, global_step = train_epoch(
             config=config,
             model=model,
             optimizer=optimizer,
@@ -348,7 +351,7 @@ def train(dict_config: DictConfig) -> None:
         )
 
         # Evaluate the model on the validation set
-        val_loss, val_acc = _validate(
+        val_loss, val_acc = validate_epoch(
             config=config,
             model=model,
             criterion=criterion,
@@ -390,7 +393,7 @@ def train(dict_config: DictConfig) -> None:
 
 @hydra.main(
     version_base=None,
-    config_path="/om2/user/valmiki/bioplnn/config",
+    config_path=os.path.join(os.path.dirname(__file__), "../config"),
     config_name="config",
 )
 def main(config: DictConfig):

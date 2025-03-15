@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from os import PathLike
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplnn.models.sparse import SparseODERNN, SparseRNN
@@ -11,31 +12,25 @@ from bioplnn.utils import init_tensor
 
 
 class ConnectomeRNN(SparseRNN):
-    """
-    Connectome Recurrent Neural Network
+    """Connectome Recurrent Neural Network.
 
-    ConnectomeRNN is a recurrent neural network designed to
-    This base class provides common functionalities for all ConnectomeRNN variants.
+    A recurrent neural network inspired by brain connectomes, using a sparse
+    connectivity structure and biologically-inspired dynamics.
 
     Args:
-        sheet_size (tuple[int, int]): Size of the sheet-like topology (height, width).
-        synapse_std (float): Standard deviation for random synapse initialization.
-        synapses_per_neuron (int): Number of synapses per neuron.
-        self_recurrence (bool): Whether to include self-recurrent connections.
-        connectivity_hh (Optional[str | torch.Tensor]): Path to a file containing the hidden-to-hidden connectivity matrix or the matrix itself.
-        connectivity_ih (Optional[str | torch.Tensor]): Path to a file containing the input-to-hidden connectivity matrix or the matrix itself.
-        num_classes (int): Number of output classes.
-        batch_first (bool): Whether the input is in (batch_size, seq_len, input_size) format.
-        input_indices (Optional[str | torch.Tensor]): Path to a file containing the input indices or the tensor itself (specifying which neurons receive input).
-        output_indices (Optional[str | torch.Tensor]): Path to a file containing the output indices or the tensor itself (specifying which neurons contribute to the output).
-        out_nonlinearity (str): Nonlinearity applied to the output layer.
+        output_neurons (Union[torch.Tensor, PathLike], optional): Tensor or path
+            to file containing indices of output neurons. Defaults to None.
+        tau_init_fn (Union[str, TensorInitFnType], optional): Function or name
+            of function to initialize time constants. Defaults to "ones".
+        *args: Additional positional arguments to pass to the parent class.
+        **kwargs: Additional keyword arguments to pass to the parent class.
     """
 
     def __init__(
         self,
         *args,
-        output_neurons: Optional[torch.Tensor | PathLike] = None,
-        tau_init_fn: str | TensorInitFnType = "ones",
+        output_neurons: Optional[Union[torch.Tensor, PathLike]] = None,
+        tau_init_fn: Union[str, TensorInitFnType] = "ones",
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -43,22 +38,26 @@ class ConnectomeRNN(SparseRNN):
         self.output_neurons = self._init_output_neurons(output_neurons)
 
         # Time constant
-        self.tau = init_tensor(tau_init_fn, 1, self.num_neurons)
-        self._tau_hook(self, None)
-        self.register_forward_pre_hook(self._tau_hook)
-
-    @staticmethod
-    def _tau_hook(module, args):
-        module.tau.data = F.softplus(module.tau) + 1
+        self.tau = init_tensor(tau_init_fn, 1, self.hidden_size)
+        self.tau = nn.Parameter(self.tau)
 
     def _init_output_neurons(
         self,
-        output_neurons: Optional[torch.Tensor | PathLike] = None,
-    ) -> torch.Tensor | None:
-        """
-        Initialize the output neurons.
-        """
+        output_neurons: Union[torch.Tensor, PathLike, None] = None,
+    ) -> Union[torch.Tensor, None]:
+        """Initialize output neuron indices.
 
+        Args:
+            output_neurons (Union[torch.Tensor, PathLike], optional): Tensor or
+                path to file containing indices of output neurons. Defaults to
+                None.
+
+        Returns:
+            Union[torch.Tensor, None]: Tensor of output neuron indices or None.
+
+        Raises:
+            TypeError: If output_neurons is not a tensor, PathLike, or None.
+        """
         output_neurons_tensor: torch.Tensor
         if output_neurons is not None:
             if isinstance(output_neurons, torch.Tensor):
@@ -78,8 +77,14 @@ class ConnectomeRNN(SparseRNN):
     def update_fn(
         self, x_t: torch.Tensor, h_t_minus_1: torch.Tensor
     ) -> torch.Tensor:
-        """
-        Update function for the ConnectomeRNN.
+        """Update hidden state for one timestep.
+
+        Args:
+            x_t (torch.Tensor): Input at current timestep.
+            h_t_minus_1 (torch.Tensor): Hidden state at previous timestep.
+
+        Returns:
+            torch.Tensor: Updated hidden state.
         """
         h_t = self.layernorm(
             self.nonlinearity(self.ih(x_t) + self.hh(h_t_minus_1))
@@ -88,21 +93,19 @@ class ConnectomeRNN(SparseRNN):
         return 1 / self.tau * h_t + (1 - 1 / self.tau) * h_t_minus_1
 
     def forward(self, *args, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the ConnectomeRNN layer.
-
-        Passes all arguments and keyword arguments to SparseRNN's forward
-        method.
+        """Forward pass of the ConnectomeRNN.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: Arguments to pass to parent class forward method.
+            **kwargs: Keyword arguments to pass to parent class forward method.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Output and hidden state for each
-                time step.
+            tuple[torch.Tensor, torch.Tensor]:
+                - First tensor is the output sequence. If output_neurons is None,
+                  this is the full hidden state. Otherwise, it's a subset of the
+                  hidden state corresponding to output_neurons.
+                - Second tensor is the full hidden state sequence.
         """
-
         hs = super().forward(*args, **kwargs)
 
         # Select output indices if provided
@@ -115,53 +118,129 @@ class ConnectomeRNN(SparseRNN):
 
 
 class ConnectomeODERNN(SparseODERNN):
+    """Connectome Ordinary Differential Equation Recurrent Neural Network.
+
+    A continuous-time version of the ConnectomeRNN, which integrates neural
+    dynamics using an ODE solver.
+
+    Args:
+        output_neurons (Union[torch.Tensor, PathLike], optional): Tensor or path
+            to file containing indices of output neurons. Defaults to None.
+        tau_init_fn (Union[str, TensorInitFnType], optional): Function or name
+            of function to initialize time constants. Defaults to "ones".
+        *args: Additional positional arguments to pass to the parent class.
+        **kwargs: Additional keyword arguments to pass to the parent class.
+    """
+
+    def __init__(
+        self,
+        *args,
+        output_neurons: Optional[Union[torch.Tensor, PathLike]] = None,
+        tau_init_fn: Union[str, TensorInitFnType] = "ones",
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+        self.output_neurons = self._init_output_neurons(output_neurons)
+
+        # Time constant
+        self.tau = init_tensor(tau_init_fn, self.hidden_size, 1)
+        self.tau = nn.Parameter(self.tau)
+
+    def _init_output_neurons(
+        self,
+        output_neurons: Union[torch.Tensor, PathLike, None] = None,
+    ) -> Union[torch.Tensor, None]:
+        """Initialize output neuron indices.
+
+        Args:
+            output_neurons (Union[torch.Tensor, PathLike], optional): Tensor or
+                path to file containing indices of output neurons. Defaults to
+                None.
+
+        Returns:
+            Union[torch.Tensor, None]: Tensor of output neuron indices or None.
+
+        Raises:
+            TypeError: If output_neurons is not a tensor, PathLike, or None.
+        """
+        output_neurons_tensor: torch.Tensor
+        if output_neurons is not None:
+            if isinstance(output_neurons, torch.Tensor):
+                output_neurons_tensor = output_neurons
+            else:
+                output_neurons_tensor = torch.load(
+                    output_neurons, weights_only=True
+                ).squeeze()
+
+            if output_neurons_tensor.dim() > 1:
+                raise ValueError("Output indices must be a 1D tensor")
+
+            return output_neurons_tensor
+        else:
+            return None
+
+    @torch.compile(dynamic=False, fullgraph=True, mode="max-autotune")
     def update_fn(
         self, t: torch.Tensor, h: torch.Tensor, args: Mapping[str, Any]
     ) -> torch.Tensor:
-        """
-        ODE term for the ConnectomeODERNN.
+        """ODE function for neural dynamics.
 
         Args:
-            t (torch.Tensor): Time points.
-            h (torch.Tensor): Hidden states.
-            args (Mapping[str, Any]): Additional arguments.
+            t (torch.Tensor): Current time point.
+            h (torch.Tensor): Current hidden state.
+            args (Mapping[str, Any]): Additional arguments, including 'x' for
+                the input at this time point.
 
         Returns:
-            torch.Tensor: dh/dt
+            torch.Tensor: Rate of change of the hidden state (dh/dt).
         """
-
         h = h.t()
+
         x = args["x"]
         start_time = args["start_time"]
         end_time = args["end_time"]
+        batch_size = x.shape[-1]
 
+        # Get index corresponding to time t
         idx = self._index_from_time(t, x, start_time, end_time)
 
-        h_new = self.nonlinearity(self.ih(x[idx]) + self.hh(h))
-        h_new = self.layernorm(h_new)
+        # Get input at time t
+        batch_indices = torch.arange(batch_size, device=idx.device)
+        x_t = x[idx, :, batch_indices].t()
 
-        assert (self.tau > 1).all()
+        # Compute new hidden state
+        h_new = self.nonlinearity(self.ih(x_t) + self.hh(h))
+
+        # Rectify hidden state to ensure it's non-negative
+        # Note: The use is still expected to provide a nonlinearity that
+        #       ensures non-negativity, e.g. sigmoid.
+        h_new = F.relu(h_new)
+
+        # Compute rate of change of hidden state
         dhdt = (h_new - h) / self.tau
 
-        return dhdt
+        return dhdt.t()
 
     def forward(
         self, *args, **kwargs
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the ConnectomeODERNN layer.
-
-        Passes all arguments and keyword arguments to SparseODERNN's forward
-        method.
+        """Forward pass of the ConnectomeODERNN.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            *args: Arguments to pass to parent class forward method.
+            **kwargs: Keyword arguments to pass to parent class forward method.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Output, hidden
-                state and time steps.
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                - First tensor is the output sequence. If output_neurons is None,
+                  this is the full hidden state. Otherwise, it's a subset of the
+                  hidden state corresponding to output_neurons.
+                - Second tensor is the full hidden state sequence.
+                - Third tensor contains the time points.
         """
+        # Ensure tau is at least 1
+        self.tau.data = torch.clamp(self.tau, min=1)
 
         hs, ts = super().forward(*args, **kwargs)
 

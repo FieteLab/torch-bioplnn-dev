@@ -5,7 +5,7 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
-from bioplnn.utils import manual_seed
+from bioplnn.utils.torch import manual_seed
 
 
 def rescale_to_range(x, old_min=0, old_max=1, new_min=-1, new_max=1):
