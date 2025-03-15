@@ -200,6 +200,7 @@ def validate_epoch(
                 x = [t.to(device) for t in x]
             labels = labels.to(device)
             # Forward pass
+            torch.compiler.cudagraph_mark_step_begin()
             outputs = model(x=x, **config.train.forward_kwargs)
             if (
                 "loss_all_timesteps" in config.train.forward_kwargs

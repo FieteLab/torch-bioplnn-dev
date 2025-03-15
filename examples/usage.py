@@ -1,19 +1,22 @@
 import torch
 import torchvision
 
-from bioplnn.models import Conv2dEIRNN, Conv2dEIRNNLayerConfig
+from bioplnn.models import (
+    SpatiallyEmbeddedAreaConfig,
+    SpatiallyEmbeddedRNN,
+)
 
 
 def example_forward_pass():
     # Define the model
-    layer_configs = [
-        Conv2dEIRNNLayerConfig(
-            spatial_size=(32, 32),
-            in_channels=1,
+    area_configs = [
+        SpatiallyEmbeddedAreaConfig(
+            in_size=(32, 32),
+            in_channels=3,
             out_channels=16,
         )
     ]
-    model = Conv2dEIRNN(num_layers=1, layer_configs=layer_configs)
+    model = SpatiallyEmbeddedRNN(num_areas=1, area_configs=area_configs)
 
     # Define the input (num_steps, batch size, channels, height, width)
     x = torch.randn(10, 16, 3, 32, 32)
@@ -29,14 +32,14 @@ def example_forward_pass():
 
 def example_backward_pass():
     # Define the model
-    layer_configs = [
-        Conv2dEIRNNLayerConfig(
-            spatial_size=(32, 32),
-            in_channels=1,
+    area_configs = [
+        SpatiallyEmbeddedAreaConfig(
+            in_size=(32, 32),
+            in_channels=3,
             out_channels=16,
         )
     ]
-    model = Conv2dEIRNN(num_layers=1, layer_configs=layer_configs)
+    model = SpatiallyEmbeddedRNN(num_areas=1, area_configs=area_configs)
 
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -51,7 +54,7 @@ def example_backward_pass():
     model.train()
 
     # Perform a forward pass
-    y = model(x)
+    y = model(x, num_steps=10)
 
     # Perform a backward pass
     loss = loss_fn(y, x)
@@ -63,14 +66,14 @@ def example_backward_pass():
 
 def example_training_loop():
     # Define the model
-    layer_configs = [
-        Conv2dEIRNNLayerConfig(
-            spatial_size=(32, 32),
-            in_channels=1,
+    area_configs = [
+        SpatiallyEmbeddedAreaConfig(
+            in_size=(32, 32),
+            in_channels=3,
             out_channels=16,
         )
     ]
-    model = Conv2dEIRNN(num_layers=1, layer_configs=layer_configs)
+    model = SpatiallyEmbeddedRNN(num_areas=1, area_configs=area_configs)
 
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -96,7 +99,7 @@ def example_training_loop():
     for epoch in range(10):
         for batch in dataloader:
             x, y = batch
-            y = model(x)
+            y = model(x, num_steps=10)
             loss = loss_fn(y, x)
             optimizer.zero_grad()
             loss.backward()

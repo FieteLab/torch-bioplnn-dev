@@ -13,7 +13,7 @@ compile:
 criterion:
   class_name: CrossEntropyLoss
 data:
-  batch_size: 256
+  batch_size: 8
   dataset: mnist
   num_workers: 8
   root: data
@@ -21,19 +21,24 @@ data:
 debug_level: 1
 debug_num_batches: null
 deterministic: false
-layer_one_in_channels_override: 1
 matmul_precision: high
 model:
-  class_name: SpatiallyEmbeddedClassifier
+  class_name: ConnectomeODEClassifier
+  dropout: 0.5
+  fc_dim: 256
   num_classes: 10
   rnn_kwargs:
     batch_first: false
-    layer_kwargs:
-    - in_channels: 1
-      out_channels: 32
-      spatial_size:
-      - 32
-      - 32
+    compile_solver_kwargs:
+      dynamic: false
+      fullgraph: true
+      mode: max-autotune
+    connectivity_hh: connectivity/sunny/connectivity_hh.pt
+    connectivity_ih: connectivity/sunny/connectivity_ih_mnist.pt
+    hidden_size: 47521
+    input_size: 784
+    nonlinearity: Sigmoid
+    output_neurons: connectivity/sunny/output_indices_mnist.pt
 optimizer:
   betas:
   - 0.9
@@ -46,7 +51,7 @@ train:
   epochs: 100
   forward_kwargs:
     loss_all_timesteps: false
-    num_steps: 5
+    num_steps: 2
   grad_clip:
     enable: false
     type: norm

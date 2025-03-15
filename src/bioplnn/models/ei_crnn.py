@@ -53,70 +53,75 @@ class Conv2dRectify(nn.Conv2d):
 
 @dataclass
 class SpatiallyEmbeddedAreaConfig:
-    """Configuration class for SpatiallyEmbeddedRNN layers.
+    """Configuration class for SpatiallyEmbeddedArea Module.
 
     Args:
-        spatial_size (tuple[int, int]): Size of the input data (height, width).
+        in_size (tuple[int, int]): Size of the input data (height, width).
         in_channels (int): Number of input channels.
         out_channels (int): Number of output channels.
-        num_neuron_types (int, optional): Number of neuron types. Defaults to 1.
-        neuron_channels (Param1dType[int], optional):
+        num_cell_types (int, optional): Number of neuron types. Defaults to 1.
+        num_cell_subtypes (Param1dType[int], optional):
             Number of channels for each neuron type. Defaults to 16.
-        neuron_type (Param1dType[str], optional): Type of neuron. Defaults to
+        cell_type_class (Param1dType[str], optional): Type of neuron. Defaults to
             "excitatory".
-        neuron_spatial_mode (Param1dType[str], optional):
+        cell_type_density (Param1dType[str], optional):
             Spatial mode for the neuron. Defaults to "same".
-        fb_channels (int, optional): Number of feedback channels. Defaults to
+        feedback_channels (int, optional): Number of feedback channels. Defaults to
             None.
-        conv_connectivity (Param2dType[Union[int, bool]], optional):
+        inter_cell_type_connectivity (Param2dType[Union[int, bool]], optional):
             Connectivity matrix for the convolutions. Defaults to [[1, 0],
             [0, 1]].
-        conv_rectify (Param2dType[bool], optional): Whether to rectify the
+        inter_cell_type_rectify (Param2dType[bool], optional): Whether to rectify the
             convolutions. Defaults to False.
-        conv_kernel_size (Param2dType[tuple[int, int]], optional):
+        inter_cell_type_spatial_extents (Param2dType[tuple[int, int]], optional):
             Kernel size for the convolutions. Defaults to (3, 3).
-        conv_activation (Param2dType[Union[str, ActivationFnType]], optional):
+        inter_cell_type_nonlinearity (Param2dType[Union[str, ActivationFnType]], optional):
             Activation function for the convolutions. Defaults to None.
-        conv_bias (Param2dType[bool], optional):
+        inter_cell_type_bias (Param2dType[bool], optional):
             Whether to add a bias term for the convolutions. Defaults to True.
-        post_agg_activation (Param1dType[Union[str, ActivationFnType]], optional):
+        cell_nonlinearity (Param1dType[Union[str, ActivationFnType]], optional):
             Activation function for the post-aggregation. Defaults to "Tanh".
         tau_mode (Param1dType[str], optional): Mode for handling membrane time
             constants. Defaults to "channel".
         tau_init_fn (Param1dType[Union[str, TensorInitFnType]], optional):
             Initialization mode for the membrane time constants. Defaults to
             "ones".
-        default_hidden_init_fn (Union[str, TensorInitFnType], optional):
+        default_neuron_state_init_fn (Union[str, TensorInitFnType], optional):
             Initialization mode for the hidden state. Defaults to "zeros".
-        default_fb_init_fn (Union[str, TensorInitFnType], optional):
-            Initialization mode for the feedback. Defaults to "zeros".
-        default_out_init_fn (Union[str, TensorInitFnType], optional):
-            Initialization mode for the output. Defaults to "zeros".
+        default_feedback_state_init_fn (Union[str, TensorInitFnType], optional):
+            Initialization mode for the feedback state. Defaults to "zeros".
+        default_output_state_init_fn (Union[str, TensorInitFnType], optional):
+            Initialization mode for the output state. Defaults to "zeros".
     """
 
-    spatial_size: tuple[int, int]
+    in_size: tuple[int, int]
     in_channels: int
     out_channels: int
-    num_neuron_types: int = 1
-    neuron_channels: Param1dType[int] = 16
-    neuron_type: Param1dType[Optional[str]] = "excitatory"
-    neuron_spatial_mode: Param1dType[str] = "same"
-    fb_channels: Optional[int] = None
-    conv_connectivity: Param2dType[Union[int, bool]] = field(
+    num_cell_types: int = 1
+    num_cell_subtypes: Param1dType[int] = 16
+    cell_type_class: Param1dType[str] = "hybrid"
+    cell_type_density: Param1dType[str] = "same"
+    feedback_channels: Optional[int] = None
+    inter_cell_type_connectivity: Param2dType[Union[int, bool]] = field(
         default_factory=lambda: [[1, 0], [0, 1]]
     )
-    conv_rectify: Param2dType[bool] = False
-    conv_kernel_size: Param2dType[Optional[tuple[int, int]]] = (3, 3)
-    conv_activation: Param2dType[Optional[Union[str, ActivationFnType]]] = None
-    conv_bias: Param2dType[bool] = True
-    post_agg_activation: Param1dType[
+    inter_cell_type_rectify: Param2dType[bool] = False
+    inter_cell_type_spatial_extents: Param2dType[Optional[tuple[int, int]]] = (
+        3,
+        3,
+    )
+    inter_cell_type_nonlinearity: Param2dType[
         Optional[Union[str, ActivationFnType]]
-    ] = "Tanh"
+    ] = None
+    inter_cell_type_bias: Param2dType[bool] = True
+    cell_nonlinearity: Param1dType[Optional[Union[str, ActivationFnType]]] = (
+        "Tanh"
+    )
     tau_mode: Param1dType[Optional[str]] = "channel"
     tau_init_fn: Param1dType[Union[str, TensorInitFnType]] = "ones"
-    default_hidden_init_fn: Union[str, TensorInitFnType] = "zeros"
-    default_fb_init_fn: Union[str, TensorInitFnType] = "zeros"
-    default_out_init_fn: Union[str, TensorInitFnType] = "zeros"
+    default_neuron_state_init_fn: Union[str, TensorInitFnType] = "zeros"
+    default_feedback_state_init_fn: Union[str, TensorInitFnType] = "zeros"
+    default_output_state_init_fn: Union[str, TensorInitFnType] = "zeros"
 
     def asdict(self) -> dict[str, Any]:
         """Converts the configuration object to a dictionary.
@@ -128,24 +133,22 @@ class SpatiallyEmbeddedAreaConfig:
 
 
 class SpatiallyEmbeddedArea(nn.Module):
-    """Implements a 2D convolutional recurrent neural network layer with
-    excitatory and inhibitory neurons.
+    """Implements a biologically-plausible, spatially embedded neural area.
 
-    This layer implements the core computational unit of the EIRNN
-    architecture, supporting multiple neuron types (excitatory and inhibitory)
-    with configurable connectivity patterns, activation functions, and time
-    constants.
+    This module implements the core computational unit of the SpatiallyEmbeddedRNN.
+    It supports multiple neuron types (excitatory and inhibitory) with configurable
+    connectivity patterns, activation functions, and time constants.
 
     Args:
         config (Optional[SpatiallyEmbeddedAreaConfig]): Configuration object that
-            specifies the layer architecture and parameters. See
+            specifies the area architecture and parameters. See
             SpatiallyEmbeddedAreaConfig for details. If None, parameters must be
             provided as keyword arguments.
         **kwargs: Keyword arguments that can be used to override or provide
             parameters not specified in the config object. These will be used to
             populate the config if one is not provided.
 
-    The layer implements:
+    The module implements:
     - Configurable neuron types (excitatory/inhibitory)
     - Convolutional connectivity between neuron populations
     - Recurrent dynamics with learnable time constants
@@ -168,93 +171,103 @@ class SpatiallyEmbeddedArea(nn.Module):
         if config is None:
             config = SpatiallyEmbeddedAreaConfig(**kwargs)
 
-        self.spatial_size = config.spatial_size
+        self.in_size = config.in_size
         self.in_channels = config.in_channels
         self.out_channels = config.out_channels
-        self.fb_channels = (
-            config.fb_channels if config.fb_channels is not None else 0
+        self.feedback_channels = (
+            config.feedback_channels
+            if config.feedback_channels is not None
+            else 0
         )
-        self.use_fb = self.fb_channels > 0
+        self.use_feedback = self.feedback_channels > 0
 
         #####################################################################
         # Neuron dimensions
         #####################################################################
-        self.num_neuron_types = config.num_neuron_types
+        self.num_cell_types = config.num_cell_types
 
         # Format neuron type
-        self.neuron_channels = expand_list(
-            config.neuron_channels, self.num_neuron_types, depth=1
+        self.num_cell_subtypes = expand_list(
+            config.num_cell_subtypes, self.num_cell_types, depth=1
         )
-        self.neuron_type = expand_list(
-            config.neuron_type, self.num_neuron_types, depth=1
+        self.cell_type_class = expand_list(
+            config.cell_type_class, self.num_cell_types, depth=1
         )
-        self.neuron_spatial_mode = expand_list(
-            config.neuron_spatial_mode, self.num_neuron_types, depth=1
+        self.cell_type_density = expand_list(
+            config.cell_type_density, self.num_cell_types, depth=1
         )
 
-        if not set(self.neuron_type) <= {"excitatory", "inhibitory"}:
+        if not set(self.cell_type_class) <= {
+            "excitatory",
+            "inhibitory",
+            "hybrid",
+        }:
             raise ValueError(
-                "neuron_type for each neuron type must be 'excitatory' or 'inhibitory'."
+                "cell_type_class for each neuron type must be 'excitatory', "
+                "'inhibitory', or 'hybrid'."
             )
-        if not set(self.neuron_spatial_mode) <= {"same", "half"}:
+        if not set(self.cell_type_density) <= {"same", "half"}:
             raise ValueError(
-                "neuron_spatial_mode for each neuron type must be 'same' or 'half'."
+                "cell_type_density for each neuron type must be 'same' or 'half'."
             )
 
-        # Save number of "types" for the input to and output from the layer
+        # Save number of "types" for the input to and output from the area
         self.num_input_types = (
-            1 + int(self.use_fb) + self.num_neuron_types
-        )  # input + fb + neurons
-        self.num_output_types = self.num_neuron_types + 1  # neurons + output
+            1 + int(self.use_feedback) + self.num_cell_types
+        )  # input + feedback + neurons
+        self.num_output_types = self.num_cell_types + 1  # neurons + output
 
         # Calculate half spatial size
-        self.half_spatial_size = (
-            ceil(self.spatial_size[0] / 2),
-            ceil(self.spatial_size[1] / 2),
+        self.half_size = (
+            ceil(self.in_size[0] / 2),
+            ceil(self.in_size[1] / 2),
         )
 
         # Calculate spatial size for each neuron type based on spatial mode
-        self.neuron_spatial_size = [
-            self.spatial_size if mode == "same" else self.half_spatial_size
-            for mode in self.neuron_spatial_mode
+        self.neuron_size = [
+            self.in_size if mode == "same" else self.half_size
+            for mode in self.cell_type_density
         ]
         #####################################################################
         # Circuit motif connectivity
         #####################################################################
 
         # Format circuit connectivity
-        self.conv_connectivity = np.array(config.conv_connectivity)
-        if self.conv_connectivity.shape != (
+        self.inter_cell_type_connectivity = np.array(
+            config.inter_cell_type_connectivity
+        )
+        if self.inter_cell_type_connectivity.shape != (
             self.num_output_types,
             self.num_input_types,
         ):
             raise ValueError(
-                "The shape of conv_connectivity must match the number of output and input types."
+                "The shape of inter_cell_type_connectivity must match the number of "
+                "output and input types."
             )
 
         # Format connectivity variables to match circuit connectivity
-        self.conv_kernel_size = expand_array_2d(
-            config.conv_kernel_size,
-            self.conv_connectivity.shape[0],
-            self.conv_connectivity.shape[1],
+        self.inter_cell_type_spatial_extents = expand_array_2d(
+            config.inter_cell_type_spatial_extents,
+            self.inter_cell_type_connectivity.shape[0],
+            self.inter_cell_type_connectivity.shape[1],
             depth=2,
         )
-        self.conv_rectify = expand_array_2d(
-            config.conv_rectify,
-            self.conv_connectivity.shape[0],
-            self.conv_connectivity.shape[1],
+        self.inter_cell_type_rectify = expand_array_2d(
+            config.inter_cell_type_rectify,
+            self.inter_cell_type_connectivity.shape[0],
+            self.inter_cell_type_connectivity.shape[1],
             depth=1,
         )
-        self.conv_activation = expand_array_2d(
-            config.conv_activation,
-            self.conv_connectivity.shape[0],
-            self.conv_connectivity.shape[1],
+        self.inter_cell_type_nonlinearity = expand_array_2d(
+            config.inter_cell_type_nonlinearity,
+            self.inter_cell_type_connectivity.shape[0],
+            self.inter_cell_type_connectivity.shape[1],
             depth=1,
         )
-        self.conv_bias = expand_array_2d(
-            config.conv_bias,
-            self.conv_connectivity.shape[0],
-            self.conv_connectivity.shape[1],
+        self.inter_cell_type_bias = expand_array_2d(
+            config.inter_cell_type_bias,
+            self.inter_cell_type_connectivity.shape[0],
+            self.inter_cell_type_connectivity.shape[1],
             depth=1,
         )
 
@@ -267,36 +280,36 @@ class SpatiallyEmbeddedArea(nn.Module):
         #####################################################################
 
         self.convs = nn.ModuleDict()
-        for i, row in enumerate(self.conv_connectivity):
+        for i, row in enumerate(self.inter_cell_type_connectivity):
             # Handle input neuron channel and spatial mode based on neuron type
             conv_in_type = self.input_type_from_idx(i)
             if conv_in_type == "input":
                 conv_in_channels = self.in_channels
-                conv_in_spatial_mode = "same"
+                conv_in_density = "same"
             elif conv_in_type == "feedback":
-                conv_in_channels = self.fb_channels
-                conv_in_spatial_mode = "same"
+                conv_in_channels = self.feedback_channels
+                conv_in_density = "same"
             elif conv_in_type in ("excitatory", "inhibitory"):
-                conv_in_channels = self.neuron_channels[
-                    i - 1 - int(self.use_fb)
+                conv_in_channels = self.num_cell_subtypes[
+                    i - 1 - int(self.use_feedback)
                 ]
-                conv_in_spatial_mode = self.neuron_spatial_mode[
-                    i - 1 - int(self.use_fb)
+                conv_in_density = self.cell_type_density[
+                    i - 1 - int(self.use_feedback)
                 ]
             else:
                 raise ValueError(f"Invalid neuron type: {conv_in_type}.")
 
-            if conv_in_spatial_mode not in ("same", "half"):
+            if conv_in_density not in ("same", "half"):
                 raise ValueError(
-                    f"Invalid neuron spatial mode: {conv_in_spatial_mode}."
+                    f"Invalid neuron spatial mode: {conv_in_density}."
                 )
 
             # Handle output neurons
-            output_indices = np.nonzero(row)[0]
-            for j in output_indices:
-                if self.conv_connectivity[i, j]:
+            to_indices = np.nonzero(row)[0]
+            for j in to_indices:
+                if self.inter_cell_type_connectivity[i, j]:
                     # Handle rectification
-                    if self.conv_rectify[i, j]:
+                    if self.inter_cell_type_rectify[i, j]:
                         Conv2d = Conv2dRectify
                     else:
                         Conv2d = nn.Conv2d
@@ -304,30 +317,26 @@ class SpatiallyEmbeddedArea(nn.Module):
                     # Handle output neuron channel and spatial mode based on neuron type
                     conv_out_type = self.output_type_from_idx(j)
                     if conv_out_type in ("excitatory", "inhibitory"):
-                        conv_out_channels: int = self.neuron_channels[j]  # type: ignore
-                        conv_out_spatial_mode: str = self.neuron_spatial_mode[
-                            j
-                        ]  # type: ignore
+                        conv_out_channels: int = self.num_cell_subtypes[j]  # type: ignore
+                        conv_out_density: str = self.cell_type_density[j]  # type: ignore
                     else:
                         conv_out_channels = self.out_channels
-                        conv_out_spatial_mode = "same"
+                        conv_out_density = "same"
 
                     # Handle stride upsampling if necessary
                     conv = nn.Sequential()
                     conv_stride = 1
                     if (
-                        conv_in_spatial_mode == "half"
-                        and conv_out_spatial_mode == "same"
+                        conv_in_density == "half"
+                        and conv_out_density == "same"
                     ):
                         conv_stride = 2
                     elif (
-                        conv_in_spatial_mode == "same"
-                        and conv_out_spatial_mode == "half"
+                        conv_in_density == "same"
+                        and conv_out_density == "half"
                     ):
                         conv.append(
-                            nn.Upsample(
-                                size=self.spatial_size, mode="bilinear"
-                            )
+                            nn.Upsample(size=self.in_size, mode="bilinear")
                         )
 
                     # Handle upsampling if necessary
@@ -335,13 +344,17 @@ class SpatiallyEmbeddedArea(nn.Module):
                         Conv2d(
                             in_channels=conv_in_channels,
                             out_channels=conv_out_channels,
-                            kernel_size=self.conv_kernel_size[i, j],
+                            kernel_size=self.inter_cell_type_spatial_extents[
+                                i, j
+                            ],
                             stride=conv_stride,
                             padding=(
-                                self.conv_kernel_size[i, j][0] // 2,
-                                self.conv_kernel_size[i, j][1] // 2,
+                                self.inter_cell_type_spatial_extents[i, j][0]
+                                // 2,
+                                self.inter_cell_type_spatial_extents[i, j][1]
+                                // 2,
                             ),
-                            bias=self.conv_bias[i, j],
+                            bias=self.inter_cell_type_bias[i, j],
                         )
                     )
 
@@ -352,32 +365,31 @@ class SpatiallyEmbeddedArea(nn.Module):
         #####################################################################
 
         # Format post convolution activation functions
-        self.post_agg_activation = expand_list(
-            config.post_agg_activation, self.num_neuron_types
+        self.cell_nonlinearity = expand_list(
+            config.cell_nonlinearity, self.num_cell_types
         )
 
         # Initialize membrane time constants
-        self.tau_mode = expand_list(config.tau_mode, self.num_neuron_types)
-        self.tau_init_fn = expand_list(
-            config.tau_init_fn, self.num_neuron_types
-        )
+        self.tau_mode = expand_list(config.tau_mode, self.num_cell_types)
+        self.tau_init_fn = expand_list(config.tau_init_fn, self.num_cell_types)
 
         self.tau = nn.ParameterList()
-        for i in range(self.num_neuron_types):
+        for i in range(self.num_cell_types):
             tau_channels = 1
-            tau_spatial_size = (1, 1)
+            tau_size = (1, 1)
             if self.tau_mode[i] == "spatial":
-                tau_spatial_size = self.neuron_spatial_size[i]
+                tau_size = self.neuron_size[i]
             elif self.tau_mode[i] == "channel":
-                tau_channels = self.neuron_channels[i]
+                tau_channels = self.num_cell_subtypes[i]
             elif self.tau_mode[i] == "channel_spatial":
-                tau_channels = self.neuron_channels[i]
-                tau_spatial_size = self.neuron_spatial_size[i]
+                tau_channels = self.num_cell_subtypes[i]
+                tau_size = self.neuron_size[i]
             elif self.tau_mode[i] is None:
                 pass
             else:
                 raise ValueError(
-                    f"Invalid tau_mode: {self.tau_mode[i]}. Must be 'spatial', 'channel', 'channel_spatial', or None."
+                    f"Invalid tau_mode: {self.tau_mode[i]}. Must be 'spatial', "
+                    "'channel', 'channel_spatial', or None."
                 )
 
             self.tau.append(
@@ -386,7 +398,7 @@ class SpatiallyEmbeddedArea(nn.Module):
                         self.tau_init_fn[i],
                         1,
                         tau_channels,
-                        *tau_spatial_size,
+                        *tau_size,
                     )
                 )
             )
@@ -395,21 +407,11 @@ class SpatiallyEmbeddedArea(nn.Module):
         # Tensor initialization
         #####################################################################
 
-        self.default_hidden_init_fn = config.default_hidden_init_fn
-        self.default_fb_init_fn = config.default_fb_init_fn
-        self.default_out_init_fn = config.default_out_init_fn
-
-        #####################################################################
-        # Print conv connectivity dataframe
-        #####################################################################
-
-        # TODO: Make this prettier
-        print("Neuron types:")
-        print(self.neuron_description_df().to_string())
-        print("-" * 80)
-        print("Connectivity:")
-        print(self.conv_connectivity_df().to_string())
-        print("-" * 80)
+        self.default_neuron_state_init_fn = config.default_neuron_state_init_fn
+        self.default_feedback_state_init_fn = (
+            config.default_feedback_state_init_fn
+        )
+        self.default_output_state_init_fn = config.default_output_state_init_fn
 
     def input_type_from_idx(self, idx: int) -> Optional[str]:
         """Converts an input index to the corresponding neuron type.
@@ -423,10 +425,10 @@ class SpatiallyEmbeddedArea(nn.Module):
         """
         if idx == 0:
             return "input"
-        elif self.use_fb and idx == 1:
+        elif self.use_feedback and idx == 1:
             return "feedback"
         else:
-            return self.neuron_type[idx - 1 - int(self.use_fb)]  # type: ignore
+            return self.cell_type_class[idx - 1 - int(self.use_feedback)]  # type: ignore
 
     def output_type_from_idx(self, idx: int) -> Optional[str]:
         """Converts an output index to the corresponding neuron type.
@@ -439,11 +441,11 @@ class SpatiallyEmbeddedArea(nn.Module):
                 "inhibitory", or "output".
         """
         if idx < self.num_output_types - 1:
-            return self.neuron_type[idx]  # type: ignore
+            return self.cell_type_class[idx]  # type: ignore
         else:
             return "output"
 
-    def init_hidden(
+    def init_neuron_state(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -468,22 +470,24 @@ class SpatiallyEmbeddedArea(nn.Module):
                 hidden states.
         """
 
-        init_fn = (
-            init_fn if init_fn is not None else self.default_hidden_init_fn
+        init_fn_corrected = (
+            init_fn
+            if init_fn is not None
+            else self.default_neuron_state_init_fn
         )
 
         return [
             init_tensor(
-                init_fn,
+                init_fn_corrected,
                 batch_size,
-                self.neuron_channels[i],
-                *self.spatial_size,
+                self.num_cell_subtypes[i],
+                *self.in_size,
                 device=device,
             )
-            for i in range(self.num_neuron_types)
+            for i in range(self.num_cell_types)
         ]
 
-    def init_out(
+    def init_output_state(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -503,17 +507,21 @@ class SpatiallyEmbeddedArea(nn.Module):
             torch.Tensor: The initialized output.
         """
 
-        init_fn = init_fn if init_fn is not None else self.default_out_init_fn
+        init_fn_corrected = (
+            init_fn
+            if init_fn is not None
+            else self.default_output_state_init_fn
+        )
 
         return init_tensor(
-            init_fn,
+            init_fn_corrected,
             batch_size,
             self.out_channels,
-            *self.spatial_size,
+            *self.in_size,
             device=device,
         )
 
-    def init_fb(
+    def init_feedback_state(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -530,20 +538,24 @@ class SpatiallyEmbeddedArea(nn.Module):
                 states on. Defaults to None.
 
         Returns:
-            Union[torch.Tensor, None]: The initialized feedback input if `use_fb` is
+            Union[torch.Tensor, None]: The initialized feedback input if `use_feedback` is
                 True, otherwise None.
         """
 
-        if not self.use_fb:
+        if not self.use_feedback:
             return None
 
-        init_fn = init_fn if init_fn is not None else self.default_fb_init_fn
+        init_fn_corrected = (
+            init_fn
+            if init_fn is not None
+            else self.default_feedback_state_init_fn
+        )
 
         return init_tensor(
-            init_fn,
+            init_fn_corrected,
             batch_size,
-            self.fb_channels,
-            *self.spatial_size,
+            self.feedback_channels,
+            *self.in_size,
             device=device,
         )
 
@@ -551,14 +563,15 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Creates a DataFrame representing the neuron types.
 
         Returns:
-            str: String with each element representing a neuron type.
+            pd.DataFrame: DataFrame with columns for neuron type, spatial mode, and
+                number of channels.
         """
 
         df_columns = defaultdict(list)
-        for i in range(self.num_neuron_types):
-            df_columns["type"].append(self.neuron_type[i])
-            df_columns["spatial_mode"].append(self.neuron_spatial_mode[i])
-            df_columns["channels"].append(self.neuron_channels[i])
+        for i in range(self.num_cell_types):
+            df_columns["type"].append(self.cell_type_class[i])
+            df_columns["spatial_mode"].append(self.cell_type_density[i])
+            df_columns["channels"].append(self.num_cell_subtypes[i])
 
         df = pd.DataFrame(df_columns)
 
@@ -573,12 +586,12 @@ class SpatiallyEmbeddedArea(nn.Module):
         """
         row_labels = (
             ["input"]
-            + (["fb"] if self.use_fb else [])
-            + [f"neuron_{i}" for i in range(self.num_neuron_types)]
+            + (["feedback"] if self.use_feedback else [])
+            + [f"neuron_{i}" for i in range(self.num_cell_types)]
         )
-        column_labels = [
-            f"neuron_{i}" for i in range(self.num_neuron_types)
-        ] + ["output"]
+        column_labels = [f"neuron_{i}" for i in range(self.num_cell_types)] + [
+            "output"
+        ]
 
         assert len(row_labels) == self.num_input_types
         assert len(column_labels) == self.num_output_types
@@ -586,14 +599,19 @@ class SpatiallyEmbeddedArea(nn.Module):
         array = np.empty((len(row_labels), len(column_labels)), dtype=object)
         for i in range(self.num_input_types):
             for j in range(self.num_output_types):
-                if self.conv_connectivity[i, j]:
+                if self.inter_cell_type_connectivity[i, j]:
                     content = []
-                    if self.conv_rectify[i, j]:
-                        content.append("r")
-                    if self.conv_bias[i, j]:
-                        content.append("b")
-                    if self.conv_activation[i, j]:
-                        content.append(self.conv_activation[i, j][:2])
+                    content.append(
+                        "r" if self.inter_cell_type_rectify[i, j] else "_"
+                    )
+                    content.append(
+                        "b" if self.inter_cell_type_bias[i, j] else "_"
+                    )
+                    content.append(
+                        self.inter_cell_type_nonlinearity[i, j][:2]
+                        if self.inter_cell_type_nonlinearity[i, j]
+                        else "_"
+                    )
                     array[i, j] = ",".join(content)
                 else:
                     array[i, j] = ""
@@ -607,26 +625,28 @@ class SpatiallyEmbeddedArea(nn.Module):
         return df
 
     def __repr__(self) -> str:
-        """Returns a string representation of the EIRNN layer.
+        """Returns a string representation of the SpatiallyEmbeddedArea.
 
         Returns:
-            str: String representation of the EIRNN layer.
+            str: String representation of the SpatiallyEmbeddedArea.
         """
         repr_str = "SpatiallyEmbeddedArea:\n"
-
-        repr_str += self.conv_connectivity_str()
-        repr_str += "\n"
-        repr_str += self.neuron_description_str()
-
+        repr_str += "=" * 80 + "\n"
+        repr_str += "Connectivity:\n"
+        repr_str += self.conv_connectivity_df().to_string()
+        repr_str += "-" * 80 + "\n"
+        repr_str += "Neuron Description:\n"
+        repr_str += self.neuron_description_df().to_string()
+        repr_str += "=" * 80 + "\n"
         return repr_str
 
     def forward(
         self,
         input: torch.Tensor,
-        h_neuron: Union[torch.Tensor, list[torch.Tensor]],
-        fb: Optional[torch.Tensor] = None,
+        neuron_state: Union[torch.Tensor, list[torch.Tensor]],
+        feedback_state: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, Union[torch.Tensor, list[torch.Tensor]]]:
-        """Forward pass of the EIRNN layer.
+        """Forward pass of the SpatiallyEmbeddedArea.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch_size, in_channels,
@@ -634,30 +654,34 @@ class SpatiallyEmbeddedArea(nn.Module):
             h_neuron (Union[torch.Tensor, list[torch.Tensor]]): List of neuron hidden
                 states of shape (batch_size, neuron_channels[i], in_size[0],
                 in_size[1]) for each neuron type i.
-            fb (Optional[torch.Tensor]): Feedback input of shape (batch_size,
-                fb_channels, in_size[0], in_size[1]).
+            feedback_state (Optional[torch.Tensor]): Feedback input of shape (batch_size,
+                feedback_channels, in_size[0], in_size[1]).
 
         Returns:
             tuple[torch.Tensor, Union[torch.Tensor, list[torch.Tensor]]]: A tuple
                 containing the output and new neuron hidden state.
         """
         # Expand h_neuron to match the number of neuron channels
-        if isinstance(h_neuron, torch.Tensor):
-            if self.num_neuron_types != 1:
+        if isinstance(neuron_state, torch.Tensor):
+            if self.num_cell_types != 1:
                 raise ValueError(
-                    "h_neuron must be a list of tensors if num_neuron_types is not 1."
+                    "neuron_state must be a list of tensors if num_cell_types is not 1."
                 )
-            h_neuron = [h_neuron]
+            neuron_state = [neuron_state]
 
         # Check if feedback is provided if necessary
-        if self.use_fb == fb is None:
+        if self.use_feedback == feedback_state is None:
             raise ValueError(
-                "use_fb must be True if and only if fb is provided."
+                "use_feedback must be True if and only if feedback_state is provided."
             )
 
         # Compute convolutions for each connection in the circuit
-        conv_ins = [input] + ([fb] if self.use_fb else []) + h_neuron
-        conv_outs = [[] for _ in range(self.num_neuron_types + 1)]
+        conv_ins = (
+            [input]
+            + ([feedback_state] if self.use_feedback else [])
+            + neuron_state
+        )
+        conv_outs = [[] for _ in range(self.num_cell_types + 1)]
         for key, conv in self.convs.items():
             i, j = key.split("->")
             i, j = int(i), int(j)
@@ -669,48 +693,47 @@ class SpatiallyEmbeddedArea(nn.Module):
             conv_outs[j].append(sign * conv(conv_ins[i]))
 
         conv_outs = [torch.cat(conv_out, dim=1) for conv_out in conv_outs]
-        h_neuron_new = conv_outs[:-1]
+        neuron_state_new = conv_outs[:-1]
         out = conv_outs[-1]
 
         # Compute Euler update for excitatory cell hidden state
-        for i in range(self.num_neuron_types):
+        for i in range(self.num_cell_types):
             tau = torch.sigmoid(self.tau[i])
-            h_neuron_new[i] = tau * h_neuron_new[i] + (1 - tau) * h_neuron[i]
+            neuron_state_new[i] = (
+                tau * neuron_state_new[i] + (1 - tau) * neuron_state[i]
+            )
 
-        return out, h_neuron_new
+        return out, neuron_state_new
 
 
 class SpatiallyEmbeddedRNN(nn.Module):
-    """
-    Implements a 2D Convolutional Recurrent Neural Network with
-    Excitatory-Inhibitory Neurons.
-
+    """T
     This module stacks multiple SpatiallyEmbeddedArea instances with optional
     feedback connections between them.
-    It handles spatial dimension matching between layers and provides a
+    It handles spatial dimension matching between areas and provides a
     flexible interface for configuring the network.
 
     Args:
-        num_layers (int): Number of EIRNN layers in the network. Defaults to 1.
-        layer_configs (list[SpatiallyEmbeddedAreaConfig], optional): Configuration object(s)
-            for the EIRNN layers. If provided as a list, must match the number of
-            layers. If a single config is provided, it will be used for all layers
+        num_areas (int): Number of EIRNN areas in the network. Defaults to 1.
+        area_configs (list[SpatiallyEmbeddedAreaConfig], optional): Configuration object(s)
+            for the EIRNN areas. If provided as a list, must match the number of
+            areas. If a single config is provided, it will be used for all areas
             with appropriate adjustments. Defaults to None.
-        layer_kwargs (list[Mapping[str, Any]], optional): Additional keyword arguments
-            for each layer. If provided as a list, must match the number of layers.
+        area_kwargs (list[Mapping[str, Any]], optional): Additional keyword arguments
+            for each area. If provided as a list, must match the number of areas.
             Defaults to None.
-        common_layer_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
-            to all layers. Defaults to None.
-        fb_connectivity (Param2dType[Union[int, bool]], optional): Connectivity matrix
-            for feedback connections between layers. Defaults to None.
-        fb_activations (Param2dType[str], optional): Activation functions for
+        common_area_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
+            to all areas. Defaults to None.
+        inter_area_feedback_connectivity (Param2dType[Union[int, bool]], optional): Connectivity matrix
+            for feedback connections between areas. Defaults to None.
+        inter_area_feedback_nonlinearity (Param2dType[str], optional): Activation functions for
             feedback connections. Defaults to None.
-        fb_rectify (Param2dType[bool]): Whether to rectify feedback connections.
+        inter_area_feedback_rectify (Param2dType[bool]): Whether to rectify feedback connections.
             Defaults to False.
-        fb_kernel_sizes (Param2dType[tuple[int, int]], optional): Kernel sizes for
+        inter_area_feedback_spatial_extents (Param2dType[tuple[int, int]], optional): Kernel sizes for
             feedback convolutions. Defaults to None.
-        pool_mode (str, optional): Pooling mode for layer outputs. Defaults to "avg".
-        layer_time_delay (bool): Whether to introduce a time delay between layers.
+        pool_mode (str, optional): Pooling mode for area outputs. Defaults to "avg".
+        area_time_delay (bool): Whether to introduce a time delay between areas.
             Defaults to False.
         batch_first (bool): Whether the input tensor has batch dimension as the first
             dimension. Defaults to True.
@@ -719,82 +742,83 @@ class SpatiallyEmbeddedRNN(nn.Module):
     def __init__(
         self,
         *,
-        num_layers: int = 1,
-        layer_configs: Optional[list[SpatiallyEmbeddedAreaConfig]] = None,
-        layer_kwargs: Optional[list[Mapping[str, Any]]] = None,
-        common_layer_kwargs: Optional[Mapping[str, Any]] = None,
-        fb_connectivity: Optional[Param2dType[Union[int, bool]]] = None,
-        fb_activations: Optional[Param2dType[str]] = None,
-        fb_rectify: Param2dType[bool] = False,
-        fb_kernel_sizes: Optional[Param2dType[tuple[int, int]]] = None,
-        layer_time_delay: bool = False,
+        num_areas: int = 1,
+        area_configs: Optional[list[SpatiallyEmbeddedAreaConfig]] = None,
+        area_kwargs: Optional[list[Mapping[str, Any]]] = None,
+        common_area_kwargs: Optional[Mapping[str, Any]] = None,
+        inter_area_feedback_connectivity: Optional[
+            Param2dType[Union[int, bool]]
+        ] = None,
+        inter_area_feedback_nonlinearity: Optional[Param2dType[str]] = None,
+        inter_area_feedback_rectify: Param2dType[bool] = False,
+        inter_area_feedback_spatial_extents: Optional[
+            Param2dType[tuple[int, int]]
+        ] = None,
+        area_time_delay: bool = False,
         pool_mode: Optional[str] = "max",
         batch_first: bool = True,
     ):
         super().__init__()
 
         ############################################################
-        # Layer configs
+        # area configs
         ############################################################
 
-        self.num_layers = num_layers
+        self.num_areas = num_areas
 
-        if layer_configs is not None:
-            if layer_kwargs is not None or common_layer_kwargs is not None:
+        if area_configs is not None:
+            if area_kwargs is not None or common_area_kwargs is not None:
                 raise ValueError(
-                    "layer_configs cannot be provided if layer_configs_kwargs "
-                    "or common_layer_config_kwargs is provided."
+                    "area_configs cannot be provided if area_configs_kwargs "
+                    "or common_area_config_kwargs is provided."
                 )
-            if len(layer_configs) != self.num_layers:
-                raise ValueError("layer_configs must be of length num_layers.")
+            if len(area_configs) != self.num_areas:
+                raise ValueError("area_configs must be of length num_areas.")
         else:
-            if layer_kwargs is None:
-                if common_layer_kwargs is None:
+            if area_kwargs is None:
+                if common_area_kwargs is None:
                     raise ValueError(
-                        "layer_kwargs or common_layer_kwargs must be provided if "
-                        "layer_configs is not provided."
+                        "area_kwargs or common_area_kwargs must be provided if "
+                        "area_configs is not provided."
                     )
-                layer_kwargs = [{}] * self.num_layers  # type: ignore
-            elif len(layer_kwargs) != self.num_layers:
-                raise ValueError("layer_kwargs must be of length num_layers.")
+                area_kwargs = [{}] * self.num_areas  # type: ignore
+            elif len(area_kwargs) != self.num_areas:
+                raise ValueError("area_kwargs must be of length num_areas.")
 
-            if common_layer_kwargs is None:
-                common_layer_kwargs = {}
+            if common_area_kwargs is None:
+                common_area_kwargs = {}
 
-            layer_configs = [
+            area_configs = [
                 SpatiallyEmbeddedAreaConfig(
-                    **common_layer_kwargs,
-                    **layer_kwargs[i],  # type: ignore
+                    **common_area_kwargs,
+                    **area_kwargs[i],  # type: ignore
                 )
-                for i in range(self.num_layers)
+                for i in range(self.num_areas)
             ]
 
-        # Validate layer configurations
-        for i in range(self.num_layers - 1):
-            if (
-                layer_configs[i].out_channels
-                != layer_configs[i + 1].in_channels
-            ):
+        # Validate area configurations
+        for i in range(self.num_areas - 1):
+            if area_configs[i].out_channels != area_configs[i + 1].in_channels:
                 raise ValueError(
-                    f"The output channels of layer {i} must match the input "
-                    f"channels of layer {i + 1}."
+                    f"The output channels of area {i} must match the input "
+                    f"channels of area {i + 1}."
                 )
 
-        # Check if the first layer input projections are rectified
+        # Check if the first area input projections are rectified
         warn = False
-        if isinstance(layer_configs[0].conv_rectify, bool):
-            if layer_configs[0].conv_rectify:
+        if isinstance(area_configs[0].inter_cell_type_rectify, bool):
+            if area_configs[0].inter_cell_type_rectify:
                 warn = True
         else:
-            if any(layer_configs[0].conv_rectify):
+            if any(area_configs[0].inter_cell_type_rectify):
                 warn = True
         if warn:
             warnings.warn(
                 "Rectification of network input may hinder learning! "
-                "Consider setting conv_rectify to False for the input "
-                "projections to the first layer or for the whole first "
-                "layer (i.e. set layer_configs[0].conv_rectify[0,:] or "
-                "layer_configs[0].conv_rectify to False). \n"
+                "Consider setting inter_cell_type_rectify to False for the input "
+                "projections to the first area or for the whole first "
+                "area (i.e. set area_configs[0].inter_cell_type_rectify[0,:] or "
+                "area_configs[0].inter_cell_type_rectify to False). \n"
                 "If your input to the network is already purely positive, "
                 "you can safely ignore this warning."
             )
@@ -803,19 +827,19 @@ class SpatiallyEmbeddedRNN(nn.Module):
         # RNN parameters
         ############################################################
 
-        self.layer_time_delay = layer_time_delay
+        self.area_time_delay = area_time_delay
         self.pool_mode = pool_mode
         self.batch_first = batch_first
 
         ############################################################
-        # Initialize layers
+        # Initialize areas
         ############################################################
 
-        # Create layers
-        self.layers = nn.ModuleList(
+        # Create areas
+        self.areas = nn.ModuleList(
             [
-                SpatiallyEmbeddedArea(layer_config)
-                for layer_config in layer_configs
+                SpatiallyEmbeddedArea(area_config)
+                for area_config in area_configs
             ]
         )
 
@@ -823,83 +847,93 @@ class SpatiallyEmbeddedRNN(nn.Module):
         # Initialize feedback connections
         ############################################################
 
-        if fb_connectivity is None:
-            if any(layer_config.fb_channels for layer_config in layer_configs):
-                raise ValueError(
-                    "fb_connectivity must be provided if and only if "
-                    "fb_channels is provided for at least one layer."
-                )
-            self.fb_convs = nn.ModuleDict()
-        else:
-            fb_connectivity = np.array(fb_connectivity, dtype=bool)
-            if fb_connectivity.shape != (
-                self.num_layers,
-                self.num_layers,
+        if inter_area_feedback_connectivity is None:
+            if any(
+                area_config.feedback_channels for area_config in area_configs
             ):
                 raise ValueError(
-                    "The shape of fb_connectivity must be (num_layers, num_layers)."
+                    "inter_area_feedback_connectivity must be provided if and only if "
+                    "feedback_channels is provided for at least one area."
                 )
-            fb_activations = expand_array_2d(
-                fb_activations,
-                self.num_layers,
-                self.num_layers,
+            self.feedback_convs = nn.ModuleDict()
+        else:
+            inter_area_feedback_connectivity = np.array(
+                inter_area_feedback_connectivity, dtype=bool
             )
-            fb_rectify = expand_array_2d(
-                fb_rectify,
-                self.num_layers,
-                self.num_layers,
+            if inter_area_feedback_connectivity.shape != (
+                self.num_areas,
+                self.num_areas,
+            ):
+                raise ValueError(
+                    "The shape of inter_area_feedback_connectivity must be (num_areas, num_areas)."
+                )
+            inter_area_feedback_nonlinearity = expand_array_2d(
+                inter_area_feedback_nonlinearity,
+                self.num_areas,
+                self.num_areas,
             )
-            fb_kernel_sizes = expand_array_2d(
-                fb_kernel_sizes,
-                self.num_layers,
-                self.num_layers,
+            inter_area_feedback_rectify = expand_array_2d(
+                inter_area_feedback_rectify,
+                self.num_areas,
+                self.num_areas,
+            )
+            inter_area_feedback_spatial_extents = expand_array_2d(
+                inter_area_feedback_spatial_extents,
+                self.num_areas,
+                self.num_areas,
             )
 
-            # Validate fb_adjacency tensor
+            # Validate inter_area_feedback_connectivity tensor
             if (
-                fb_connectivity.ndim != 2
-                or fb_connectivity.shape[0] != self.num_layers
-                or fb_connectivity.shape[1] != self.num_layers
+                inter_area_feedback_connectivity.ndim != 2
+                or inter_area_feedback_connectivity.shape[0] != self.num_areas
+                or inter_area_feedback_connectivity.shape[1] != self.num_areas
             ):
                 raise ValueError(
-                    "The dimensions of fb_connectivity must match the number of layers."
+                    "The dimensions of inter_area_feedback_connectivity must match the number of areas."
                 )
-            if fb_connectivity.sum() == 0:
+            if inter_area_feedback_connectivity.sum() == 0:
                 raise ValueError(
-                    "fb_connectivity must be a non-zero tensor if provided."
+                    "inter_area_feedback_connectivity must be a non-zero tensor if provided."
                 )
 
             # Create feedback convolutions
-            self.fb_convs = nn.ModuleDict()
-            for i, row in enumerate(fb_connectivity):
+            self.feedback_convs = nn.ModuleDict()
+            for i, row in enumerate(inter_area_feedback_connectivity):
                 nonzero_indices = np.nonzero(row)[0]
                 for j in nonzero_indices:
-                    if not self.layers[j].use_fb:
+                    if not self.areas[j].use_feedback:
                         raise ValueError(
-                            f"the connection from layer {i} to layer {j} is "
-                            f"not valid because layer {j} does not receive "
-                            f"feedback (hint: fb_channels may not be provided)"
+                            f"the connection from area {i} to area {j} is "
+                            f"not valid because area {j} does not receive "
+                            f"feedback (hint: feedback_channels may not be provided)"
                         )
-                    if fb_rectify[i, j]:
-                        Conv2dFb = Conv2dRectify
+                    if inter_area_feedback_rectify[i, j]:
+                        Conv2dFeedback = Conv2dRectify
                     else:
-                        Conv2dFb = nn.Conv2d
-                    self.fb_convs[f"{i}->{j}"] = nn.Sequential(
+                        Conv2dFeedback = nn.Conv2d
+                    self.feedback_convs[f"{i}->{j}"] = nn.Sequential(
                         nn.Upsample(
-                            size=layer_configs[j].spatial_size,
+                            size=area_configs[j].in_size,
                             mode="bilinear",
                         ),
-                        Conv2dFb(
-                            in_channels=layer_configs[i].out_channels,
-                            out_channels=layer_configs[j].fb_channels,
-                            kernel_size=layer_configs[j].fb_kernel_size,
+                        Conv2dFeedback(
+                            in_channels=area_configs[i].out_channels,
+                            out_channels=area_configs[j].feedback_channels,
+                            kernel_size=area_configs[
+                                j
+                            ].inter_area_feedback_spatial_extents[i, j],
                             padding=(
-                                fb_kernel_sizes[j][0] // 2,
-                                fb_kernel_sizes[j][1] // 2,
+                                inter_area_feedback_spatial_extents[i, j][0]
+                                // 2,
+                                inter_area_feedback_spatial_extents[i, j][1]
+                                // 2,
                             ),
-                            bias=layer_configs[j].fb_bias,
+                            bias=area_configs[
+                                j
+                            ].default_feedback_state_init_fn,
                         ),
-                        get_activation(fb_activations[i, j]),
+                        get_activation(inter_area_feedback_nonlinearity[i, j]),
                     )
 
     def init_hidden(
@@ -908,7 +942,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
         device: Optional[Union[torch.device, str]] = None,
     ) -> list[list[torch.Tensor]]:
-        """Initializes the hidden states for all layers.
+        """Initializes the hidden states for all areas.
 
         Args:
             batch_size (int): Batch size.
@@ -918,12 +952,12 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         Returns:
             list[torch.Tensor]: A list containing the initialized neuron hidden
-                states for each layer.
+                states for each area.
         """
 
         return [
-            layer.init_hidden(batch_size, init_fn, device)
-            for layer in self.layers
+            area.init_hidden(batch_size, init_fn, device)
+            for area in self.areas
         ]
 
     def init_fb(
@@ -932,7 +966,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
         device: Optional[Union[torch.device, str]] = None,
     ) -> list[Optional[torch.Tensor]]:
-        """Initializes the feedback inputs for all layers.
+        """Initializes the feedback inputs for all areas.
 
         Args:
             batch_size (int): Batch size.
@@ -942,10 +976,10 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         Returns:
             list[torch.Tensor]: A list of initialized feedback inputs for each
-                layer.
+                area.
         """
         return [
-            layer.init_fb(batch_size, init_fn, device) for layer in self.layers
+            area.init_fb(batch_size, init_fn, device) for area in self.areas
         ]
 
     def init_out(
@@ -954,7 +988,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
         device: Optional[Union[torch.device, str]] = None,
     ) -> list[torch.Tensor]:
-        """Initializes the outputs for all layers.
+        """Initializes the outputs for all areas.
 
         Args:
             batch_size (int): Batch size.
@@ -964,12 +998,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         Returns:
             list[torch.Tensor]: A list of initialized outputs for each
-                layer.
+                area.
         """
 
         return [
-            layer.init_out(batch_size, init_fn, device)
-            for layer in self.layers
+            area.init_out(batch_size, init_fn, device) for area in self.areas
         ]
 
     def init_state(
@@ -992,12 +1025,12 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         Args:
             out0 (Optional[Sequence[Union[torch.Tensor, None]]]): Initial outputs for
-                each layer. If None, default initialization is used.
+                each area. If None, default initialization is used.
             h_neuron0 (Optional[Sequence[Sequence[Union[torch.Tensor, None]]]]):
-                Initial neuron hidden states for each layer. If None, default
+                Initial neuron hidden states for each area. If None, default
                 initialization is used.
             fb0 (Optional[Sequence[Union[torch.Tensor, None]]]): Initial feedback
-                inputs for each layer. If None, default initialization is used.
+                inputs for each area. If None, default initialization is used.
             num_steps (int): Number of time steps.
             batch_size (int): Batch size.
             out_init_fn (Optional[Union[str, TensorInitFnType]]): Initialization
@@ -1014,37 +1047,37 @@ class SpatiallyEmbeddedRNN(nn.Module):
                   list[list[list[Union[torch.Tensor, None]]],
                   list[list[Union[torch.Tensor, int, None]]]:
                 A tuple containing:
-                - Initialized outputs for each layer and time step
-                - Initialized neuron hidden states for each layer, time step, and
+                - Initialized outputs for each area and time step
+                - Initialized neuron hidden states for each area, time step, and
                   neuron type
-                - Initialized feedback inputs for each layer and time step
+                - Initialized feedback inputs for each area and time step
 
         Raises:
             ValueError: If the length of out0, h_neuron0, or fb0 doesn't match
-                the number of layers.
+                the number of areas.
         """
 
         # Validate input shapes of out0, h_neuron0, fb0
         if out0 is None:
-            out0 = [None] * self.num_layers
-        elif len(out0) != self.num_layers:
+            out0 = [None] * self.num_areas
+        elif len(out0) != self.num_areas:
             raise ValueError(
-                "The length of out0 must be equal to the number of layers."
+                "The length of out0 must be equal to the number of areas."
             )
         if h_neuron0 is None:
             h_neuron0 = [
-                [None] * self.layers[i].num_neuron_types
-                for i in range(self.num_layers)
+                [None] * self.areas[i].num_cell_types
+                for i in range(self.num_areas)
             ]
-        elif len(h_neuron0) != self.num_layers:
+        elif len(h_neuron0) != self.num_areas:
             raise ValueError(
-                "The length of h_neuron0 must be equal to the number of layers."
+                "The length of h_neuron0 must be equal to the number of areas."
             )
         if fb0 is None:
-            fb0 = [None] * self.num_layers
-        elif len(fb0) != self.num_layers:
+            fb0 = [None] * self.num_areas
+        elif len(fb0) != self.num_areas:
             raise ValueError(
-                "The length of fb0 must be equal to the number of layers."
+                "The length of fb0 must be equal to the number of areas."
             )
 
         # Initialize default values
@@ -1056,25 +1089,22 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         # Initialize output, hidden state, and feedback lists
         outs: list[list[Union[torch.Tensor, None]]] = [
-            [None] * num_steps for _ in range(self.num_layers)
+            [None] * num_steps for _ in range(self.num_areas)
         ]
         h_neurons: list[list[list[Union[torch.Tensor, None]]]] = [
-            [
-                [None] * self.layers[i].num_neuron_types
-                for _ in range(num_steps)
-            ]
-            for i in range(self.num_layers)
+            [[None] * self.areas[i].num_cell_types for _ in range(num_steps)]
+            for i in range(self.num_areas)
         ]
         fbs: list[list[Union[torch.Tensor, int, None]]] = [
-            [0 if self.layers[i].use_fb else None] * num_steps
-            for i in range(self.num_layers)
+            [0 if self.areas[i].use_fb else None] * num_steps
+            for i in range(self.num_areas)
         ]
 
         # Fill time step -1 with the initial values
-        for i in range(self.num_layers):
+        for i in range(self.num_areas):
             outs[i][-1] = out0[i] if out0[i] is not None else out0_default[i]
             fbs[i][-1] = fb0[i] if fb0[i] is not None else fb0_default[i]
-            for k in range(self.layers[i].num_neuron_types):
+            for k in range(self.areas[i].num_cell_types):
                 h_neurons[i][-1][k] = (
                     h_neuron0[i][k]
                     if h_neuron0[i][k] is not None
@@ -1148,55 +1178,55 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Formats the outputs, hidden states, and feedback inputs for return.
 
         This method stacks tensors across time steps and applies batch_first
-        transposition if needed.
+        transposition if needed. Each tensor has shape (batch_size, channels,
+        height, width).
 
         Args:
-            outs (list[list[torch.Tensor]]): Outputs for each layer and time
-                step. Shape: [num_layers][num_steps], with each tensor of shape
-                (batch_size, channels, height, width).
+            outs (list[list[torch.Tensor]]): Outputs for each area and time
+                step. Shape: [num_areas][num_steps],
             h_neurons (list[list[list[torch.Tensor]]]): Neuron hidden states for
-                each layer, time step, and neuron type. Shape:
-                [num_layers][num_steps][num_neuron_types].
-            fbs (list[list[Optional[torch.Tensor]]]): Feedback inputs for each layer
-                and time step. Shape: [num_layers][num_steps].
+                each area, time step, and neuron type. Shape:
+                [num_areas][num_steps][num_cell_types].
+            fbs (list[list[Optional[torch.Tensor]]]): Feedback inputs for each area
+                and time step. Shape: [num_areas][num_steps].
 
         Returns:
             tuple[list[torch.Tensor], list[list[torch.Tensor]], list[Optional[torch.Tensor]]]:
                 A tuple containing:
-                - List of stacked outputs per layer. Each tensor has shape:
+                - List of stacked outputs per area. Each tensor has shape:
                   (seq_len, batch_size, channels, height, width) or
                   (batch_size, seq_len, channels, height, width) if batch_first=True.
-                - List of lists of stacked hidden states per layer and neuron type.
+                - List of lists of stacked hidden states per area and neuron type.
                   Same shape pattern as outputs.
-                - List of stacked feedback inputs per layer (or None if not used).
+                - List of stacked feedback inputs per area (or None if not used).
                   Same shape pattern as outputs.
         """
         outs_stack: list[torch.Tensor] = []
         h_neurons_stack: list[list[torch.Tensor]] = []
         fbs_stack: Optional[list[Optional[torch.Tensor]]] = []
 
-        for i in range(self.num_layers):
+        for i in range(self.num_areas):
             outs_stack.append(torch.stack(outs[i]))
             h_neurons_stack.append(
                 [
                     torch.stack(
                         [h_neurons[i][t][j] for t in range(len(h_neurons[i]))]
                     )
-                    for j in range(self.layers[i].num_neuron_types)
+                    for j in range(self.areas[i].num_cell_types)
                 ]
             )
-            if self.layers[i].use_fb:
+            if self.areas[i].use_fb:
                 fbs_stack.append(torch.stack(fbs[i]))  # type: ignore
             else:
-                assert all(fb is None for fb in fbs[i])
+                assert all(feedback_state is None for feedback_state in fbs[i])
                 fbs_stack.append(None)
             if self.batch_first:
                 outs_stack[i] = outs_stack[i].transpose(0, 1)
-                for j in range(self.layers[i].num_neuron_types):
+                for j in range(self.areas[i].num_cell_types):
                     h_neurons_stack[i][j] = h_neurons_stack[i][j].transpose(
                         0, 1
                     )
-                if self.layers[i].use_fb:
+                if self.areas[i].use_fb:
                     fbs_stack[i] = fbs_stack[i].transpose(0, 1)  # type: ignore
 
         return outs_stack, h_neurons_stack, fbs_stack
@@ -1209,7 +1239,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Adjusts the spatial dimensions of the input tensor.
 
         This method ensures that tensors have compatible spatial dimensions when
-        passing between layers. It uses either pooling (when downsampling) or
+        passing between areas. It uses either pooling (when downsampling) or
         interpolation (when upsampling).
 
         Args:
@@ -1240,9 +1270,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
         self,
         x: torch.Tensor,
         num_steps: Optional[int] = None,
-        out0: Optional[Sequence[Optional[torch.Tensor]]] = None,
-        h_neuron0: Optional[Sequence[Sequence[Optional[torch.Tensor]]]] = None,
-        fb0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        output_state0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        neuron_state0: Optional[
+            Sequence[Sequence[Optional[torch.Tensor]]]
+        ] = None,
+        feedback_state0: Optional[Sequence[Optional[torch.Tensor]]] = None,
     ) -> tuple[
         list[torch.Tensor],
         list[list[torch.Tensor]],
@@ -1260,26 +1292,26 @@ class SpatiallyEmbeddedRNN(nn.Module):
                   batch_first=True.
             num_steps (Optional[int]): Number of time steps. Required if x is 4D.
                 If x is 5D, this must match the sequence length dimension in x.
-            out0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial outputs for
-                each layer. Length should match the number of layers. Each element
+            output_state0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial outputs for
+                each area. Length should match the number of areas. Each element
                 can be None to use default initialization.
-            h_neuron0 (Optional[Sequence[Sequence[Optional[torch.Tensor]]]]):
-                Initial neuron hidden states for each layer and neuron type. Length
-                should match the number of layers, and each inner sequence length
-                should match the number of neuron types in that layer.
-            fb0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial feedback inputs
-                for each layer. Length should match the number of layers.
+            neuron_state0 (Optional[Sequence[Sequence[Optional[torch.Tensor]]]]):
+                Initial neuron hidden states for each area and neuron type. Length
+                should match the number of areas, and each inner sequence length
+                should match the number of neuron types in that area.
+            feedback_state0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial feedback inputs
+                for each area. Length should match the number of areas.
 
         Returns:
             tuple[list[torch.Tensor], list[list[torch.Tensor]], list[Union[torch.Tensor, None]]]:
                 A tuple containing:
-                - list[torch.Tensor]: Outputs for each layer. Each tensor has shape:
+                - list[torch.Tensor]: Outputs for each area. Each tensor has shape:
                   (seq_len, batch_size, out_channels, height, width) or
                   (batch_size, seq_len, out_channels, height, width) if batch_first=True.
-                - list[list[torch.Tensor]]: Hidden states for each layer and neuron type.
+                - list[list[torch.Tensor]]: Hidden states for each area and neuron type.
                   Same shape pattern as outputs but with neuron_channels.
-                - list[Union[torch.Tensor, None]]: Feedback inputs for each layer (None if the
-                  layer doesn't use feedback).
+                - list[Union[torch.Tensor, None]]: Feedback inputs for each area (None if the
+                  area doesn't use feedback).
 
         Raises:
             ValueError: If input shape is invalid or num_steps is inconsistent with
@@ -1292,48 +1324,54 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         batch_size = x.shape[1]
 
-        outs, h_neurons, fbs = self.init_state(
-            out0,
-            h_neuron0,
-            fb0,
+        output_states, neuron_states, feedback_states = self.init_state(
+            output_state0,
+            neuron_state0,
+            feedback_state0,
             num_steps,
             batch_size,
             device=device,
         )
 
         for t in range(num_steps):
-            for i, layer in enumerate(self.layers):
-                # Compute layer update and output
+            for i, area in enumerate(self.areas):
+                # Compute area update and output
                 if i == 0:
-                    layer_in = x[t]
-                    layer_in = F.interpolate(
-                        layer_in,
-                        self.layers[i].spatial_size,
+                    area_in = x[t]
+                    area_in = F.interpolate(
+                        area_in,
+                        self.areas[i].neuron_size,
                         mode="bilinear",
                         align_corners=False,
                     )
                 else:
-                    if self.layer_time_delay:
-                        layer_in = outs[i - 1][t - 1]
+                    if self.area_time_delay:
+                        area_in = output_states[i - 1][t - 1]
                     else:
-                        layer_in = outs[i - 1][t]
-                    assert isinstance(layer_in, torch.Tensor)
-                    layer_in = self._match_spatial_size(
-                        layer_in, self.layers[i].spatial_size
+                        area_in = output_states[i - 1][t]
+                    assert isinstance(area_in, torch.Tensor)
+                    area_in = self._match_spatial_size(
+                        area_in, self.areas[i].neuron_size
                     )
 
-                outs[i][t], h_neurons[i][t] = layer(
-                    input=layer_in,
-                    h_neuron=h_neurons[i][t - 1],
-                    fb=fbs[i][t - 1],
+                output_states[i][t], neuron_states[i][t] = area(
+                    input=area_in,
+                    neuron_state=neuron_states[i][t - 1],
+                    feedback_state=feedback_states[i][t - 1],
                 )
 
             # Apply feedback
-            for key, conv in self.fb_convs.items():
-                fb_i, fb_j = key.split("->")
-                fb_i, fb_j = int(fb_i), int(fb_j)
-                fbs[fb_j][t] = fbs[fb_j][t] + conv(outs[fb_i][t])
+            for key, conv in self.feedback_convs.items():
+                area_i, area_j = key.split("->")
+                area_i, area_j = int(area_i), int(area_j)
+                feedback_states[area_j][t] = feedback_states[area_j][t] + conv(
+                    output_states[area_i][t]
+                )
 
-        outs, h_neurons, fbs = self._format_result(outs, h_neurons, fbs)  # type: ignore
+        output_states, neuron_states, feedback_states = self._format_result(
+            output_states,  # type: ignore
+            neuron_states,  # type: ignore
+            feedback_states,  # type: ignore
+        )
 
-        return outs, h_neurons, fbs
+        return output_states, neuron_states, feedback_states

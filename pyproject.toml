@@ -16,8 +16,8 @@ classifiers = [
 ]
 dependencies = [
   "numpy",
-  "torch",
-  "torchvision",
+  "torch<=2.5.1",
+  "torchvision<=0.20.1",
   "torchode",
   "opencv-python",
   "matplotlib",

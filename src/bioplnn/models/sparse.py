@@ -489,7 +489,6 @@ class SparseODERNN(SparseRNN):
 
         # Compile solver
         if compile_solver_kwargs is not None:
-            print(f"Compiling solver with kwargs: {compile_solver_kwargs}")
             self.solver = torch.compile(self.solver, **compile_solver_kwargs)
 
     def _format_x(self, x: torch.Tensor):

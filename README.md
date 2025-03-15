@@ -8,8 +8,23 @@
 
 ## Key Features
 
-* **TopographicalRNN:** This module simulates a population of rate-based neurons with arbitrary connectivity patterns. It utilizes sparse tensors for efficient memory usage, enabling simulations of large-scale networks.
-* **Conv2dEIRNN:** This module builds upon PyTorch's existing Conv2d and RNN modules by introducing separate excitatory and inhibitory neural populations within each layer. It allows users to define the connectivity between these populations within and across layers.
+* **ConnectomeRNN:** This module simulates a population of rate-based neurons with arbitrary connectivity patterns. It utilizes sparse tensors for efficient memory usage, enabling simulations of large-scale networks.
+* **SpatiallyEmbeddedRNN:** This module simulates a series of spatially embedded areas of the brain, each with their configurable neuron types, circuit motifs, and transfer functions.
+
+## Setting up your environment
+
+### Using conda
+
+```bash
+conda create -n bioplnn python=3.12
+conda activate bioplnn
+```
+### Using venv
+
+```bash
+python -m venv venv
+source venv/bin/activate
+```
 
 ## Installation
 
@@ -35,12 +50,28 @@ git clone https://github.com/valmikikothare/bioplnn.git
 cd bioplnn
 ```
 
-3. Build and install the package:
+3. Install specific dependencies:
 
 ```bash
-pip install [-e] .
+pip install -r requirements/[cu124.txt|cpu.txt]
+pip install -r requirements/[sparse_cu124.txt|sparse_cpu.txt]
 ```
-where `-e` is optional and will install the package in editable mode.
+where `cu124*` is for systems with CUDA 12.4-compatible GPUs and `cpu*` is for systems without CUDA.
+These need to be installed in this order because of build dependencies and version conflicts.
+
+4. [Optional] Install the development dependencies:
+
+```bash
+pip install -r requirements/dev.txt
+```
+
+5. Build and install the package:
+
+```bash
+pip install -e .
+```
+where `-e` installs the package in editable mode.
+
 
 ## Usage
 
@@ -65,7 +96,7 @@ defaults:
   - data: null
   ...
 ```
-There means that the `model` and `data` keys must be overridden in the command
+This means that the `model` and `data` keys must be overridden in the command
 line, as shown above. If you want to set these to the default values, you can
 edit the `config/config.yaml` file as follows:
 ```yaml
@@ -77,40 +108,78 @@ defaults:
 
 ### Using the API
 
-#### TopographicalRNN
+#### ConnectomeRNN
 
 ```python
 import torch
-from bioplnn.models import TopographicalRNN
+from bioplnn.models import ConnectomeRNN
 
-config = # Get config dictionary using yaml, hydra, etc.
+connectivity_hh = torch.load("path/to/connectivity_hh.pt")
+connectivity_ih = torch.load("path/to/connectivity_ih.pt")
+output_neurons = torch.load("path/to/output_neurons.pt")
+input_size = connectivity_hh.shape[1]
+hidden_size = connectivity_hh.shape[2]
 
-# Create RNN layer
-rnn = TopographicalRNN(**config)
+# Define the model
+model = ConnectomeRNN(
+    input_size=input_size,
+    hidden_size=hidden_size,
+    connectivity_hh=connectivity_hh,
+    connectivity_ih=connectivity_ih,
+    output_neurons=output_neurons,
+    nonlinearity="Sigmoid",
+    batch_first=False,
+    compile_solver_kwargs={
+        "mode": "max-autotune",
+        "dynamic": False,
+        "fullgraph": True,
+    },
+)
 
-# Define input data
-inputs = torch.rand(batch_size, num_neurons)
+# Define the input
+num_steps = 10
+batch_size = 8
+inputs = torch.randn(num_steps, batch_size, input_size)
 
-# Run forward pass
-outputs = rnn(inputs)
+# Set the model to evaluation mode
+model.eval()
+
+# Perform a forward pass
+outputs = model(inputs)
+
+print(outputs.shape)
+# (num_steps, batch_size, hidden_size)
 ```
 
-#### Conv2dEIRNN
+#### SpatiallyEmbeddedRNN
 
 ```python
 import torch
-from bioplnn.models import Conv2dEIRNN
+from bioplnn.models import SpatiallyEmbeddedRNN, SpatiallyEmbeddedAreaConfig
 
-config = # Get config dictionary using yaml, hydra, etc.
+# Define the model
+area_configs = [
+    SpatiallyEmbeddedAreaConfig(
+        in_size=(32, 32),
+        in_channels=3,
+        out_channels=16,
+    )
+]
+model = SpatiallyEmbeddedRNN(num_areas=1, area_configs=area_configs, batch_first=False)
 
-# Create Conv2dEIRNN layer
-rnn = Conv2dEIRNN(**config)
+# Define the input (num_steps, batch size, channels, height, width)
+num_steps = 10
+batch_size = 8
+x = torch.randn(num_steps, batch_size, 3, 32, 32)
 
-# Define input data
-inputs = torch.rand(batch_size, in_channels, height, width)
+# Set the model to evaluation mode
+model.eval()
 
-# Run forward pass
-outputs = rnn(inputs)
+# Perform a forward pass
+outputs = model(x, num_steps=num_steps)
+
+print(outputs.shape)
+# (num_steps, batch_size, 16, 32, 32)
 ```
 
 **Further Documentation:**
