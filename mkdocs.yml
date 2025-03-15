@@ -36,8 +36,9 @@ theme:
           name: Light mode
         primary: indigo
         accent: deep orange
-  favicon: images/chair.png
-  logo: images/chair.png
+
+  favicon: images/biopl-logo.png
+  logo: images/biopl-logo-light.png
 
 plugins:
   - search
