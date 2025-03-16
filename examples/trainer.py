@@ -2,7 +2,7 @@ import os
 import sys
 from collections.abc import Callable
 from traceback import print_exc
-from typing import Optional
+from typing import Any, Optional
 
 import hydra
 import torch
@@ -248,13 +248,28 @@ def train(dict_config: DictConfig) -> None:
     config = AttrDict(config)
 
     # Override parameters
-    if (
-        "layer_one_in_channels_override" in config
-        and config.layer_one_in_channels_override is not None
-    ):
-        config.model.rnn_kwargs.area_kwargs[
-            0
-        ].in_channels = config.layer_one_in_channels_override
+    def parse_overrides(original: Any, overrides: Any) -> Any:
+        if isinstance(overrides, dict):
+            assert isinstance(original, dict)
+            for key, value in overrides.items():
+                original[key] = parse_overrides(original[key], value)
+        elif isinstance(overrides, list):
+            assert isinstance(original, list)
+            assert len(original) == len(overrides)
+            for i, item in enumerate(original):
+                original[i] = parse_overrides(item, overrides[i])
+        else:
+            original = overrides
+        return original
+
+    config = parse_overrides(config, config.overrides)
+    # if (
+    #     "layer_one_in_channels_override" in config
+    #     and config.layer_one_in_channels_override is not None
+    # ):
+    #     config.model.rnn_kwargs.area_kwargs[
+    #         0
+    #     ].in_channels = config.layer_one_in_channels_override
 
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))

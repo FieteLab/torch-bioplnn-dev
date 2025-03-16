@@ -80,7 +80,7 @@ class SpatiallyEmbeddedAreaConfig:
         inter_cell_type_bias (Param2dType[bool], optional):
             Whether to add a bias term for the convolutions. Defaults to True.
         cell_nonlinearity (Param1dType[Union[str, ActivationFnType]], optional):
-            Activation function for the post-aggregation. Defaults to "Tanh".
+            Activation function for the post-aggregation. Defaults to "Sigmoid".
         tau_mode (Param1dType[str], optional): Mode for handling membrane time
             constants. Defaults to "channel".
         tau_init_fn (Param1dType[Union[str, TensorInitFnType]], optional):
@@ -115,7 +115,7 @@ class SpatiallyEmbeddedAreaConfig:
     ] = None
     inter_cell_type_bias: Param2dType[bool] = True
     cell_nonlinearity: Param1dType[Optional[Union[str, ActivationFnType]]] = (
-        "Tanh"
+        "Sigmoid"
     )
     tau_mode: Param1dType[Optional[str]] = "channel"
     tau_init_fn: Param1dType[Union[str, TensorInitFnType]] = "ones"
@@ -1165,6 +1165,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             raise ValueError(
                 "The input must be a 4D tensor or a 5D tensor with sequence length."
             )
+
         return x, num_steps
 
     def _format_result(
@@ -1338,12 +1339,6 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 # Compute area update and output
                 if i == 0:
                     area_in = x[t]
-                    area_in = F.interpolate(
-                        area_in,
-                        self.areas[i].in_size,
-                        mode="bilinear",
-                        align_corners=False,
-                    )
                 else:
                     if self.area_time_delay:
                         area_in = output_states[i - 1][t - 1]

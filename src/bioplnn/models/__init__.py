@@ -5,7 +5,7 @@ from .classifiers import (
 )
 from .connectome import ConnectomeODERNN, ConnectomeRNN
 from .sparse import SparseLinear, SparseRNN
-from .spatiallyembedded import (
+from .spatially_embedded import (
     SpatiallyEmbeddedArea,
     SpatiallyEmbeddedAreaConfig,
     SpatiallyEmbeddedRNN,
