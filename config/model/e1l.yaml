@@ -3,5 +3,5 @@ rnn_kwargs:
   num_areas: 1
   area_kwargs:
     - in_size: [32, 32]
-      in_channels: 1
+      in_channels: 3
       out_channels: 32

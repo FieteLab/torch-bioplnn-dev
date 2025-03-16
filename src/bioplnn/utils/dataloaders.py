@@ -370,7 +370,7 @@ def _image_classification_dataloaders(
         "transform": transform,
     }
     if v1:
-        kwargs = kwargs | {"retina_path": retina_path}
+        kwargs["retina_path"] = retina_path
 
     train_set = dataset_cls(train=True, **kwargs)
     test_set = dataset_cls(train=False, **kwargs)
