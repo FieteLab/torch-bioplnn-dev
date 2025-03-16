@@ -17,7 +17,7 @@ source venv/bin/activate
 
 ### Using pip
 
-The recommended installation method is via pip (not yet available):
+The recommended installation method is via pip (**not yet available**):
 
 ```bash
 pip install bioplnn
