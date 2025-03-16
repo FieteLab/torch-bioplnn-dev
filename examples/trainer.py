@@ -91,6 +91,7 @@ def train_epoch(
         labels = labels.to(device)
 
         # Forward pass
+        torch.compiler.cudagraph_mark_step_begin()
         outputs = model(x=x, **config.train.forward_kwargs)
         if (
             "loss_all_timesteps" in config.train.forward_kwargs
@@ -247,15 +248,13 @@ def train(dict_config: DictConfig) -> None:
     config = AttrDict(config)
 
     # Override parameters
-    try:
-        layer_one_in_channels_override = config.layer_one_in_channels_override
-    except KeyError:
-        pass
-    else:
-        if layer_one_in_channels_override is not None:
-            config.model.rnn_kwargs.layer_kwargs[
-                0
-            ].in_channels = config.layer_one_in_channels_override
+    if (
+        "layer_one_in_channels_override" in config
+        and config.layer_one_in_channels_override is not None
+    ):
+        config.model.rnn_kwargs.area_kwargs[
+            0
+        ].in_channels = config.layer_one_in_channels_override
 
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))

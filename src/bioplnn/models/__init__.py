@@ -4,12 +4,12 @@ from .classifiers import (
     SpatiallyEmbeddedClassifier,
 )
 from .connectome import ConnectomeODERNN, ConnectomeRNN
-from .ei_crnn import (
+from .sparse import SparseLinear, SparseRNN
+from .spatiallyembedded import (
     SpatiallyEmbeddedArea,
     SpatiallyEmbeddedAreaConfig,
     SpatiallyEmbeddedRNN,
 )
-from .sparse import SparseLinear, SparseRNN
 
 __all__ = [
     "SpatiallyEmbeddedRNN",
