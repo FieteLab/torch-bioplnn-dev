@@ -2,32 +2,39 @@ from collections.abc import Mapping
 from typing import Any, Optional
 
 import numpy as np
-from addict import Dict
 from numpy.typing import NDArray
 
 from bioplnn.typing import Param1dType, Param2dType, T
 
+try:
+    from addict import Dict
 
-class AttrDict(Dict):
-    """A non-default version of the `addict.Dict` class that raises a `KeyError`
-    when a key is not found in the dictionary.
-
-    Args:
-        *args: Any positional arguments.
-        **kwargs: Any keyword arguments.
-    """
-
-    def __missing__(self, key: Any):
-        """Override the default behavior of `addict.Dict` to raise a `KeyError`
+    class AttrDict(Dict):
+        """A non-default version of the `addict.Dict` class that raises a `KeyError`
         when a key is not found in the dictionary.
 
         Args:
-            key: The key that was not found.
-
-        Raises:
-            KeyError: Always raised.
+            *args: Any positional arguments.
+            **kwargs: Any keyword arguments.
         """
-        raise KeyError(key)
+
+        def __missing__(self, key: Any):
+            """Override the default behavior of `addict.Dict` to raise a `KeyError`
+            when a key is not found in the dictionary.
+
+            Args:
+                key: The key that was not found.
+
+            Raises:
+                KeyError: Always raised.
+            """
+            raise KeyError(key)
+
+except ImportError as e:
+    raise ImportError(
+        "addict is not installed. Please install it with `pip install addict`"
+        "or `pip install bioplnn[dev]`."
+    ) from e
 
 
 def pass_fn(*args, **kwargs):

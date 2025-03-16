@@ -189,9 +189,9 @@ def idx_2D_to_1D_tensor(x: torch.Tensor, m: int, n: int) -> torch.Tensor:
     return x[0] * n + x[1]
 
 
-def print_cuda_mem_stats():
+def print_cuda_mem_stats(device: Optional[torch.device] = None):
     """Print CUDA memory statistics for debugging."""
-    f, t = torch.cuda.mem_get_info()
+    f, t = torch.cuda.mem_get_info(device)
     print(f"Free/Total: {f / (1024**3):.2f}GB/{t / (1024**3):.2f}GB")
 
 

@@ -99,7 +99,7 @@ class SpatiallyEmbeddedAreaConfig:
     out_channels: int
     num_cell_types: int = 1
     num_cell_subtypes: Param1dType[int] = 16
-    cell_type_class: Param1dType[str] = "hybrid"
+    cell_type_class: Param1dType[str] = "excitatory"
     cell_type_density: Param1dType[str] = "same"
     feedback_channels: Optional[int] = None
     inter_cell_type_connectivity: Param2dType[Union[int, bool]] = field(
@@ -936,7 +936,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                         get_activation(inter_area_feedback_nonlinearity[i, j]),
                     )
 
-    def init_hidden(
+    def init_neuron_states(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -956,11 +956,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """
 
         return [
-            area.init_hidden(batch_size, init_fn, device)
+            area.init_neuron_state(batch_size, init_fn, device)
             for area in self.areas
         ]
 
-    def init_fb(
+    def init_feedback_states(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -979,10 +979,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 area.
         """
         return [
-            area.init_fb(batch_size, init_fn, device) for area in self.areas
+            area.init_feedback_state(batch_size, init_fn, device)
+            for area in self.areas
         ]
 
-    def init_out(
+    def init_output_states(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
@@ -1002,10 +1003,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """
 
         return [
-            area.init_out(batch_size, init_fn, device) for area in self.areas
+            area.init_output_state(batch_size, init_fn, device)
+            for area in self.areas
         ]
 
-    def init_state(
+    def init_states(
         self,
         out0: Optional[Sequence[Union[torch.Tensor, None]]],
         h_neuron0: Optional[Sequence[Sequence[Union[torch.Tensor, None]]]],
@@ -1081,11 +1083,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
             )
 
         # Initialize default values
-        h_neuron0_default = self.init_hidden(
+        h_neuron0_default = self.init_neuron_states(
             batch_size, hidden_init_fn, device
         )
-        fb0_default = self.init_fb(batch_size, fb_init_fn, device)
-        out0_default = self.init_out(batch_size, out_init_fn, device)
+        fb0_default = self.init_feedback_states(batch_size, fb_init_fn, device)
+        out0_default = self.init_output_states(batch_size, out_init_fn, device)
 
         # Initialize output, hidden state, and feedback lists
         outs: list[list[Union[torch.Tensor, None]]] = [
@@ -1096,7 +1098,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             for i in range(self.num_areas)
         ]
         fbs: list[list[Union[torch.Tensor, int, None]]] = [
-            [0 if self.areas[i].use_fb else None] * num_steps
+            [0 if self.areas[i].use_feedback else None] * num_steps
             for i in range(self.num_areas)
         ]
 
@@ -1215,7 +1217,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     for j in range(self.areas[i].num_cell_types)
                 ]
             )
-            if self.areas[i].use_fb:
+            if self.areas[i].use_feedback:
                 fbs_stack.append(torch.stack(fbs[i]))  # type: ignore
             else:
                 assert all(feedback_state is None for feedback_state in fbs[i])
@@ -1226,7 +1228,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     h_neurons_stack[i][j] = h_neurons_stack[i][j].transpose(
                         0, 1
                     )
-                if self.areas[i].use_fb:
+                if self.areas[i].use_feedback:
                     fbs_stack[i] = fbs_stack[i].transpose(0, 1)  # type: ignore
 
         return outs_stack, h_neurons_stack, fbs_stack
@@ -1234,7 +1236,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
     def _match_spatial_size(
         self,
         x: torch.Tensor,
-        spatial_size: tuple[int, int],
+        size: tuple[int, int],
     ) -> torch.Tensor:
         """Adjusts the spatial dimensions of the input tensor.
 
@@ -1244,7 +1246,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         Args:
             x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).
-            spatial_size (tuple[int, int]): Target spatial size (height, width).
+            size (tuple[int, int]): Target spatial size (height, width).
 
         Returns:
             torch.Tensor: Resized tensor matching the target spatial size.
@@ -1252,17 +1254,15 @@ class SpatiallyEmbeddedRNN(nn.Module):
         Raises:
             ValueError: If self.pool_mode is not 'avg' or 'max'.
         """
-        if x.shape[-2:] > spatial_size:
+        if x.shape[-2:] > size:
             if self.pool_mode == "avg":
-                return F.avg_pool2d(x, spatial_size)
+                return F.avg_pool2d(x, size)
             elif self.pool_mode == "max":
-                return F.max_pool2d(x, spatial_size)
+                return F.max_pool2d(x, size)
             else:
                 raise ValueError(f"Invalid pool_mode: {self.pool_mode}")
-        elif x.shape[-2:] < spatial_size:
-            return F.interpolate(
-                x, spatial_size, mode="bilinear", align_corners=False
-            )
+        elif x.shape[-2:] < size:
+            return F.interpolate(x, size, mode="bilinear", align_corners=False)
         else:
             return x
 
@@ -1324,7 +1324,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
         batch_size = x.shape[1]
 
-        output_states, neuron_states, feedback_states = self.init_state(
+        output_states, neuron_states, feedback_states = self.init_states(
             output_state0,
             neuron_state0,
             feedback_state0,
@@ -1340,7 +1340,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     area_in = x[t]
                     area_in = F.interpolate(
                         area_in,
-                        self.areas[i].neuron_size,
+                        self.areas[i].in_size,
                         mode="bilinear",
                         align_corners=False,
                     )
@@ -1351,7 +1351,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                         area_in = output_states[i - 1][t]
                     assert isinstance(area_in, torch.Tensor)
                     area_in = self._match_spatial_size(
-                        area_in, self.areas[i].neuron_size
+                        area_in, self.areas[i].in_size
                     )
 
                 output_states[i][t], neuron_states[i][t] = area(
