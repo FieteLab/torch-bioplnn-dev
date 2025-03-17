@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, TypeVar, Union
 
 import torch
@@ -30,23 +30,51 @@ Returns:
 
 T = TypeVar("T")
 
-Param1dType = Union[T, list[T], NDArray[Any]]
+Param1dType = Union[T, Sequence[T], NDArray[Any]]
 """Type alias for a 1D parameter.
 
-Used to annotate function arguments that can be a single value, a list, or a 
+Used to annotate function arguments that can be a single value, a Sequence, or a 
 NumPy array. Generic over the element type T.
 
 Type:
-    Union[T, list[T], NDArray[T]]: A single value, list, or NumPy array.
+    Union[T, Sequence[T], NDArray[T]]: A single value, Sequence, or NumPy array.
 """
 
-Param2dType = Union[T, list[list[T]], NDArray[Any]]
+CellTypeParam = Param1dType[T]
+"""Type alias for a cell type parameter.
+
+Used to annotate function arguments that can be a single value, a Sequence, or a 
+NumPy array. Generic over the element type T.
+"""
+
+NeuronTypeParam = Param1dType[T]
+"""Type alias for a neuron type parameter.
+
+Used to annotate function arguments that can be a single value, a Sequence, or a 
+NumPy array. Generic over the element type T.
+"""
+
+Param2dType = Union[T, Sequence[Sequence[T]], NDArray[Any]]
 """Type alias for a 2D parameter.
 
-Used to annotate function arguments that can be a single value, a nested list,
+Used to annotate function arguments that can be a single value, a nested Sequence,
 or a NumPy array. Generic over the element type T.
 
 Type:
-    Union[T, list[list[T]], NDArray[T]]: A single value, nested list, or 
+    Union[T, Sequence[Sequence[T]], NDArray[T]]: A single value, nested Sequence, or 
     NumPy array.
+"""
+
+InterCellTypeParam = Param2dType[T]
+"""Type alias for an inter-cell type parameter.
+
+Used to annotate function arguments that can be a single value, a Sequence, or a 
+NumPy array. Generic over the element type T.
+"""
+
+InterAreaParam = Param2dType[T]
+"""Type alias for an inter-area parameter.
+
+Used to annotate function arguments that can be a single value, a Sequence, or a 
+NumPy array. Generic over the element type T.
 """

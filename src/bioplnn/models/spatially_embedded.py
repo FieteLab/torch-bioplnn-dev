@@ -6,18 +6,19 @@ from math import ceil
 from typing import Any, Optional, Union
 
 import numpy as np
-from numpy.typing import NDArray
 import pandas as pd
 import torch
 from torch import nn
 from torch.nn import functional as F
 
 from bioplnn.typing import (
-    Param1dType,
-    Param2dType,
+    CellTypeParam,
+    InterAreaParam,
+    InterCellTypeParam,
     TensorInitFnType,
 )
 from bioplnn.utils import (
+    check_possible_values,
     expand_array_2d,
     expand_list,
     get_activation,
@@ -45,9 +46,9 @@ class Conv2dRectify(nn.Conv2d):
         Returns:
             torch.Tensor: The output tensor.
         """
-        self.weight.data = torch.relu(self.weight.data)
+        self.weight.data.clamp_(min=0.0)
         if self.bias is not None:
-            self.bias.data = torch.relu(self.bias.data)
+            self.bias.data.clamp_(min=0.0)
         return super().forward(*args, **kwargs)
 
 
@@ -70,40 +71,40 @@ class SpatiallyEmbeddedAreaConfig:
         out_channels (int): Number of output channels.
         feedback_channels (int, optional): Number of feedback channels. Defaults to
             None.
-        in_class (Param1dType[str], optional): Class of input signal. Can be
+        in_class (CellTypeParam[str], optional): Class of input signal. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
         feedback_class (str, optional): Class of feedback signal. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
-        inter_cell_type_connectivity (Param2dType[Union[int, bool]], optional):
+        num_cell_types (int, optional): Number of cell types. Defaults to 1.
+        num_cell_subtypes (CellTypeParam[int], optional):
+            Number of subtypes for each cell type. Defaults to 16.
+        cell_type_class (CellTypeParam[str], optional): Class of cell type. Can be
+            "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
+        cell_type_density (CellTypeParam[str], optional):
+            Spatial density of each cell type. Can be "same" or "half". Defaults to
+            "same".
+        cell_type_nonlinearity (CellTypeParam[Optional[Union[str, nn.Module]]], optional):
+            Nonlinearity to apply to each cell type's activity after adding the
+            impact of all connected inputs/cell types in the circuit motif.
+            Defaults to "Sigmoid".
+        inter_cell_type_connectivity (InterCellTypeParam[Union[int, bool]], optional):
             Connectivity matrix for the circuit motif. Defaults to:
             [[1, 0],
              [1, 1]].
             This corresponds to an area with one excitatory cell type
-        num_cell_types (int, optional): Number of cell types. Defaults to 1.
-        num_cell_subtypes (Param1dType[int], optional):
-            Number of subtypes for each cell type. Defaults to 16.
-        cell_type_class (Param1dType[str], optional): Class of cell type. Can be
-            "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
-        cell_type_density (Param1dType[str], optional):
-            Spatial density of each cell type. Can be "same" or "half". Defaults to
-            "same".
-        cell_type_nonlinearity (Param1dType[Union[str, nn.Module, None]], optional):
-            Nonlinearity to apply to each cell type's activity after adding the
-            impact of all connected inputs/cell types in the circuit motif.
-            Defaults to "Sigmoid".
-        inter_cell_type_spatial_extents (Param2dType[tuple[int, int]], optional):
+        inter_cell_type_spatial_extents (InterCellTypeParam[tuple[int, int]], optional):
             Spatial extent for each circuit motif connection. Defaults to (3, 3).
-        inter_cell_type_nonlinearity (Param2dType[Union[str, nn.Module, None]], optional):
+        inter_cell_type_nonlinearity (InterCellTypeParam[Optional[Union[str, nn.Module]]], optional):
             Nonlinearity for each circuit motif connection. Defaults to None.
-        inter_cell_type_bias (Param2dType[bool], optional):
+        inter_cell_type_bias (InterCellTypeParam[bool], optional):
             Whether to add a bias term for each circuit motif connection.
             Defaults to True.
-        tau_mode (Param1dType[str]): Mode determining which parts of
+        tau_mode (CellTypeParam[str]): Mode determining which parts of
             neuron activity share a time constant. Can be "subtype" (one tau per
             neuron subtype), "spatial" (one tau per spatial location),
             "subtype_spatial" (one tau per neuron subtype and spatial location)
             or "type" (one tau for each neuron type). Defaults to "subtype".
-        tau_init_fn (Param1dType[Union[str, TensorInitFnType]], optional):
+        tau_init_fn (CellTypeParam[Union[str, TensorInitFnType]], optional):
             Initialization mode for the membrane time constants. Defaults to
             "ones".
         out_nonlinearity (Optional[Union[str, nn.Module]], optional):
@@ -123,23 +124,26 @@ class SpatiallyEmbeddedAreaConfig:
     in_class: str = "hybrid"
     feedback_class: str = "hybrid"
     num_cell_types: int = 1
-    num_cell_subtypes: Param1dType[int] = 16
-    cell_type_class: Param1dType[str] = "hybrid"
-    cell_type_density: Param1dType[str] = "same"
-    cell_type_nonlinearity: Optional[
-        Param1dType[Union[str, nn.Module, None]]
-    ] = "Sigmoid"
-    inter_cell_type_connectivity: Param2dType[Union[int, bool]] = field(
+    num_cell_subtypes: CellTypeParam[int] = 16
+    cell_type_class: CellTypeParam[str] = "hybrid"
+    cell_type_density: CellTypeParam[str] = "same"
+    cell_type_nonlinearity: CellTypeParam[Optional[Union[str, nn.Module]]] = (
+        "Sigmoid"
+    )
+    inter_cell_type_connectivity: InterCellTypeParam[Union[int, bool]] = field(
         default_factory=lambda: [[1, 0], [1, 1]]
     )
-    inter_cell_type_spatial_extents: Param2dType[tuple[int, int]] = (3, 3)
-    inter_cell_type_nonlinearity: Param2dType[
-        Optional[Union[str, nn.Module, None]]
+    inter_cell_type_spatial_extents: InterCellTypeParam[tuple[int, int]] = (
+        3,
+        3,
+    )
+    inter_cell_type_nonlinearity: InterCellTypeParam[
+        Optional[Union[str, nn.Module]]
     ] = None
-    inter_cell_type_bias: Param2dType[bool] = True
+    inter_cell_type_bias: InterCellTypeParam[bool] = True
     out_nonlinearity: Optional[Union[str, nn.Module]] = None
-    tau_mode: Param1dType[str] = "subtype"
-    tau_init_fn: Param1dType[Union[str, TensorInitFnType]] = "ones"
+    tau_mode: CellTypeParam[str] = "subtype"
+    tau_init_fn: CellTypeParam[Union[str, TensorInitFnType]] = "ones"
     default_neuron_state_init_fn: Union[str, TensorInitFnType] = "zeros"
     default_feedback_state_init_fn: Union[str, TensorInitFnType] = "zeros"
     default_output_state_init_fn: Union[str, TensorInitFnType] = "zeros"
@@ -228,13 +232,13 @@ class SpatiallyEmbeddedArea(nn.Module):
         self.use_feedback = self.feedback_channels > 0
 
         self.in_class = config.in_class
-        self._check_possible_values(
+        check_possible_values(
             "in_class",
             (self.in_class,),
             ("excitatory", "inhibitory", "hybrid"),
         )
         self.feedback_class = config.feedback_class
-        self._check_possible_values(
+        check_possible_values(
             "feedback_class",
             (self.feedback_class,),
             ("excitatory", "inhibitory", "hybrid"),
@@ -255,7 +259,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         self.cell_type_class = expand_list(
             config.cell_type_class, self.num_cell_types
         )
-        self._check_possible_values(
+        check_possible_values(
             "cell_type_class",
             self.cell_type_class,
             ("excitatory", "inhibitory", "hybrid"),
@@ -264,7 +268,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             config.cell_type_density, self.num_cell_types
         )
         # TODO: Add support for quarter
-        self._check_possible_values(
+        check_possible_values(
             "cell_type_density",
             self.cell_type_density,
             ("same", "half"),
@@ -439,7 +443,7 @@ class SpatiallyEmbeddedArea(nn.Module):
 
         # Initialize membrane time constants
         self.tau_mode = expand_list(config.tau_mode, self.num_cell_types)
-        self._check_possible_values(
+        check_possible_values(
             "tau_mode",
             self.tau_mode,
             ("subtype", "spatial", "subtype_spatial", "type"),
@@ -468,7 +472,7 @@ class SpatiallyEmbeddedArea(nn.Module):
                 tau_channels,
                 *tau_size,
             )
-            noise = torch.randn_like(tau) * 1e-6
+            noise = torch.rand_like(tau) * 1e-6
 
             self.tau.append(
                 nn.Parameter(
@@ -486,14 +490,6 @@ class SpatiallyEmbeddedArea(nn.Module):
             config.default_feedback_state_init_fn
         )
         self.default_output_state_init_fn = config.default_output_state_init_fn
-
-    def _check_possible_values(
-        self, param_name: str, param: Union[Sequence[Any], NDArray], valid_values: Any
-    ) -> None:
-        if isinstance(param, np.ndarray):
-            param = param.tolist()
-        if not set(param) <= set(valid_values):
-            raise ValueError(f"{param_name} must be one of {valid_values}.")
 
     def _type_from_row_idx(self, idx: int) -> Optional[str]:
         """Converts an input index to the corresponding input type.
@@ -544,6 +540,10 @@ class SpatiallyEmbeddedArea(nn.Module):
             return "cell"
         else:
             return "output"
+
+    def _clamp_taus(self) -> None:
+        for tau in self.taus:
+            tau.data = torch.clamp(tau, min=1.0)
 
     def init_neuron_state(
         self,
@@ -693,12 +693,12 @@ class SpatiallyEmbeddedArea(nn.Module):
             "output"
         ]
 
-        assert len(row_labels) == self.num_input_types
-        assert len(column_labels) == self.num_output_types
+        assert len(row_labels) == self.num_rows_connectivity
+        assert len(column_labels) == self.num_cols_connectivity
 
         array = np.empty((len(row_labels), len(column_labels)), dtype=object)
-        for i in range(self.num_input_types):
-            for j in range(self.num_output_types):
+        for i in range(self.num_rows_connectivity):
+            for j in range(self.num_cols_connectivity):
                 if self.inter_cell_type_connectivity[i, j]:
                     content = []
                     content.append(
@@ -721,7 +721,7 @@ class SpatiallyEmbeddedArea(nn.Module):
 
         return df
 
-    def __repr__(self) -> str:
+    def summary(self) -> str:
         """Returns a string representation of the SpatiallyEmbeddedArea.
 
         Returns:
@@ -791,6 +791,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             circuit_outs[j].append(sign * conv(circuit_ins[i]))
 
         # Update neuron states
+        self._clamp_taus()
         neuron_state_new = []
         for i in range(self.num_cell_types):
             # Aggregate all circuit outputs to this cell type
@@ -798,7 +799,6 @@ class SpatiallyEmbeddedArea(nn.Module):
             state_new = self.cell_type_nonlinearity[i](state_new)
 
             # Euler update
-            self.tau[i].data = torch.clamp(self.tau[i], min=1.0)
             state_new = (
                 state_new / self.tau[i]
                 + (1 - 1 / self.tau[i]) * neuron_state[i]
@@ -852,13 +852,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
             Defaults to None.
         common_area_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
             to all areas. Defaults to None.
-        inter_area_feedback_connectivity (Param2dType[Union[int, bool]], optional): Connectivity matrix
+        inter_area_feedback_connectivity (InterAreaParam[Union[int, bool]], optional): Connectivity matrix
             for feedback connections between areas. Defaults to None.
-        inter_area_feedback_nonlinearity (Param2dType[Union[str, nn.Module, None]], optional):
+        inter_area_feedback_nonlinearity (InterAreaParam[Union[str, nn.Module, None]], optional):
             Activation functions for feedback connections. Defaults to None.
-        inter_area_feedback_rectify (Param2dType[bool]): Whether to rectify feedback connections.
-            Defaults to False.
-        inter_area_feedback_spatial_extents (Param2dType[tuple[int, int]], optional): Kernel sizes for
+        inter_area_feedback_spatial_extents (InterAreaParam[tuple[int, int]], optional): Kernel sizes for
             feedback convolutions. Defaults to None.
         pool_mode (str, optional): Pooling mode for area outputs. Defaults to "avg".
         area_time_delay (bool): Whether to introduce a time delay between areas.
@@ -871,18 +869,17 @@ class SpatiallyEmbeddedRNN(nn.Module):
         self,
         *,
         num_areas: int = 1,
-        area_configs: Optional[list[SpatiallyEmbeddedAreaConfig]] = None,
-        area_kwargs: Optional[list[Mapping[str, Any]]] = None,
+        area_configs: Optional[Sequence[SpatiallyEmbeddedAreaConfig]] = None,
+        area_kwargs: Optional[Sequence[Mapping[str, Any]]] = None,
         common_area_kwargs: Optional[Mapping[str, Any]] = None,
         inter_area_feedback_connectivity: Optional[
-            Param2dType[Union[int, bool]]
+            InterAreaParam[Union[int, bool]]
         ] = None,
         inter_area_feedback_nonlinearity: Optional[
-            Param2dType[Union[str, nn.Module, None]]
+            InterAreaParam[Union[str, nn.Module, None]]
         ] = None,
-        inter_area_feedback_rectify: Param2dType[bool] = False,
         inter_area_feedback_spatial_extents: Optional[
-            Param2dType[tuple[int, int]]
+            InterAreaParam[tuple[int, int]]
         ] = None,
         area_time_delay: bool = False,
         pool_mode: Optional[str] = "max",
@@ -958,6 +955,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         # Initialize feedback connections
         ############################################################
 
+        self.feedback_convs = nn.ModuleDict()
         if inter_area_feedback_connectivity is None:
             if any(
                 area_config.feedback_channels for area_config in area_configs
@@ -966,7 +964,6 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     "inter_area_feedback_connectivity must be provided if and only if "
                     "feedback_channels is provided for at least one area."
                 )
-            self.feedback_convs = nn.ModuleDict()
         else:
             inter_area_feedback_connectivity = np.array(
                 inter_area_feedback_connectivity, dtype=bool
@@ -980,11 +977,6 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 )
             inter_area_feedback_nonlinearity = expand_array_2d(
                 inter_area_feedback_nonlinearity,
-                self.num_areas,
-                self.num_areas,
-            )
-            inter_area_feedback_rectify = expand_array_2d(
-                inter_area_feedback_rectify,
                 self.num_areas,
                 self.num_areas,
             )
@@ -1010,7 +1002,6 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 )
 
             # Create feedback convolutions
-            self.feedback_convs = nn.ModuleDict()
             for i, row in enumerate(inter_area_feedback_connectivity):
                 nonzero_indices = np.nonzero(row)[0]
                 for j in nonzero_indices:
@@ -1020,16 +1011,12 @@ class SpatiallyEmbeddedRNN(nn.Module):
                             f"not valid because area {j} does not receive "
                             f"feedback (hint: feedback_channels may not be provided)"
                         )
-                    if inter_area_feedback_rectify[i, j]:
-                        Conv2dFeedback = Conv2dRectify
-                    else:
-                        Conv2dFeedback = nn.Conv2d
                     self.feedback_convs[f"{i}->{j}"] = nn.Sequential(
                         nn.Upsample(
                             size=area_configs[j].in_size,
                             mode="bilinear",
                         ),
-                        Conv2dFeedback(
+                        nn.Conv2d(
                             in_channels=area_configs[i].out_channels,
                             out_channels=area_configs[j].feedback_channels,
                             kernel_size=area_configs[
