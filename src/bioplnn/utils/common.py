@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -214,3 +214,10 @@ def expand_array_2d(
         raise ValueError(f"x must have shape ({m}, {n}).")
 
     return x
+
+
+def check_possible_values(
+    param_name: str, param: Iterable, valid_values: Iterable
+) -> None:
+    if not set(param) <= set(valid_values):
+        raise ValueError(f"{param_name} must be one of {valid_values}.")

@@ -91,6 +91,7 @@ class SparseLinear(nn.Module):
         Returns:
             torch.Tensor: Output tensor after sparse linear transformation.
         """
+
         shape = list(x.shape)
 
         if self.feature_dim != 0:
@@ -136,8 +137,6 @@ class SparseRNN(nn.Module):
             input-to-hidden connections will be dense. Defaults to None.
         default_hidden_init_fn (str, optional): Initialization mode for the
             hidden state. Defaults to "zeros".
-        use_layernorm (bool, optional): Whether to use layer normalization.
-            Defaults to False.
         nonlinearity (str, optional): Nonlinearity function. Defaults to "Tanh".
         batch_first (bool, optional): Whether the input is in (batch_size,
             seq_len, input_size) format. Defaults to True.
@@ -151,8 +150,7 @@ class SparseRNN(nn.Module):
         connectivity_hh: Union[PathLike, torch.Tensor],
         connectivity_ih: Optional[Union[PathLike, torch.Tensor]] = None,
         default_hidden_init_fn: str = "zeros",
-        use_layernorm: bool = False,
-        nonlinearity: str = "ReLU",
+        nonlinearity: str = "Sigmoid",
         batch_first: bool = True,
         bias: bool = True,
     ):
@@ -163,23 +161,23 @@ class SparseRNN(nn.Module):
         self.nonlinearity = get_activation(nonlinearity)
         self.batch_first = batch_first
 
-        self.connectivity_hh, self.connectivity_ih = self._init_connectivity(
+        connectivity_hh, connectivity_ih = self._init_connectivity(
             connectivity_hh, connectivity_ih
         )
 
         self.hh = SparseLinear(
             in_features=hidden_size,
             out_features=hidden_size,
-            connectivity=self.connectivity_hh,
+            connectivity=connectivity_hh,
             feature_dim=0,
             bias=bias,
         )
 
-        if self.connectivity_ih is not None:
+        if connectivity_ih is not None:
             self.ih = SparseLinear(
                 in_features=input_size,
                 out_features=hidden_size,
-                connectivity=self.connectivity_ih,
+                connectivity=connectivity_ih,
                 feature_dim=0,
                 bias=False,
             )
@@ -201,10 +199,6 @@ class SparseRNN(nn.Module):
                 out_features=hidden_size,
                 bias=False,
             )
-
-        self.layernorm = (
-            nn.LayerNorm(hidden_size) if use_layernorm else nn.Identity()
-        )
 
     def _init_connectivity(
         self,
@@ -229,6 +223,7 @@ class SparseRNN(nn.Module):
             ValueError: If connectivity matrices are not in COO format or have
                 invalid dimensions.
         """
+
         connectivity_hh_tensor: torch.Tensor
         connectivity_ih_tensor: Union[torch.Tensor, None] = None
 
@@ -274,13 +269,20 @@ class SparseRNN(nn.Module):
 
         return connectivity_hh_tensor, connectivity_ih_tensor
 
+    def _connectivity_nonnegative(self) -> None:
+        """Ensure the connectivity matrix is nonnegative."""
+
+        self.hh.values.data.clamp_(min=0.0)
+        if self.ih is not None:
+            self.ih.values.data.clamp_(min=0.0)
+
     def init_hidden(
         self,
         batch_size: int,
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
         device: Optional[Union[torch.device, str]] = None,
     ) -> torch.Tensor:
-        """Initialize the hidden state.
+        """_initialize the hidden state.
 
         Args:
             batch_size (int): Batch size.
@@ -293,6 +295,7 @@ class SparseRNN(nn.Module):
             torch.Tensor: The initialized hidden state of shape
                 (batch_size, hidden_size).
         """
+
         if init_fn is None:
             init_fn = self.default_hidden_init_fn
 
@@ -325,6 +328,7 @@ class SparseRNN(nn.Module):
             list[Optional[torch.Tensor]]: The initialized hidden states for each
                 time step.
         """
+
         hs: list[Optional[torch.Tensor]] = [None] * num_steps
         if h0 is None:
             h0 = self.init_hidden(
@@ -438,6 +442,7 @@ class SparseRNN(nn.Module):
                 hidden_size) if batch_first, else (num_steps, batch_size,
                 hidden_size).
         """
+        self._connectivity_clamp_nonnegative()
 
         x, num_steps = self._format_x(x, num_steps)
         batch_size = x.shape[-1]
@@ -583,7 +588,6 @@ class SparseODERNN(SparseRNN):
         idx = self._index_from_time(t, x, start_time, end_time)
 
         h_new = self.nonlinearity(self.ih(x[idx]) + self.hh(h))
-        h_new = self.layernorm(h_new)
 
         dhdt = h_new - h
 
