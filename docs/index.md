@@ -1,6 +1,5 @@
 # `torch-biopl`: Biologically-plausible networks made easy 
-
-You can now instantiate and test model hypotheses in a few lines of code.
+![code-api](images/code-snippet-edited.gif)
 
 ## Overview
 * We provide our general philosophy and an overview of the functionalities supported in `torch-biopl` below. This is a growing list, so if you have any suggestions please don't hesitate to get in contact.
