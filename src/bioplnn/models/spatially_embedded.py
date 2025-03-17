@@ -276,10 +276,12 @@ class SpatiallyEmbeddedArea(nn.Module):
         cell_type_nonlinearity = expand_list(
             config.cell_type_nonlinearity, self.num_cell_types
         )
-        self.cell_type_nonlinearity = [
-            get_activation(nonlinearity)
-            for nonlinearity in cell_type_nonlinearity
-        ]
+        self.cell_type_nonlinearity = nn.ModuleList(
+            [
+                get_activation(nonlinearity)
+                for nonlinearity in cell_type_nonlinearity
+            ]
+        )
 
         # Save number of "types" for the input to and output from the area
         self.num_rows_connectivity = (
@@ -541,8 +543,8 @@ class SpatiallyEmbeddedArea(nn.Module):
         else:
             return "output"
 
-    def _clamp_taus(self) -> None:
-        for tau in self.taus:
+    def _clamp_tau(self) -> None:
+        for tau in self.tau:
             tau.data = torch.clamp(tau, min=1.0)
 
     def init_neuron_state(
@@ -791,7 +793,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             circuit_outs[j].append(sign * conv(circuit_ins[i]))
 
         # Update neuron states
-        self._clamp_taus()
+        self._clamp_tau()
         neuron_state_new = []
         for i in range(self.num_cell_types):
             # Aggregate all circuit outputs to this cell type
