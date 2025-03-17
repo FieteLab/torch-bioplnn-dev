@@ -121,7 +121,7 @@ class ConnectomeODEClassifier(nn.Module):
         self.rnn = ConnectomeODERNN(**rnn_kwargs)
 
         if self.rnn.output_neurons is None:
-            out_size = self.rnn.num_neurons
+            out_size = self.rnn.hidden_size
         else:
             out_size = len(self.rnn.output_neurons)
 
