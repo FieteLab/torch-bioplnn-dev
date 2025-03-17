@@ -102,16 +102,21 @@ def get_activation_class(
         return [_get_single_activation_class(act) for act in activations]
 
 
-def get_activation(activation: Union[str, None]) -> nn.Module:
+def get_activation(
+    activation: Union[str, None, nn.Module],
+) -> nn.Module:
     """Get an initialized activation function module.
 
     Args:
-        activation (str, optional): The name of the activation function.
-            If None, returns nn.Identity(). Defaults to None.
+        activation (Union[str, nn.Module], optional): The name(s) of the
+            activation function(s) or an already initialized nn.Module. If the
+            latter, the moduleis returned as is. If None, returns nn.Identity().
 
     Returns:
         nn.Module: The initialized activation function.
     """
+    if isinstance(activation, nn.Module):
+        return activation
     activation_classes = get_activation_class(activation)
     if isinstance(activation_classes, list):
         return nn.Sequential(*[act() for act in activation_classes])
