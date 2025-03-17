@@ -88,10 +88,21 @@ class SpatiallyEmbeddedAreaConfig:
             impact of all connected inputs/cell types in the circuit motif.
             Defaults to "Sigmoid".
         inter_cell_type_connectivity (InterCellTypeParam[Union[int, bool]], optional):
-            Connectivity matrix for the circuit motif. Defaults to:
+            Connectivity matrix for the circuit motif whose shape is
+            (1 + int(use_feedback) + num_cell_types, num_cell_types + 1). Here,
+            rows represent source types and columns represent destination types.
+            A True entry in the matrix indicates a connection from the source to
+            the destination.
+            The first row corresponds to the input, the second row corresponds to
+            the feedback (if feedback_channels > 0), and the remaining rows
+            correspond to the cell types.
+            The first num_cell_types columns correspond to the cell types and the
+            last column corresponds to the output. To get a template of the
+            connectivity matrix for your configuration with appropriate row and
+            column labels, use the inter_cell_type_connectivity_template_df
+            method of this class. Defaults to:
             [[1, 0],
              [1, 1]].
-            This corresponds to an area with one excitatory cell type
         inter_cell_type_spatial_extents (InterCellTypeParam[tuple[int, int]], optional):
             Spatial extent for each circuit motif connection. Defaults to (3, 3).
         inter_cell_type_nonlinearity (InterCellTypeParam[Optional[Union[str, nn.Module]]], optional):
@@ -855,11 +866,14 @@ class SpatiallyEmbeddedRNN(nn.Module):
         common_area_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
             to all areas. Defaults to None.
         inter_area_feedback_connectivity (InterAreaParam[Union[int, bool]], optional): Connectivity matrix
-            for feedback connections between areas. Defaults to None.
+            for feedback connections between areas of shape (num_areas, num_areas).
+            Must be lower triangular and zero/False on the diagonal. Defaults to
+            None (no feedback connections).
         inter_area_feedback_nonlinearity (InterAreaParam[Union[str, nn.Module, None]], optional):
-            Activation functions for feedback connections. Defaults to None.
+            Nonlinearities for feedback connections of shape (num_areas, num_areas).
+            Defaults to None.
         inter_area_feedback_spatial_extents (InterAreaParam[tuple[int, int]], optional): Kernel sizes for
-            feedback convolutions. Defaults to None.
+            feedback convolutions of shape (num_areas, num_areas). Defaults to None.
         pool_mode (str, optional): Pooling mode for area outputs. Defaults to "avg".
         area_time_delay (bool): Whether to introduce a time delay between areas.
             Defaults to False.
@@ -967,22 +981,22 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     "feedback_channels is provided for at least one area."
                 )
         else:
-            inter_area_feedback_connectivity = np.array(
+            self.inter_area_feedback_connectivity = np.array(
                 inter_area_feedback_connectivity, dtype=bool
             )
-            if inter_area_feedback_connectivity.shape != (
+            if self.inter_area_feedback_connectivity.shape != (
                 self.num_areas,
                 self.num_areas,
             ):
                 raise ValueError(
                     "The shape of inter_area_feedback_connectivity must be (num_areas, num_areas)."
                 )
-            inter_area_feedback_nonlinearity = expand_array_2d(
+            self.inter_area_feedback_nonlinearity = expand_array_2d(
                 inter_area_feedback_nonlinearity,
                 self.num_areas,
                 self.num_areas,
             )
-            inter_area_feedback_spatial_extents = expand_array_2d(
+            self.inter_area_feedback_spatial_extents = expand_array_2d(
                 inter_area_feedback_spatial_extents,
                 self.num_areas,
                 self.num_areas,
@@ -991,22 +1005,32 @@ class SpatiallyEmbeddedRNN(nn.Module):
 
             # Validate inter_area_feedback_connectivity tensor
             if (
-                inter_area_feedback_connectivity.ndim != 2
-                or inter_area_feedback_connectivity.shape[0] != self.num_areas
-                or inter_area_feedback_connectivity.shape[1] != self.num_areas
+                self.inter_area_feedback_connectivity.ndim != 2
+                or self.inter_area_feedback_connectivity.shape[0]
+                != self.num_areas
+                or self.inter_area_feedback_connectivity.shape[1]
+                != self.num_areas
             ):
                 raise ValueError(
                     "The dimensions of inter_area_feedback_connectivity must match the number of areas."
                 )
-            if inter_area_feedback_connectivity.sum() == 0:
+            if self.inter_area_feedback_connectivity.sum() == 0:
                 raise ValueError(
                     "inter_area_feedback_connectivity must be a non-zero tensor if provided."
                 )
 
             # Create feedback convolutions
-            for i, row in enumerate(inter_area_feedback_connectivity):
+            for i, row in enumerate(self.inter_area_feedback_connectivity):
                 nonzero_indices = np.nonzero(row)[0]
                 for j in nonzero_indices:
+                    if i <= j:
+                        raise ValueError(
+                            f"the feedback connection from area {i} to area {j} "
+                            f"is not valid because feedback connections must "
+                            f"pass information from later areas to earlier "
+                            f"areas (i.e. inter_area_feedback_connectivity must "
+                            f"be lower triangular and zero on the diagonal)."
+                        )
                     if not self.areas[j].use_feedback:
                         raise ValueError(
                             f"the connection from area {i} to area {j} is "
@@ -1021,20 +1045,26 @@ class SpatiallyEmbeddedRNN(nn.Module):
                         nn.Conv2d(
                             in_channels=area_configs[i].out_channels,
                             out_channels=area_configs[j].feedback_channels,
-                            kernel_size=area_configs[
-                                j
-                            ].inter_area_feedback_spatial_extents[i, j],
+                            kernel_size=self.inter_area_feedback_spatial_extents[
+                                i, j
+                            ],
                             padding=(
-                                inter_area_feedback_spatial_extents[i, j][0]
+                                self.inter_area_feedback_spatial_extents[i, j][
+                                    0
+                                ]
                                 // 2,
-                                inter_area_feedback_spatial_extents[i, j][1]
+                                self.inter_area_feedback_spatial_extents[i, j][
+                                    1
+                                ]
                                 // 2,
                             ),
                             bias=area_configs[
                                 j
                             ].default_feedback_state_init_fn,
                         ),
-                        get_activation(inter_area_feedback_nonlinearity[i, j]),
+                        get_activation(
+                            self.inter_area_feedback_nonlinearity[i, j]
+                        ),
                     )
 
     def init_neuron_states(
