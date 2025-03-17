@@ -166,6 +166,22 @@ def init_tensor(
             raise e
 
 
+def load_tensor(tensor: Union[torch.Tensor, PathLike]) -> torch.Tensor:
+    """Load a tensor from a file or tensor.
+
+    Args:
+        tensor (Union[torch.Tensor, PathLike]): Tensor or path to file
+            containing tensor.
+
+    Returns:
+        torch.Tensor: The original or loaded tensor.
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor
+    else:
+        return torch.load(tensor, weights_only=True).squeeze()
+
+
 def idx_1D_to_2D_tensor(x: torch.Tensor, m: int, n: int) -> torch.Tensor:
     """Convert 1D indices to 2D coordinates.
 

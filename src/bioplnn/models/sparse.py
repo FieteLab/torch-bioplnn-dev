@@ -149,6 +149,8 @@ class SparseRNN(nn.Module):
         hidden_size: int,
         connectivity_hh: Union[PathLike, torch.Tensor],
         connectivity_ih: Optional[Union[PathLike, torch.Tensor]] = None,
+        train_hh: bool = True,
+        train_ih: bool = True,
         default_hidden_init_fn: str = "zeros",
         nonlinearity: str = "Sigmoid",
         batch_first: bool = True,
@@ -171,6 +173,7 @@ class SparseRNN(nn.Module):
             connectivity=connectivity_hh,
             feature_dim=0,
             bias=bias,
+            requires_grad=train_hh,
         )
 
         if connectivity_ih is not None:
@@ -180,6 +183,7 @@ class SparseRNN(nn.Module):
                 connectivity=connectivity_ih,
                 feature_dim=0,
                 bias=False,
+                requires_grad=train_ih,
             )
         else:
             warnings.warn(
@@ -193,6 +197,10 @@ class SparseRNN(nn.Module):
                     f"({input_size}, {hidden_size}). This may result in too "
                     "many parameters to fit on your GPU. Consider providing "
                     "connectivity_ih or decreasing input_size."
+                )
+            if not train_ih:
+                raise ValueError(
+                    "train_ih must be True if connectivity_ih is not provided"
                 )
             self.ih = nn.Linear(
                 in_features=input_size,
@@ -268,13 +276,6 @@ class SparseRNN(nn.Module):
             )
 
         return connectivity_hh_tensor, connectivity_ih_tensor
-
-    def _connectivity_nonnegative(self) -> None:
-        """Ensure the connectivity matrix is nonnegative."""
-
-        self.hh.values.data.clamp_(min=0.0)
-        if self.ih is not None:
-            self.ih.values.data.clamp_(min=0.0)
 
     def init_hidden(
         self,
@@ -404,6 +405,13 @@ class SparseRNN(nn.Module):
         else:
             return hs.permute(0, 2, 1)
 
+    def _clamp_connectivity(self) -> None:
+        """Ensure the connectivity matrix is nonnegative."""
+
+        self.hh.values.data.clamp_(min=0.0)
+        if self.ih is not None:
+            self.ih.values.data.clamp_(min=0.0)
+
     def update_fn(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """Update function for the SparseRNN.
 
@@ -442,8 +450,11 @@ class SparseRNN(nn.Module):
                 hidden_size) if batch_first, else (num_steps, batch_size,
                 hidden_size).
         """
-        self._connectivity_clamp_nonnegative()
 
+        # Ensure connectivity matrix is nonnegative
+        self._clamp_connectivity()
+
+        # Format input and initialize variables
         x, num_steps = self._format_x(x, num_steps)
         batch_size = x.shape[-1]
         device = x.device
@@ -627,6 +638,10 @@ class SparseODERNN(SparseRNN):
         Raises:
             ValueError: If num_steps is less than 2.
         """
+
+        # Ensure connectivity matrix is nonnegative
+        self._clamp_connectivity()
+
         # Format input and initialize variables
         x = self._format_x(x)
         batch_size = x.shape[-1]
