@@ -894,9 +894,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         inter_area_feedback_nonlinearity: Optional[
             InterAreaParam[Union[str, nn.Module, None]]
         ] = None,
-        inter_area_feedback_spatial_extents: Optional[
-            InterAreaParam[tuple[int, int]]
-        ] = None,
+        inter_area_feedback_spatial_extents: InterAreaParam[tuple[int, int]] = (3, 3),
         area_time_delay: bool = False,
         pool_mode: Optional[str] = "max",
         batch_first: bool = True,
