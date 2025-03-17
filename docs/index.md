@@ -23,7 +23,7 @@ In this package, we provide a basic set of features that will enable to user to 
     ![celltypes](images/celltype-thumb.png){ width="300" }
     <figcaption>Synapses can adhere to Dale's law. Specify synapse- vs neuron-specific nonlinearities.</figcaption>
     </figure>
-    [:octicons-arrow-right-24: Example](#)
+    [:octicons-arrow-right-24: Example](examples/advance_config.md)
 
 -   __Spatially embedded populations__
 
@@ -33,7 +33,7 @@ In this package, we provide a basic set of features that will enable to user to 
     ![spatial](images/spatial-thumb.png){ width="300" }
     <figcaption>Construct hierarchical populations of spatially embedded neurons.</figcaption>
     </figure>
-    [:octicons-arrow-right-24: Example](#)
+    [:octicons-arrow-right-24: Example](examples/basic_spatial_example.md)
 
 -   __Microcircuit archetypes__
 
@@ -43,7 +43,7 @@ In this package, we provide a basic set of features that will enable to user to 
     ![microcircuits](images/microcircuits-thumb.png){ width="300" }
     <figcaption>Learnable scaffolds for local "microcircuit" patterns of connectivity.</figcaption>
     </figure>
-    [:octicons-arrow-right-24: Example](#)
+    [:octicons-arrow-right-24: Example](examples/advance_config.md)
 
 -   __Diverse feedback wiring__
 
@@ -53,7 +53,7 @@ In this package, we provide a basic set of features that will enable to user to 
     ![feedback](images/feedback-thumb.png){ width="300" }
     <figcaption>Various specifications for inter-areal feedback projections.</figcaption>
     </figure>
-    [:octicons-arrow-right-24: Example](#)
+    [:octicons-arrow-right-24: Example](examples/advance_config.md)
 
 -   __Connectome constrained modelling__
 
@@ -63,6 +63,6 @@ In this package, we provide a basic set of features that will enable to user to 
     ![connectome](images/connectome-thumb.png){ width="300" }
     <figcaption>Efficient implementation of sparse-matrix arithmetic for forward and backpropagation.</figcaption>
     </figure>
-    [:octicons-arrow-right-24: Example](#)
+    [:octicons-arrow-right-24: Example](examples/connectome_reverse.md)
 
 </div>

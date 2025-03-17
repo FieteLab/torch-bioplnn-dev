@@ -259,10 +259,12 @@ def train(dict_config: DictConfig) -> None:
             for i, item in enumerate(original):
                 original[i] = parse_overrides(item, overrides[i])
         else:
+            assert type(original) is type(overrides)
             original = overrides
         return original
 
-    config = parse_overrides(config, config.overrides)
+    if "overrides" in config:
+        config = parse_overrides(config, config.overrides)
     # if (
     #     "layer_one_in_channels_override" in config
     #     and config.layer_one_in_channels_override is not None

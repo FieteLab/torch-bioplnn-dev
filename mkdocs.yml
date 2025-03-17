@@ -6,9 +6,13 @@ nav:
   - Quick start guide: install.md
   - Examples:
     - Spatially embedded networks:
-      - Single layer network: examples/ex01.md
+      - Basic example: examples/basic_spatial_example.md
+      - Advanced configurability: examples/advance_configs.md
+      - Advnaced datasets: examples/advance_datasets.md
     - Connectome-constrained models:
       - Running forward dynamics: examples/connectome_forward.md
+      - Running reverse dynamics: examples/connectome_backward.md
+      - Cell typing connectomes: examples/connectome_forward_neuron_types.md
   - API Reference:
     - Spatially embedded networks: reference/eirnn.md
     - Connectome-constrained models: reference/connectome.md
@@ -102,6 +106,10 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 # markdown_extensions:
 #   # - extra
