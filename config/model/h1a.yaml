@@ -1,3 +1,4 @@
+# 1 hybrid area with 1 hybrid neuron type
 class_name: SpatiallyEmbeddedClassifier
 rnn_kwargs:
   num_areas: 1
