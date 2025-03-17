@@ -17,7 +17,6 @@ model:
     neuron_type_tau_init:
       - 1.5
       - 1
-    train_tau: false
     compile_solver_kwargs:
       mode: max-autotune
       dynamic: false
