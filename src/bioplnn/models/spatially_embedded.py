@@ -156,9 +156,9 @@ class SpatiallyEmbeddedAreaConfig:
         """
         return asdict(self)
 
-    @classmethod
+    @staticmethod
     def inter_cell_type_connectivity_template_df(
-        cls, use_feedback: bool, num_cell_types: int
+        use_feedback: bool, num_cell_types: int
     ) -> pd.DataFrame:
         """Samples the inter-cell type connectivity matrix.
 
@@ -175,7 +175,7 @@ class SpatiallyEmbeddedAreaConfig:
         ]
 
         return pd.DataFrame(
-            cls.inter_cell_type_connectivity,
+            np.zeros((len(row_labels), len(column_labels)), dtype=np.bool),
             index=row_labels,
             columns=column_labels,
         )
