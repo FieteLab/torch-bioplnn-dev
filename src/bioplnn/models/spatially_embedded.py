@@ -276,10 +276,12 @@ class SpatiallyEmbeddedArea(nn.Module):
         cell_type_nonlinearity = expand_list(
             config.cell_type_nonlinearity, self.num_cell_types
         )
-        self.cell_type_nonlinearity = [
-            get_activation(nonlinearity)
-            for nonlinearity in cell_type_nonlinearity
-        ]
+        self.cell_type_nonlinearity = nn.ModuleList(
+            [
+                get_activation(nonlinearity)
+                for nonlinearity in cell_type_nonlinearity
+            ]
+        )
 
         # Save number of "types" for the input to and output from the area
         self.num_rows_connectivity = (
