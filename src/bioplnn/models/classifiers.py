@@ -224,7 +224,7 @@ class SpatiallyEmbeddedClassifier(nn.Module):
         self.readout = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.areas[-1].out_channels * pool_size[0] * pool_size[1],
+                self.rnn.areas[-1].out_channels * pool_size[0] * pool_size[1],  # type: ignore
                 fc_dim,
             ),
             nn.ReLU(),
