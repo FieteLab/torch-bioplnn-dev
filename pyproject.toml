@@ -37,6 +37,7 @@ dev = [
   "wandb",
   "ipykernel",
   "seaborn",
+  "gdown",
 ]
 
 [project.urls]
