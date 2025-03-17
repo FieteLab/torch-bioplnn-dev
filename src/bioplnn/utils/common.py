@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -124,7 +124,7 @@ def dict_flatten(d, delimiter=".", key=None):
 
 def expand_list(
     x: Optional[Param1dType[T]], n: int, depth: int = 0
-) -> list[T] | NDArray[Any]:
+) -> Union[list[T], NDArray[Any]]:
     """Expands a value to a list of length n.
 
     If x is already a list, then the list is returned unchanged.
@@ -155,7 +155,7 @@ def expand_list(
             if isinstance(inner, str):
                 raise TypeError
             inner = inner[0]  # type: ignore
-    except TypeError:
+    except (IndexError, TypeError):
         return [x] * n  # type: ignore
 
     if x is None:

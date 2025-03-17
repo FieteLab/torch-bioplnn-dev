@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from bioplnn.models.connectome import ConnectomeODERNN, ConnectomeRNN
-from bioplnn.models.spatiallyembedded import SpatiallyEmbeddedRNN
+from bioplnn.models.spatially_embedded import SpatiallyEmbeddedRNN
 
 
 class ConnectomeClassifier(nn.Module):

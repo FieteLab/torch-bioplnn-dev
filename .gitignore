@@ -21,4 +21,7 @@
 /connectivity/sunny/
 /post_proc/
 /connectivity/
-experimental_stuff/
+/experimental_stuff/
+/shared_data/
+/examples/data/
+/examples/*.pt
