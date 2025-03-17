@@ -6,6 +6,7 @@ from math import ceil
 from typing import Any, Optional, Union
 
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 import torch
 from torch import nn
@@ -249,10 +250,10 @@ class SpatiallyEmbeddedArea(nn.Module):
 
         # Format neuron type
         self.num_cell_subtypes = expand_list(
-            config.num_cell_subtypes, self.num_cell_types, depth=1
+            config.num_cell_subtypes, self.num_cell_types
         )
         self.cell_type_class = expand_list(
-            config.cell_type_class, self.num_cell_types, depth=1
+            config.cell_type_class, self.num_cell_types
         )
         self._check_possible_values(
             "cell_type_class",
@@ -260,7 +261,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             ("excitatory", "inhibitory", "hybrid"),
         )
         self.cell_type_density = expand_list(
-            config.cell_type_density, self.num_cell_types, depth=1
+            config.cell_type_density, self.num_cell_types
         )
         # TODO: Add support for quarter
         self._check_possible_values(
@@ -269,7 +270,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             ("same", "half"),
         )
         cell_type_nonlinearity = expand_list(
-            config.cell_type_nonlinearity, self.num_cell_types, depth=1
+            config.cell_type_nonlinearity, self.num_cell_types
         )
         self.cell_type_nonlinearity = [
             get_activation(nonlinearity)
@@ -319,19 +320,17 @@ class SpatiallyEmbeddedArea(nn.Module):
             config.inter_cell_type_spatial_extents,
             self.inter_cell_type_connectivity.shape[0],
             self.inter_cell_type_connectivity.shape[1],
-            depth=2,
+            depth=1,
         )
         self.inter_cell_type_nonlinearity = expand_array_2d(
             config.inter_cell_type_nonlinearity,
             self.inter_cell_type_connectivity.shape[0],
             self.inter_cell_type_connectivity.shape[1],
-            depth=1,
         )
         self.inter_cell_type_bias = expand_array_2d(
             config.inter_cell_type_bias,
             self.inter_cell_type_connectivity.shape[0],
             self.inter_cell_type_connectivity.shape[1],
-            depth=1,
         )
 
         #####################################################################
@@ -489,8 +488,10 @@ class SpatiallyEmbeddedArea(nn.Module):
         self.default_output_state_init_fn = config.default_output_state_init_fn
 
     def _check_possible_values(
-        self, param_name: str, param: Param1dType[Any], valid_values: Any
+        self, param_name: str, param: Union[Sequence[Any], NDArray], valid_values: Any
     ) -> None:
+        if isinstance(param, np.ndarray):
+            param = param.tolist()
         if not set(param) <= set(valid_values):
             raise ValueError(f"{param_name} must be one of {valid_values}.")
 
@@ -991,6 +992,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 inter_area_feedback_spatial_extents,
                 self.num_areas,
                 self.num_areas,
+                depth=1,
             )
 
             # Validate inter_area_feedback_connectivity tensor

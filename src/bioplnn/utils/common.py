@@ -155,7 +155,7 @@ def expand_list(
             if isinstance(inner, str):
                 raise TypeError
             inner = inner[0]  # type: ignore
-    except TypeError:
+    except (IndexError, TypeError):
         return [x] * n  # type: ignore
 
     if x is None:

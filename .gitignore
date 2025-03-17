@@ -23,3 +23,5 @@
 /connectivity/
 /experimental_stuff/
 /shared_data/
+/examples/data/
+/examples/*.pt
