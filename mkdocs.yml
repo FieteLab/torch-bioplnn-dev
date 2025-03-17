@@ -1,0 +1,119 @@
+site_name: torch-biopl
+site_url: https://sitename.example
+
+nav:
+  - Home: index.md
+  - Quick start guide: install.md
+  - Examples:
+    - Spatially embedded networks:
+      - Basic example: examples/basic_spatial_example.md
+      - Advanced configurability: examples/advance_configs.md
+      - Advnaced datasets: examples/advance_datasets.md
+    - Connectome-constrained models:
+      - Running forward dynamics: examples/connectome_forward.md
+      - Running reverse dynamics: examples/connectome_backward.md
+      - Cell typing connectomes: examples/connectome_forward_neuron_types.md
+  - API Reference:
+    - Spatially embedded networks: reference/eirnn.md
+    - Connectome-constrained models: reference/connectome.md
+    - Sparse utilities: reference/sparse.md
+    - Misc utilities: reference/misc.md
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.expand
+  font:
+    text: Roboto
+    code: Red Hat Mono
+  palette:
+      # Dark Mode
+      - scheme: slate
+        toggle:
+          icon: material/weather-sunny
+          name: Dark mode
+        primary: lime
+        accent: light green
+
+      # Light Mode
+      - scheme: mcgovern
+        toggle:
+          icon: material/weather-night
+          name: Light mode
+        primary: indigo
+        accent: deep orange
+
+  favicon: images/biopl-logo.png
+  logo: images/biopl-logo-light.png
+
+plugins:
+  - search
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: auto
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      caption_position: bottom
+      background: white
+      shadow: true
+      manual: false
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: true
+            heading_level: 2
+            show_root_toc_entry: true
+            show_symbol_type_toc: true
+            show_root_full_path: false
+            show_root_heading: true
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions: 
+  - extra
+  - attr_list
+  - md_in_html
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+# markdown_extensions:
+#   # - extra
+#   # - smarty
+#   - markdown_include.include:
+#       base_path: ../
+
