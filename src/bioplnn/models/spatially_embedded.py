@@ -27,24 +27,17 @@ from bioplnn.utils import (
 
 
 class Conv2dRectify(nn.Conv2d):
-    """
-    A convolutional layer that ensures positive weights and biases.
-
-    Args:
-        *args: Positional arguments passed to the base `nn.Conv2d` class.
-        **kwargs: Keyword arguments passed to the base `nn.Conv2d` class.
-    """
+    """Applies a 2d convolution with nonnegative weights and biases."""
 
     def forward(self, *args, **kwargs):
-        """
-        Forward pass of the layer.
+        """Forward pass of the layer.
 
         Args:
-            *args: Positional arguments passed to the base `nn.Conv2d` class.
-            **kwargs: Keyword arguments passed to the base `nn.Conv2d` class.
+            *args: Positional arguments passed to `nn.Conv2d`.
+            **kwargs: Keyword arguments passed to `nn.Conv2d`.
 
         Returns:
-            torch.Tensor: The output tensor.
+            The convolution output.
         """
         self.weight.data.clamp_(min=0.0)
         if self.bias is not None:
@@ -54,7 +47,7 @@ class Conv2dRectify(nn.Conv2d):
 
 @dataclass
 class SpatiallyEmbeddedAreaConfig:
-    """Configuration class for SpatiallyEmbeddedArea Module.
+    """Configuration for `SpatiallyEmbeddedArea`.
 
     This class defines the configuration for a spatially embedded area. It
     specifies the size of the input data, the number of input and output
@@ -65,30 +58,29 @@ class SpatiallyEmbeddedAreaConfig:
     one excitatory cell type which is stimulated by the input and by itself
     (lateral connections).
 
-    Args:
-        in_size (tuple[int, int]): Size of the input data (height, width).
-        in_channels (int): Number of input channels.
-        out_channels (int): Number of output channels.
-        feedback_channels (int, optional): Number of feedback channels. Defaults to
-            None.
-        in_class (CellTypeParam[str], optional): Class of input signal. Can be
+    Attributes:
+        in_size: Spatial size of the input data (height, width).
+            This size determines the spatial sizes of the neuronal states and
+            the output.
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        feedback_channels: Number of feedback channels. If
+            provided, this area receives feedback from another area. Defaults to
+            `None`.
+        in_class: Class of input signal. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
-        feedback_class (str, optional): Class of feedback signal. Can be
+        feedback_class: Class of feedback signal. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
-        num_cell_types (int, optional): Number of cell types. Defaults to 1.
-        num_cell_subtypes (CellTypeParam[int], optional):
-            Number of subtypes for each cell type. Defaults to 16.
-        cell_type_class (CellTypeParam[str], optional): Class of cell type. Can be
+        num_cell_types: Number of cell types. Defaults to 1.
+        num_cell_subtypes: Number of subtypes for each cell type. Defaults to 16.
+        cell_type_class: Class of cell type. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
-        cell_type_density (CellTypeParam[str], optional):
-            Spatial density of each cell type. Can be "same" or "half". Defaults to
+        cell_type_density: Spatial density of each cell type. Can be "same" or "half". Defaults to
             "same".
-        cell_type_nonlinearity (CellTypeParam[Optional[Union[str, nn.Module]]], optional):
-            Nonlinearity to apply to each cell type's activity after adding the
+        cell_type_nonlinearity: Nonlinearity to apply to each cell type's activity after adding the
             impact of all connected inputs/cell types in the circuit motif.
             Defaults to "Sigmoid".
-        inter_cell_type_connectivity (InterCellTypeParam[Union[int, bool]], optional):
-            Connectivity matrix for the circuit motif whose shape is
+        inter_cell_type_connectivity: Connectivity matrix for the circuit motif. The shape should be
             (1 + int(use_feedback) + num_cell_types, num_cell_types + 1). Here,
             rows represent source types and columns represent destination types.
             A True entry in the matrix indicates a connection from the source to
@@ -99,33 +91,25 @@ class SpatiallyEmbeddedAreaConfig:
             The first num_cell_types columns correspond to the cell types and the
             last column corresponds to the output. To get a template of the
             connectivity matrix for your configuration with appropriate row and
-            column labels, use the inter_cell_type_connectivity_template_df
+            column labels, use the `inter_cell_type_connectivity_template_df`
             method of this class. Defaults to:
             [[1, 0],
              [1, 1]].
-        inter_cell_type_spatial_extents (InterCellTypeParam[tuple[int, int]], optional):
-            Spatial extent for each circuit motif connection. Defaults to (3, 3).
-        inter_cell_type_nonlinearity (InterCellTypeParam[Optional[Union[str, nn.Module]]], optional):
-            Nonlinearity for each circuit motif connection. Defaults to None.
-        inter_cell_type_bias (InterCellTypeParam[bool], optional):
-            Whether to add a bias term for each circuit motif connection.
+        inter_cell_type_spatial_extents: Spatial extent for each circuit motif connection. Defaults to (3, 3).
+        inter_cell_type_nonlinearity: Nonlinearity for each circuit motif connection. Defaults to None.
+        inter_cell_type_bias: Whether to add a bias term for each circuit motif connection.
             Defaults to True.
-        tau_mode (CellTypeParam[str]): Mode determining which parts of
+        tau_mode: Mode determining which parts of
             neuron activity share a time constant. Can be "subtype" (one tau per
             neuron subtype), "spatial" (one tau per spatial location),
             "subtype_spatial" (one tau per neuron subtype and spatial location)
             or "type" (one tau for each neuron type). Defaults to "subtype".
-        tau_init_fn (CellTypeParam[Union[str, TensorInitFnType]], optional):
-            Initialization mode for the membrane time constants. Defaults to
+        tau_init_fn: Initialization mode for the membrane time constants. Defaults to
             "ones".
-        out_nonlinearity (Optional[Union[str, nn.Module]], optional):
-            Nonlinearity to apply to the output. Defaults to None.
-        default_neuron_state_init_fn (Union[str, TensorInitFnType], optional):
-            Initialization mode for the hidden state. Defaults to "zeros".
-        default_feedback_state_init_fn (Union[str, TensorInitFnType], optional):
-            Initialization mode for the feedback state. Defaults to "zeros".
-        default_output_state_init_fn (Union[str, TensorInitFnType], optional):
-            Initialization mode for the output state. Defaults to "zeros".
+        out_nonlinearity: Nonlinearity to apply to the output. Defaults to None.
+        default_neuron_state_init_fn: Initialization mode for the hidden state. Defaults to "zeros".
+        default_feedback_state_init_fn: Initialization mode for the feedback state. Defaults to "zeros".
+        default_output_state_init_fn: Initialization mode for the output state. Defaults to "zeros".
     """
 
     in_size: tuple[int, int]
@@ -193,44 +177,82 @@ class SpatiallyEmbeddedAreaConfig:
 
 
 class SpatiallyEmbeddedArea(nn.Module):
-    """Implements a biologically-plausible, spatially embedded neural area.
-
-    This module implements the core computational unit of the SpatiallyEmbeddedRNN.
-    It supports multiple neuron types (excitatory, inhibitory, and hybrid) with
-    configurable connectivity patterns, activation functions, and time constants.
-
-    Args:
-        config (Optional[SpatiallyEmbeddedAreaConfig]): Configuration object that
-            specifies the area architecture and parameters. See
-            SpatiallyEmbeddedAreaConfig for details. If None, parameters must be
-            provided as keyword arguments.
-        **kwargs: Keyword arguments that can be used to override or provide
-            parameters not specified in the config object. These will be used to
-            populate the config if one is not provided.
+    """A biologically-plausible, spatially embedded neural area.
 
     The module implements:
     - Configurable neuron types (excitatory/inhibitory/hybrid)
-    - Configurable spatial modes (same/half)
+    - Configurable spatial extents(same/half)
     - Convolutional connectivity between neuron populations
     - Recurrent dynamics with learnable time constants
     - Optional feedback connections
     - Customizable activation functions
 
-    Raises:
-        ValueError: If invalid configuration arguments are provided.
+    Attributes:
+        in_size: Spatial size of the input data (height, width).
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        feedback_channels: Number of feedback channels.
+        use_feedback: Whether this area receives feedback from another area.
+        in_class: Class of input signal ("excitatory", "inhibitory", or "hybrid").
+        feedback_class: Class of feedback signal ("excitatory", "inhibitory", or "hybrid").
+        out_nonlinearity: Nonlinearity applied to the output.
+
+        num_cell_types: Number of cell types in the area.
+        num_cell_subtypes: Number of subtypes for each cell type.
+        cell_type_class: Class of each cell type ("excitatory", "inhibitory", or "hybrid").
+        cell_type_density: Spatial density of each cell type ("same" or "half").
+        cell_type_nonlinearity: Nonlinearity for each cell type's activity.
+        cell_type_size: Spatial size of each cell type.
+
+        num_rows_connectivity: Number of rows in the connectivity matrix.
+        num_cols_connectivity: Number of columns in the connectivity matrix.
+        inter_cell_type_connectivity: Connectivity matrix for the circuit motif.
+        inter_cell_type_spatial_extents: Spatial extent for each circuit motif connection.
+        inter_cell_type_nonlinearity: Nonlinearity for each circuit motif connection.
+        inter_cell_type_bias: Whether to add a bias term for each circuit motif connection.
+
+        tau_mode: Mode determining which parts of neuron activity share a time constant.
+        tau_init_fn: Initialization for the membrane time constants.
+        tau: Learnable time constants for each cell type.
+
+        default_neuron_state_init_fn: Default initialization for neuron states.
+        default_feedback_state_init_fn: Default initialization for feedback states.
+        default_output_state_init_fn: Default initialization for output states.
+
+        convs: Convolutional layers representing connections between neuron types.
+        out_convs: Convolutional layers connecting to the output.
     """
 
     def __init__(
         self, config: Optional[SpatiallyEmbeddedAreaConfig] = None, **kwargs
     ):
+        """Initialize the SpatiallyEmbeddedArea.
+
+        Args:
+            config: Configuration object that specifies the area architecture and parameters.
+                See SpatiallyEmbeddedAreaConfig for details. If None, parameters must be
+                provided as keyword arguments.
+            **kwargs: Keyword arguments to instantiate the configuration if
+                `config` is not provided.
+
+        Raises:
+            ValueError: If both `config` and `kwargs` are provided.
+            ValueError: If an invalid configuration is provided.
+        """
+
         super().__init__()
+
+        if config is None:
+            config = SpatiallyEmbeddedAreaConfig(**kwargs)
+        elif kwargs:
+            raise ValueError(
+                "Cannot provide both config and keyword arguments. Please provide "
+                "only one of the two."
+            )
 
         #####################################################################
         # Input, output, and feedback parameters
         #####################################################################
-
-        if config is None:
-            config = SpatiallyEmbeddedAreaConfig(**kwargs)
 
         self.in_size = config.in_size
         self.in_channels = config.in_channels
@@ -362,7 +384,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         self.out_convs = nn.ModuleDict()
         for i, row in enumerate(self.inter_cell_type_connectivity):
             # Handle input neuron channel and spatial mode based on neuron type
-            conv_in_type = self._type_from_row_idx(i)
+            conv_in_type = self._source_from_row_idx(i)
             if conv_in_type == "input":
                 conv_in_channels = self.in_channels
                 conv_in_density = "same"
@@ -390,7 +412,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             for j in to_indices:
                 if self.inter_cell_type_connectivity[i, j]:
                     # Handle output neuron channel and spatial mode based on neuron type
-                    conv_out_type = self._type_from_col_idx(j)
+                    conv_out_type = self._destination_from_col_idx(j)
                     if conv_out_type == "cell":
                         conv_out_channels: int = self.num_cell_subtypes[j]  # type: ignore
                         conv_out_density: str = self.cell_type_density[j]  # type: ignore
@@ -504,15 +526,15 @@ class SpatiallyEmbeddedArea(nn.Module):
         )
         self.default_output_state_init_fn = config.default_output_state_init_fn
 
-    def _type_from_row_idx(self, idx: int) -> Optional[str]:
-        """Converts an input index to the corresponding input type.
+    def _source_from_row_idx(self, idx: int) -> Optional[str]:
+        """Converts a row index to the corresponding source.
 
         Args:
-            idx (int): Input index in the circuit connectivity matrix.
+            idx: Row index in the circuit connectivity matrix.
 
         Returns:
-            str: The input type associated with the index. Can be "input",
-                "feedback", or "cell".
+            The source associated with the index. Can be "input",
+            "feedback", or "cell".
         """
         if idx == 0:
             return "input"
@@ -522,32 +544,32 @@ class SpatiallyEmbeddedArea(nn.Module):
             return "cell"
 
     def _class_from_row_idx(self, idx: int) -> Optional[str]:
-        """Converts an input index to the corresponding type class.
+        """Converts a row index to the corresponding class.
 
         Args:
-            idx (int): Input index in the circuit connectivity matrix.
+            idx: Row index in the circuit connectivity matrix.
 
         Returns:
-            str: The input type associated with the index. Can be "excitatory",
-                "inhibitory", or "hybrid".
+            The class associated with the index. Can be "excitatory",
+            "inhibitory", or "hybrid".
         """
-        in_type = self._type_from_row_idx(idx)
-        if in_type == "input":
+        source = self._source_from_row_idx(idx)
+        if source == "input":
             return self.in_class
-        elif in_type == "feedback":
+        elif source == "feedback":
             return self.feedback_class
         else:
             return self.cell_type_class[idx - 1 - int(self.use_feedback)]  # type: ignore
 
-    def _type_from_col_idx(self, idx: int) -> Optional[str]:
-        """Converts an output index to the corresponding neuron type.
+    def _destination_from_col_idx(self, idx: int) -> Optional[str]:
+        """Converts a column index to the corresponding destination.
 
         Args:
-            idx (int): Output index in the circuit connectivity matrix.
+            idx: Column index in the circuit connectivity matrix.
 
         Returns:
-            str: The neuron type associated with the index. Can be "cell" or
-                "output".
+            The destination associated with the index. Can be "cell" or
+            "output".
         """
         if idx < self.num_cols_connectivity - 1:
             return "cell"
@@ -567,20 +589,17 @@ class SpatiallyEmbeddedArea(nn.Module):
         """initializers the neuron hidden states.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization mode.
-                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None.
-                If None, the default initialization mode will be used. If a
-                function, it must take a variable number of positional arguments
+            batch_size: Batch size.
+            init_fn: Initialization mode. Must be 'zeros', 'ones', 'randn', 'rand',
+                a function, or None. If None, the default initialization mode will be used.
+                If a function, it must take a variable number of positional arguments
                 corresponding to the shape of the tensor to initialize, as well
                 as a `device` keyword argument that sends the device to allocate
                 the tensor on.
-            device (Union[torch.device, str], optional): Device to allocate the hidden
-                states on. Defaults to None.
+            device: Device to allocate the hidden states on. Defaults to None.
 
         Returns:
-            list[torch.Tensor]: A list containing the initialized neuron
-                hidden states.
+            A list containing the initialized neuron hidden states.
         """
 
         init_fn_corrected = (
@@ -609,15 +628,13 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Initializes the output.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization function.
-                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None. If
-                None, the default initialization mode will be used.
-            device (Union[torch.device, str], optional): Device to allocate the hidden
-                states on. Defaults to None.
+            batch_size: Batch size.
+            init_fn: Initialization function. Must be 'zeros', 'ones', 'randn', 'rand',
+                a function, or None. If None, the default initialization mode will be used.
+            device: Device to allocate the hidden states on. Defaults to None.
 
         Returns:
-            torch.Tensor: The initialized output.
+            The initialized output.
         """
 
         init_fn_corrected = (
@@ -643,16 +660,13 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Initializes the feedback input.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization function.
-                Must be 'zeros', 'ones', 'randn', 'rand', a function, or None. If
-                None, the default initialization mode will be used.
-            device (Union[torch.device, str], optional): Device to allocate the hidden
-                states on. Defaults to None.
+            batch_size: Batch size.
+            init_fn: Initialization function. Must be 'zeros', 'ones', 'randn', 'rand',
+                a function, or None. If None, the default initialization mode will be used.
+            device: Device to allocate the hidden states on. Defaults to None.
 
         Returns:
-            Union[torch.Tensor, None]: The initialized feedback input if `use_feedback` is
-                True, otherwise None.
+            The initialized feedback input if `use_feedback` is True, otherwise None.
         """
 
         if not self.use_feedback:
@@ -676,8 +690,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Creates a DataFrame representing the neuron types.
 
         Returns:
-            pd.DataFrame: DataFrame with columns for neuron type, spatial mode, and
-                number of channels.
+            DataFrame with columns for neuron type, spatial mode, and number of channels.
         """
 
         df_columns = defaultdict(list)
@@ -694,8 +707,8 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Creates a DataFrame representing connectivity between neural populations.
 
         Returns:
-            pd.DataFrame: DataFrame with rows representing source populations
-                ("from") and columns representing target populations ("to").
+            DataFrame with rows representing source populations ("from") and
+            columns representing target populations ("to").
         """
         row_labels = (
             ["input"]
@@ -738,7 +751,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Returns a string representation of the SpatiallyEmbeddedArea.
 
         Returns:
-            str: String representation of the SpatiallyEmbeddedArea.
+            String representation of the SpatiallyEmbeddedArea.
         """
         repr_str = "SpatiallyEmbeddedArea:\n"
         repr_str += "=" * 80 + "\n"
@@ -759,17 +772,14 @@ class SpatiallyEmbeddedArea(nn.Module):
         """Forward pass of the SpatiallyEmbeddedArea.
 
         Args:
-            input (torch.Tensor): Input tensor of shape (batch_size, in_channels,
+            input: Input tensor of shape (batch_size, in_channels, in_size[0], in_size[1]).
+            h_neuron: List of neuron hidden states of shape (batch_size, neuron_channels[i],
+                in_size[0], in_size[1]) for each neuron type i.
+            feedback_state: Feedback input of shape (batch_size, feedback_channels,
                 in_size[0], in_size[1]).
-            h_neuron (Union[torch.Tensor, list[torch.Tensor]]): List of neuron hidden
-                states of shape (batch_size, neuron_channels[i], in_size[0],
-                in_size[1]) for each neuron type i.
-            feedback_state (Optional[torch.Tensor]): Feedback input of shape (batch_size,
-                feedback_channels, in_size[0], in_size[1]).
 
         Returns:
-            tuple[torch.Tensor, Union[torch.Tensor, list[torch.Tensor]]]: A tuple
-                containing the output and new neuron hidden state.
+            A tuple containing the output and new neuron hidden state.
         """
 
         # Expand h_neuron to match the number of neuron channels
@@ -829,13 +839,13 @@ class SpatiallyEmbeddedArea(nn.Module):
             else:
                 sign = 1
 
-            conv_in_type = self._type_from_row_idx(i)
-            if conv_in_type == "cell":
+            source = self._source_from_row_idx(i)
+            if source == "cell":
                 i = i - 1 - int(self.use_feedback)
                 out.append(sign * conv(neuron_state_new[i]))
             else:
                 warnings.warn(
-                    f"Connection from {conv_in_type} to output is not "
+                    f"Connection from {source} to output is not "
                     "recommended. Consider changing inter_cell_type_connectivity "
                     "to remove this connection."
                 )
@@ -855,30 +865,24 @@ class SpatiallyEmbeddedRNN(nn.Module):
     flexible interface for configuring the network.
 
     Args:
-        num_areas (int): Number of EIRNN areas in the network. Defaults to 1.
-        area_configs (list[SpatiallyEmbeddedAreaConfig], optional): Configuration object(s)
-            for the EIRNN areas. If provided as a list, must match the number of
-            areas. If a single config is provided, it will be used for all areas
-            with appropriate adjustments. Defaults to None.
-        area_kwargs (list[Mapping[str, Any]], optional): Additional keyword arguments
-            for each area. If provided as a list, must match the number of areas.
-            Defaults to None.
-        common_area_kwargs (Mapping[str, Any], optional): Keyword arguments to apply
-            to all areas. Defaults to None.
-        inter_area_feedback_connectivity (InterAreaParam[Union[int, bool]], optional): Connectivity matrix
-            for feedback connections between areas of shape (num_areas, num_areas).
-            Must be lower triangular and zero/False on the diagonal. Defaults to
-            None (no feedback connections).
-        inter_area_feedback_nonlinearity (InterAreaParam[Union[str, nn.Module, None]], optional):
-            Nonlinearities for feedback connections of shape (num_areas, num_areas).
-            Defaults to None.
-        inter_area_feedback_spatial_extents (InterAreaParam[tuple[int, int]], optional): Kernel sizes for
-            feedback convolutions of shape (num_areas, num_areas). Defaults to None.
-        pool_mode (str, optional): Pooling mode for area outputs. Defaults to "avg".
-        area_time_delay (bool): Whether to introduce a time delay between areas.
-            Defaults to False.
-        batch_first (bool): Whether the input tensor has batch dimension as the first
-            dimension. Defaults to True.
+        num_areas: Number of EIRNN areas in the network. Defaults to 1.
+        area_configs: Configuration object(s) for the EIRNN areas. If provided as a list,
+            must match the number of areas. If a single config is provided, it will be
+            used for all areas with appropriate adjustments. Defaults to None.
+        area_kwargs: Additional keyword arguments for each area. If provided as a list,
+            must match the number of areas. Defaults to None.
+        common_area_kwargs: Keyword arguments to apply to all areas. Defaults to None.
+        inter_area_feedback_connectivity: Connectivity matrix for feedback connections
+            between areas of shape (num_areas, num_areas). Must be lower triangular and
+            zero/False on the diagonal. Defaults to None (no feedback connections).
+        inter_area_feedback_nonlinearity: Nonlinearities for feedback connections of
+            shape (num_areas, num_areas). Defaults to None.
+        inter_area_feedback_spatial_extents: Kernel sizes for feedback convolutions
+            of shape (num_areas, num_areas). Defaults to None.
+        pool_mode: Pooling mode for area outputs. Defaults to "avg".
+        area_time_delay: Whether to introduce a time delay between areas. Defaults to False.
+        batch_first: Whether the input tensor has batch dimension as the first dimension.
+            Defaults to True.
     """
 
     def __init__(
@@ -894,11 +898,35 @@ class SpatiallyEmbeddedRNN(nn.Module):
         inter_area_feedback_nonlinearity: Optional[
             InterAreaParam[Union[str, nn.Module, None]]
         ] = None,
-        inter_area_feedback_spatial_extents: InterAreaParam[tuple[int, int]] = (3, 3),
+        inter_area_feedback_spatial_extents: InterAreaParam[
+            tuple[int, int]
+        ] = (3, 3),
         area_time_delay: bool = False,
         pool_mode: Optional[str] = "max",
         batch_first: bool = True,
     ):
+        """Initialize the SpatiallyEmbeddedRNN.
+
+        Args:
+            num_areas: Number of EIRNN areas in the network. Defaults to 1.
+            area_configs: Configuration object(s) for the EIRNN areas. If provided as a list,
+                must match the number of areas. If a single config is provided, it will be
+                used for all areas with appropriate adjustments. Defaults to None.
+            area_kwargs: Additional keyword arguments for each area. If provided as a list,
+                must match the number of areas. Defaults to None.
+            common_area_kwargs: Keyword arguments to apply to all areas. Defaults to None.
+            inter_area_feedback_connectivity: Connectivity matrix for feedback connections
+                between areas of shape (num_areas, num_areas). Must be lower triangular and
+                zero/False on the diagonal. Defaults to None (no feedback connections).
+            inter_area_feedback_nonlinearity: Nonlinearities for feedback connections of
+                shape (num_areas, num_areas). Defaults to None.
+            inter_area_feedback_spatial_extents: Kernel sizes for feedback convolutions
+                of shape (num_areas, num_areas). Defaults to None.
+            pool_mode: Pooling mode for area outputs. Defaults to "avg".
+            area_time_delay: Whether to introduce a time delay between areas. Defaults to False.
+            batch_first: Whether the input tensor has batch dimension as the first dimension.
+                Defaults to True.
+        """
         super().__init__()
 
         ############################################################
@@ -1074,18 +1102,16 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Initializes the hidden states for all areas.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization
-                function.
-            device (Union[torch.device, str], optional): Device to allocate tensors.
+            batch_size: Batch size.
+            init_fn: Initialization function.
+            device: Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list containing the initialized neuron hidden
-                states for each area.
+            A list containing the initialized neuron hidden states for each area.
         """
 
         return [
-            area.init_neuron_state(batch_size, init_fn, device)
+            area.init_neuron_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1098,17 +1124,15 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Initializes the feedback inputs for all areas.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization
-                function.
-            device (Union[torch.device, str], optional): Device to allocate tensors.
+            batch_size: Batch size.
+            init_fn: Initialization function.
+            device: Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list of initialized feedback inputs for each
-                area.
+            A list of initialized feedback inputs for each area.
         """
         return [
-            area.init_feedback_state(batch_size, init_fn, device)
+            area.init_feedback_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1121,18 +1145,16 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Initializes the outputs for all areas.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization
-                function.
-            device (Union[torch.device, str], optional): Device to allocate tensors.
+            batch_size: Batch size.
+            init_fn: Initialization function.
+            device: Device to allocate tensors.
 
         Returns:
-            list[torch.Tensor]: A list of initialized outputs for each
-                area.
+            A list of initialized outputs for each area.
         """
 
         return [
-            area.init_output_state(batch_size, init_fn, device)
+            area.init_output_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1155,33 +1177,24 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Initializes the state of the network.
 
         Args:
-            out0 (Optional[Sequence[Union[torch.Tensor, None]]]): Initial outputs for
-                each area. If None, default initialization is used.
-            h_neuron0 (Optional[Sequence[Sequence[Union[torch.Tensor, None]]]]):
-                Initial neuron hidden states for each area. If None, default
+            out0: Initial outputs for each area. If None, default initialization is used.
+            h_neuron0: Initial neuron hidden states for each area. If None, default
                 initialization is used.
-            fb0 (Optional[Sequence[Union[torch.Tensor, None]]]): Initial feedback
-                inputs for each area. If None, default initialization is used.
-            num_steps (int): Number of time steps.
-            batch_size (int): Batch size.
-            out_init_fn (Optional[Union[str, TensorInitFnType]]): Initialization
-                function for outputs if out0 is None. Defaults to None.
-            hidden_init_fn (Optional[Union[str, TensorInitFnType]]): Initialization
-                function for hidden states if h_neuron0 is None. Defaults to None.
-            fb_init_fn (Optional[Union[str, TensorInitFnType]]): Initialization
-                function for feedback inputs if fb0 is None. Defaults to None.
-            device (Optional[Union[torch.device, str]]): Device to allocate tensors on.
+            fb0: Initial feedback inputs for each area. If None, default initialization is used.
+            num_steps: Number of time steps.
+            batch_size: Batch size.
+            out_init_fn: Initialization function for outputs if out0 is None. Defaults to None.
+            hidden_init_fn: Initialization function for hidden states if h_neuron0 is None.
                 Defaults to None.
+            fb_init_fn: Initialization function for feedback inputs if fb0 is None.
+                Defaults to None.
+            device: Device to allocate tensors on. Defaults to None.
 
         Returns:
-            tuple[list[list[Union[torch.Tensor, None]]],
-                  list[list[list[Union[torch.Tensor, None]]],
-                  list[list[Union[torch.Tensor, int, None]]]:
-                A tuple containing:
-                - Initialized outputs for each area and time step
-                - Initialized neuron hidden states for each area, time step, and
-                  neuron type
-                - Initialized feedback inputs for each area and time step
+            A tuple containing:
+            - Initialized outputs for each area and time step
+            - Initialized neuron hidden states for each area, time step, and neuron type
+            - Initialized feedback inputs for each area and time step
 
         Raises:
             ValueError: If the length of out0, h_neuron0, or fb0 doesn't match
@@ -1197,7 +1210,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             )
         if h_neuron0 is None:
             h_neuron0 = [
-                [None] * self.areas[i].num_cell_types
+                [None] * self.areas[i].num_cell_types  # type: ignore
                 for i in range(self.num_areas)
             ]
         elif len(h_neuron0) != self.num_areas:
@@ -1223,7 +1236,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             [None] * num_steps for _ in range(self.num_areas)
         ]
         h_neurons: list[list[list[Union[torch.Tensor, None]]]] = [
-            [[None] * self.areas[i].num_cell_types for _ in range(num_steps)]
+            [[None] * self.areas[i].num_cell_types for _ in range(num_steps)]  # type: ignore
             for i in range(self.num_areas)
         ]
         fbs: list[list[Union[torch.Tensor, int, None]]] = [
@@ -1235,7 +1248,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         for i in range(self.num_areas):
             outs[i][-1] = out0[i] if out0[i] is not None else out0_default[i]
             fbs[i][-1] = fb0[i] if fb0[i] is not None else fb0_default[i]
-            for k in range(self.areas[i].num_cell_types):
+            for k in range(self.areas[i].num_cell_types):  # type: ignore
                 h_neurons[i][-1][k] = (
                     h_neuron0[i][k]
                     if h_neuron0[i][k] is not None
@@ -1256,20 +1269,19 @@ class SpatiallyEmbeddedRNN(nn.Module):
         For 4D inputs, it replicates the input across all time steps.
 
         Args:
-            x (torch.Tensor): Input tensor, can be:
+            x: Input tensor, can be:
                 - 4D tensor of shape (batch_size, channels, height, width) for a
                   single time step. Will be expanded to all time steps.
                 - 5D tensor of shape (seq_len, batch_size, channels, height, width) or
                   (batch_size, seq_len, channels, height, width) if batch_first=True.
-            num_steps (Optional[int]): Number of time steps. Required if x is 4D.
+            num_steps: Number of time steps. Required if x is 4D.
                 If x is 5D, it will be inferred from the sequence dimension unless
                 explicitly provided.
 
         Returns:
-            tuple[torch.Tensor, int]: A tuple containing:
-                - The formatted input tensor with shape (seq_len, batch_size,
-                  channels, height, width)
-                - The number of time steps
+            A tuple containing:
+            - The formatted input tensor with shape (seq_len, batch_size, channels, height, width)
+            - The number of time steps
 
         Raises:
             ValueError: If x has invalid dimensions (not 4D or 5D), if num_steps is
@@ -1314,24 +1326,20 @@ class SpatiallyEmbeddedRNN(nn.Module):
         height, width).
 
         Args:
-            outs (list[list[torch.Tensor]]): Outputs for each area and time
-                step. Shape: [num_areas][num_steps],
-            h_neurons (list[list[list[torch.Tensor]]]): Neuron hidden states for
-                each area, time step, and neuron type. Shape:
-                [num_areas][num_steps][num_cell_types].
-            fbs (list[list[Optional[torch.Tensor]]]): Feedback inputs for each area
-                and time step. Shape: [num_areas][num_steps].
+            outs: Outputs for each area and time step. Shape: [num_areas][num_steps],
+            h_neurons: Neuron hidden states for each area, time step, and neuron type.
+                Shape: [num_areas][num_steps][num_cell_types].
+            fbs: Feedback inputs for each area and time step. Shape: [num_areas][num_steps].
 
         Returns:
-            tuple[list[torch.Tensor], list[list[torch.Tensor]], list[Optional[torch.Tensor]]]:
-                A tuple containing:
-                - List of stacked outputs per area. Each tensor has shape:
-                  (seq_len, batch_size, channels, height, width) or
-                  (batch_size, seq_len, channels, height, width) if batch_first=True.
-                - List of lists of stacked hidden states per area and neuron type.
-                  Same shape pattern as outputs.
-                - List of stacked feedback inputs per area (or None if not used).
-                  Same shape pattern as outputs.
+            A tuple containing:
+            - List of stacked outputs per area. Each tensor has shape:
+              (seq_len, batch_size, channels, height, width) or
+              (batch_size, seq_len, channels, height, width) if batch_first=True.
+            - List of lists of stacked hidden states per area and neuron type.
+              Same shape pattern as outputs.
+            - List of stacked feedback inputs per area (or None if not used).
+              Same shape pattern as outputs.
         """
         outs_stack: list[torch.Tensor] = []
         h_neurons_stack: list[list[torch.Tensor]] = []
@@ -1344,7 +1352,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     torch.stack(
                         [h_neurons[i][t][j] for t in range(len(h_neurons[i]))]
                     )
-                    for j in range(self.areas[i].num_cell_types)
+                    for j in range(self.areas[i].num_cell_types)  # type: ignore
                 ]
             )
             if self.areas[i].use_feedback:
@@ -1354,7 +1362,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 fbs_stack.append(None)
             if self.batch_first:
                 outs_stack[i] = outs_stack[i].transpose(0, 1)
-                for j in range(self.areas[i].num_cell_types):
+                for j in range(self.areas[i].num_cell_types):  # type: ignore
                     h_neurons_stack[i][j] = h_neurons_stack[i][j].transpose(
                         0, 1
                     )
@@ -1375,11 +1383,11 @@ class SpatiallyEmbeddedRNN(nn.Module):
         interpolation (when upsampling).
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width).
-            size (tuple[int, int]): Target spatial size (height, width).
+            x: Input tensor of shape (batch_size, channels, height, width).
+            size: Target spatial size (height, width).
 
         Returns:
-            torch.Tensor: Resized tensor matching the target spatial size.
+            Resized tensor matching the target spatial size.
 
         Raises:
             ValueError: If self.pool_mode is not 'avg' or 'max'.
@@ -1413,35 +1421,31 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """Performs forward pass of the SpatiallyEmbeddedRNN.
 
         Args:
-            x (torch.Tensor): Input tensor. Can be either:
+            x: Input tensor. Can be either:
                 - 4D tensor of shape (batch_size, in_channels, height, width)
                   representing a single time step. In this case, num_steps must be
                   provided.
                 - 5D tensor of shape (seq_len, batch_size, in_channels, height, width)
                   or (batch_size, seq_len, in_channels, height, width) if
                   batch_first=True.
-            num_steps (Optional[int]): Number of time steps. Required if x is 4D.
+            num_steps: Number of time steps. Required if x is 4D.
                 If x is 5D, this must match the sequence length dimension in x.
-            output_state0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial outputs for
-                each area. Length should match the number of areas. Each element
-                can be None to use default initialization.
-            neuron_state0 (Optional[Sequence[Sequence[Optional[torch.Tensor]]]]):
-                Initial neuron hidden states for each area and neuron type. Length
-                should match the number of areas, and each inner sequence length
+            output_state0: Initial outputs for each area. Length should match the
+                number of areas. Each element can be None to use default initialization.
+            neuron_state0: Initial neuron hidden states for each area and neuron type.
+                Length should match the number of areas, and each inner sequence length
                 should match the number of neuron types in that area.
-            feedback_state0 (Optional[Sequence[Optional[torch.Tensor]]]): Initial feedback inputs
-                for each area. Length should match the number of areas.
+            feedback_state0: Initial feedback inputs for each area. Length should match
+                the number of areas.
 
         Returns:
-            tuple[list[torch.Tensor], list[list[torch.Tensor]], list[Union[torch.Tensor, None]]]:
-                A tuple containing:
-                - list[torch.Tensor]: Outputs for each area. Each tensor has shape:
-                  (seq_len, batch_size, out_channels, height, width) or
-                  (batch_size, seq_len, out_channels, height, width) if batch_first=True.
-                - list[list[torch.Tensor]]: Hidden states for each area and neuron type.
-                  Same shape pattern as outputs but with neuron_channels.
-                - list[Union[torch.Tensor, None]]: Feedback inputs for each area (None if the
-                  area doesn't use feedback).
+            A tuple containing:
+            - Outputs for each area. Each tensor has shape:
+              (seq_len, batch_size, out_channels, height, width) or
+              (batch_size, seq_len, out_channels, height, width) if batch_first=True.
+            - Hidden states for each area and neuron type.
+              Same shape pattern as outputs but with neuron_channels.
+            - Feedback inputs for each area (None if the area doesn't use feedback).
 
         Raises:
             ValueError: If input shape is invalid or num_steps is inconsistent with
@@ -1475,7 +1479,8 @@ class SpatiallyEmbeddedRNN(nn.Module):
                         area_in = output_states[i - 1][t]
                     assert isinstance(area_in, torch.Tensor)
                     area_in = self._match_spatial_size(
-                        area_in, self.areas[i].in_size
+                        area_in,
+                        self.areas[i].in_size,  # type: ignore
                     )
 
                 output_states[i][t], neuron_states[i][t] = area(
