@@ -8,6 +8,7 @@ from typing import Any, Optional, Union
 import numpy as np
 import pandas as pd
 import torch
+import torchode as to
 from torch import nn
 from torch.nn import functional as F
 
@@ -894,7 +895,9 @@ class SpatiallyEmbeddedRNN(nn.Module):
         inter_area_feedback_nonlinearity: Optional[
             InterAreaParam[Union[str, nn.Module, None]]
         ] = None,
-        inter_area_feedback_spatial_extents: InterAreaParam[tuple[int, int]] = (3, 3),
+        inter_area_feedback_spatial_extents: InterAreaParam[
+            tuple[int, int]
+        ] = (3, 3),
         area_time_delay: bool = False,
         pool_mode: Optional[str] = "max",
         batch_first: bool = True,
@@ -1085,7 +1088,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """
 
         return [
-            area.init_neuron_state(batch_size, init_fn, device)
+            area.init_neuron_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1108,7 +1111,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 area.
         """
         return [
-            area.init_feedback_state(batch_size, init_fn, device)
+            area.init_feedback_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1132,7 +1135,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         """
 
         return [
-            area.init_output_state(batch_size, init_fn, device)
+            area.init_output_state(batch_size, init_fn, device)  # type: ignore
             for area in self.areas
         ]
 
@@ -1197,7 +1200,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             )
         if h_neuron0 is None:
             h_neuron0 = [
-                [None] * self.areas[i].num_cell_types
+                [None] * self.areas[i].num_cell_types  # type: ignore
                 for i in range(self.num_areas)
             ]
         elif len(h_neuron0) != self.num_areas:
@@ -1223,7 +1226,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
             [None] * num_steps for _ in range(self.num_areas)
         ]
         h_neurons: list[list[list[Union[torch.Tensor, None]]]] = [
-            [[None] * self.areas[i].num_cell_types for _ in range(num_steps)]
+            [[None] * self.areas[i].num_cell_types for _ in range(num_steps)]  # type: ignore
             for i in range(self.num_areas)
         ]
         fbs: list[list[Union[torch.Tensor, int, None]]] = [
@@ -1235,7 +1238,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
         for i in range(self.num_areas):
             outs[i][-1] = out0[i] if out0[i] is not None else out0_default[i]
             fbs[i][-1] = fb0[i] if fb0[i] is not None else fb0_default[i]
-            for k in range(self.areas[i].num_cell_types):
+            for k in range(self.areas[i].num_cell_types):  # type: ignore
                 h_neurons[i][-1][k] = (
                     h_neuron0[i][k]
                     if h_neuron0[i][k] is not None
@@ -1344,7 +1347,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                     torch.stack(
                         [h_neurons[i][t][j] for t in range(len(h_neurons[i]))]
                     )
-                    for j in range(self.areas[i].num_cell_types)
+                    for j in range(self.areas[i].num_cell_types)  # type: ignore
                 ]
             )
             if self.areas[i].use_feedback:
@@ -1354,7 +1357,7 @@ class SpatiallyEmbeddedRNN(nn.Module):
                 fbs_stack.append(None)
             if self.batch_first:
                 outs_stack[i] = outs_stack[i].transpose(0, 1)
-                for j in range(self.areas[i].num_cell_types):
+                for j in range(self.areas[i].num_cell_types):  # type: ignore
                     h_neurons_stack[i][j] = h_neurons_stack[i][j].transpose(
                         0, 1
                     )
@@ -1395,6 +1398,47 @@ class SpatiallyEmbeddedRNN(nn.Module):
             return F.interpolate(x, size, mode="bilinear", align_corners=False)
         else:
             return x
+
+    def update_fn(
+        self,
+        x_t: torch.Tensor,
+        output_state: list[torch.Tensor],
+        neuron_state: list[torch.Tensor],
+        feedback_state: list[torch.Tensor],
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
+        output_state_new = [None] * len(self.areas)
+        neuron_state_new = [None] * len(self.areas)
+        feedback_state_new = [None] * len(self.areas)
+        for i, area in enumerate(self.areas):
+            # Compute area update and output
+            if i == 0:
+                area_in = x_t
+            else:
+                if self.area_time_delay:
+                    area_in = output_state[i - 1]
+                else:
+                    area_in = output_state[i - 1]
+                assert isinstance(area_in, torch.Tensor)
+                area_in = self._match_spatial_size(
+                    area_in,
+                    self.areas[i].in_size,  # type: ignore
+                )
+
+            output_state_new[i], neuron_state_new[i] = area(
+                input=area_in,
+                neuron_state=neuron_state[i],
+                feedback_state=feedback_state[i],
+            )
+
+        # Apply feedback
+        for key, conv in self.feedback_convs.items():
+            area_i, area_j = key.split("->")
+            area_i, area_j = int(area_i), int(area_j)
+            feedback_state_new[area_j] = feedback_state_new[area_j] + conv(
+                output_state_new[area_i]
+            )
+
+        return output_state_new, neuron_state_new, feedback_state_new  # type: ignore
 
     def forward(
         self,
@@ -1475,7 +1519,8 @@ class SpatiallyEmbeddedRNN(nn.Module):
                         area_in = output_states[i - 1][t]
                     assert isinstance(area_in, torch.Tensor)
                     area_in = self._match_spatial_size(
-                        area_in, self.areas[i].in_size
+                        area_in,
+                        self.areas[i].in_size,  # type: ignore
                     )
 
                 output_states[i][t], neuron_states[i][t] = area(
@@ -1499,3 +1544,167 @@ class SpatiallyEmbeddedRNN(nn.Module):
         )
 
         return output_states, neuron_states, feedback_states
+
+
+class SpatiallyEmbeddedODERNN(SpatiallyEmbeddedRNN):
+    def __init__(
+        self,
+        *args,
+        compile_solver_kwargs: Optional[Mapping[str, Any]] = None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        # Define ODE solver
+        term = to.ODETerm(self.update_fn, with_args=True)  # type: ignore
+        step_method = to.Dopri5(term=term)
+        step_size_controller = to.IntegralController(
+            atol=1e-6, rtol=1e-3, term=term
+        )
+        self.solver = to.AutoDiffAdjoint(step_method, step_size_controller)  # type: ignore
+
+        # Compile solver
+        if compile_solver_kwargs is not None:
+            self.solver = torch.compile(self.solver, **compile_solver_kwargs)
+
+    def _format_x(
+        self,
+        x: torch.Tensor,
+        num_steps: Optional[int] = None,
+    ) -> tuple[torch.Tensor, int]:
+        """Formats the input tensor to match the expected shape.
+
+        This method handles both single-step (4D) and multi-step (5D) input tensors,
+        converting them to a consistent format with seq_len as the first dimension.
+        For 4D inputs, it replicates the input across all time steps.
+
+        Args:
+            x (torch.Tensor): Input tensor, can be:
+                - 4D tensor of shape (batch_size, channels, height, width) for a
+                  single time step. Will be expanded to all time steps.
+                - 5D tensor of shape (seq_len, batch_size, channels, height, width) or
+                  (batch_size, seq_len, channels, height, width) if batch_first=True.
+            num_steps (Optional[int]): Number of time steps. Required if x is 4D.
+                If x is 5D, it will be inferred from the sequence dimension unless
+                explicitly provided.
+
+        Returns:
+            tuple[torch.Tensor, int]: A tuple containing:
+                - The formatted input tensor with shape (seq_len, batch_size,
+                  channels, height, width)
+                - The number of time steps
+
+        Raises:
+            ValueError: If x has invalid dimensions (not 4D or 5D), if num_steps is
+                not provided for 4D inputs, or if num_steps is inconsistent with
+                the sequence length of 5D inputs.
+        """
+        if x.dim() == 4:
+            if num_steps is None or num_steps < 1:
+                raise ValueError(
+                    "If x is 4D, num_steps must be provided and greater than 0"
+                )
+            x = x.unsqueeze(0).expand((num_steps, -1, -1, -1, -1))
+        elif x.dim() == 5:
+            if self.batch_first:
+                x = x.transpose(0, 1)
+            if num_steps is not None and num_steps != x.shape[0]:
+                raise ValueError(
+                    "If x is 5D and num_steps is provided, it must match the sequence length."
+                )
+            num_steps = x.shape[0]
+        else:
+            raise ValueError(
+                "The input must be a 4D tensor or a 5D tensor with sequence length."
+            )
+
+        return x, num_steps
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        num_steps: int,
+        start_time: float = 0.0,
+        end_time: float = 1.0,
+        output_state0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        neuron_state0: Optional[
+            Sequence[Sequence[Optional[torch.Tensor]]]
+        ] = None,
+        feedback_state0: Optional[Sequence[Optional[torch.Tensor]]] = None,
+        hidden_init_fn: Optional[Union[str, TensorInitFnType]] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass of the SparseODERNN layer.
+
+        Solves the initial value problem for the ODE defined by update_fn.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            num_steps (int): Number of time steps.
+            start_time (float, optional): Start time for simulation.
+                Defaults to 0.0.
+            end_time (float, optional): End time for simulation.
+                Defaults to 1.0.
+            h0 (torch.Tensor, optional): Initial hidden state. Defaults to None.
+            hidden_init_fn (Union[str, TensorInitFnType], optional):
+                Initialization function for the hidden state. Defaults to None.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Tuple containing:
+                - Hidden states of shape (batch_size, num_steps, hidden_size) if
+                  batch_first, else (num_steps, batch_size, hidden_size)
+                - Time points of shape (batch_size, num_steps) if batch_first,
+                  else (num_steps, batch_size)
+
+        Raises:
+            ValueError: If num_steps is less than 2.
+        """
+
+        # Format input and initialize variables
+        device = x.device
+
+        x, num_steps = self._format_x(x, num_steps)
+
+        batch_size = x.shape[1]
+
+        output_states, neuron_states, feedback_states = self.init_states(
+            output_state0,
+            neuron_state0,
+            feedback_state0,
+            num_steps,
+            batch_size,
+            device=device,
+        )
+        # Define evaluation time points
+        if num_steps < 2:
+            raise ValueError("num_steps must be greater than 1")
+        t_eval = (
+            torch.linspace(start_time, end_time, num_steps, device=device)
+            .unsqueeze(0)
+            .expand(batch_size, -1)
+        )
+
+        # Initialize hidden state
+        if h0 is None:
+            h0 = self.init_hidden(
+                batch_size,
+                init_fn=hidden_init_fn,
+                device=device,
+            )
+
+        # Solve ODE
+        problem = to.InitialValueProblem(y0=h0, t_eval=t_eval)  # type: ignore
+        sol = self.solver.solve(
+            problem,
+            args={
+                "x": x,
+                "start_time": start_time,
+                "end_time": end_time,
+            },
+        )
+        hs = sol.ys.permute(1, 2, 0)
+        assert hs.shape == (num_steps, self.hidden_size, batch_size)
+
+        # Format outputs
+        hs = self._format_hs(hs)
+        ts = self._format_ts(sol.ts)
+
+        return hs, ts
