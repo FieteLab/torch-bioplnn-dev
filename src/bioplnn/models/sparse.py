@@ -409,8 +409,6 @@ class SparseRNN(nn.Module):
         """Ensure the connectivity matrix is nonnegative."""
 
         self.hh.values.data.clamp_(min=0.0)
-        if self.ih is not None:
-            self.ih.values.data.clamp_(min=0.0)
 
     def update_fn(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """Update function for the SparseRNN.
