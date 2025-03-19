@@ -199,7 +199,8 @@ class SpatiallyEmbeddedArea(nn.Module):
     to which other neuron types, and which neuron types project to the output of
     the area.
 
-    Some key features:
+    ### Some key features:
+    
     - Configurable neuron types (excitatory/inhibitory/hybrid)
     - Configurable spatial extents of lateral connections (same/half)
     - Convolutional connectivity between neuron populations
@@ -243,6 +244,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         out_convs: Convolutional layers connecting to the output.
 
     Example:
+    '''
     >>> config = SpatiallyEmbeddedAreaConfig(
     ...     in_size=(32, 32),
     ...     in_channels=3,
@@ -257,6 +259,7 @@ class SpatiallyEmbeddedArea(nn.Module):
     ... )
     >>> area = SpatiallyEmbeddedArea(config)
     >>> print(area.summary())
+    '''
     """
 
     def __init__(
