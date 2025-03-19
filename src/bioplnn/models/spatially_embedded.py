@@ -114,6 +114,29 @@ class SpatiallyEmbeddedAreaConfig:
         default_neuron_state_init_fn: Initialization mode for the hidden state.
         default_feedback_state_init_fn: Initialization mode for the feedback state.
         default_output_state_init_fn: Initialization mode for the output state.
+
+    Examples:
+        >>> connectivity_df = SpatiallyEmbeddedAreaConfig.inter_neuron_type_connectivity_template_df(
+        ...     use_feedback=False,
+        ...     num_neuron_types=2,
+        ... )
+        >>> print(connectivity_df)
+                        destination
+        source          neuron_0  neuron_1  output
+        input           False     False     False
+        neuron_0        False     False     False
+        neuron_1        False     False     False
+        >>> connectivity_df.loc["input", "neuron_0"] = True
+        >>> connectivity_df.loc["neuron_0", "neuron_0"] = True
+        >>> connectivity_df.loc["neuron_0", "neuron_1"] = True
+        >>> connectivity_df.loc["neuron_1", "neuron_0"] = True
+        >>> connectivity_df.loc["neuron_0", "output"] = True
+        >>> config = SpatiallyEmbeddedAreaConfig(
+        ...     in_size=(32, 32),
+        ...     in_channels=3,
+        ...     out_channels=16,
+        ...     inter_neuron_type_connectivity=connectivity_df.to_numpy(),
+        ... )
     """
 
     # Input, output, and feedback parameters
@@ -200,7 +223,7 @@ class SpatiallyEmbeddedArea(nn.Module):
     the area.
 
     ### Some key features:
-    
+
     - Configurable neuron types (excitatory/inhibitory/hybrid)
     - Configurable spatial extents of lateral connections (same/half)
     - Convolutional connectivity between neuron populations
@@ -254,7 +277,7 @@ class SpatiallyEmbeddedArea(nn.Module):
     ...     neuron_type_class=["excitatory", "inhibitory"],
     ...     neuron_type_density=["same", "half"],
     ...     neuron_type_nonlinearity=,
-    ...     inter_neuron_type_connectivity=[[1, 0], [1, 1]],
+    ...     inter_neuron_type_connectivity=[[1, 0, 0], [1, 1, 1], [1, 0, 0]],
     ...     inter_neuron_type_spatial_extents=(3, 3),
     ... )
     >>> area = SpatiallyEmbeddedArea(config)
