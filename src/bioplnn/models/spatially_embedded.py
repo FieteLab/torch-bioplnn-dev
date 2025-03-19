@@ -834,7 +834,7 @@ class SpatiallyEmbeddedArea(nn.Module):
             neuron_state = [neuron_state]
 
         # Check if feedback is provided if necessary
-        if self.use_feedback == feedback_state is None:
+        if self.use_feedback == (feedback_state is None):
             raise ValueError(
                 "use_feedback must be True if and only if feedback_state is provided."
             )
@@ -1431,16 +1431,17 @@ class SpatiallyEmbeddedRNN(nn.Module):
         Raises:
             ValueError: If self.pool_mode is not 'avg' or 'max'.
         """
-        if x.shape[-2:] > size:
+        if x.shape[-2] > size[0] and x.shape[-1] > size[1]:
             if self.pool_mode == "avg":
-                return F.avg_pool2d(x, size)
+                return F.adaptive_avg_pool2d(x, size)
             elif self.pool_mode == "max":
-                return F.max_pool2d(x, size)
+                return F.adaptive_max_pool2d(x, size)
             else:
                 raise ValueError(f"Invalid pool_mode: {self.pool_mode}")
-        elif x.shape[-2:] < size:
+        elif x.shape[-2] < size[0] and x.shape[-1] < size[1]:
             return F.interpolate(x, size, mode="bilinear", align_corners=False)
         else:
+            assert x.shape[-2] == size[0] and x.shape[-1] == size[1]
             return x
 
     def forward(
