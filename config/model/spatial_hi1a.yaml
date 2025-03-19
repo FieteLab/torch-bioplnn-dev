@@ -5,6 +5,6 @@ rnn_kwargs:
     - in_size: [32, 32]
       in_channels: 3
       out_channels: 32
-      cell_type_class:
+      neuron_type_class:
         - excitatory
         - inhibitory

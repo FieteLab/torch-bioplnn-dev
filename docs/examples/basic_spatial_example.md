@@ -38,10 +38,10 @@ Let us wire up a simple one-area network with two neural classes. Let one of the
 In `torch-biopl` we adopt the following convention:
 
 - Inter-celltype connectivity (within a given area) is specified through an adjacency matrix.
-- In addition to the cell types within an area, we also have to account for projections into and out of the area. Keeping this in mind, we use a schema where rows in the adjacency matrix represent the ***pre-synaptic*** cell type and columns represent the ***post-synaptic*** cell type. 
+- In addition to the neuron types within an area, we also have to account for projections into and out of the area. Keeping this in mind, we use a schema where rows in the adjacency matrix represent the ***pre-synaptic*** neuron type and columns represent the ***post-synaptic*** neuron type. 
 - The **first row** always denotes projections into the area, and the **last column** always denotes feedforward projections out of the area.
 
-For example, if our cell_type_1 is E and cell_type_2 is I, then `inter_cell_type_connectivity`= $\begin{bmatrix} 1 & 1 & 0 \cr 1 & 1 & 1 \cr 1 & 1 & 0 \end{bmatrix}$ represents a standard recurrent inhibitory circuit motif (ala [Wong et al. (2006)](https://pubmed.ncbi.nlm.nih.gov/16436619/)), where both the E and I populations receive input, and only the E population projects downstream.
+For example, if our neuron_type_1 is E and neuron_type_2 is I, then `inter_neuron_type_connectivity`= $\begin{bmatrix} 1 & 1 & 0 \cr 1 & 1 & 1 \cr 1 & 1 & 0 \end{bmatrix}$ represents a standard recurrent inhibitory circuit motif (ala [Wong et al. (2006)](https://pubmed.ncbi.nlm.nih.gov/16436619/)), where both the E and I populations receive input, and only the E population projects downstream.
 
 Since we plan to train on grayscale images in this example, `in_channels` = 1
 
@@ -53,10 +53,10 @@ model = SpatiallyEmbeddedClassifier(
         "num_areas": 1,
         "area_kwargs": [
             {
-                "num_cell_types": 2,
-                "num_cell_subtypes": np.array([16, 16]),
-                "cell_type_class": np.array(['excitatory', 'inhibitory']),
-                "inter_cell_type_connectivity": np.array([[1, 1, 0], [1, 1, 1], [1, 1, 0]]),
+                "num_neuron_types": 2,
+                "num_neuron_subtypes": np.array([16, 16]),
+                "neuron_type_class": np.array(['excitatory', 'inhibitory']),
+                "inter_neuron_type_connectivity": np.array([[1, 1, 0], [1, 1, 1], [1, 1, 0]]),
                 "in_size": [28, 28],
                 "in_channels": 1,
                 "out_channels": 32,
