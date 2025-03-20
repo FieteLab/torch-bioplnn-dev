@@ -1,0 +1,5 @@
+# experiment/activation: choice(tanh_none, relu_tanh, none_tanh)
+model.pool_mode_classifier: choice(max, avg)
+model: choice(spatial_4h1a, spatial_big_1h1a)
+# python examples/ei_trainer.py -m +hydra/sweeper/params=cabc_sweep wandb.mode=disabled data=cabc
+# python examples/ei_trainer.py -m hydra/launcher=slurm +hydra/sweeper/params=cabc_sweep wandb.mode=online wandb.group=cabc_0 data=cabc

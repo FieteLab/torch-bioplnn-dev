@@ -102,9 +102,14 @@ class SpatiallyEmbeddedAreaConfig:
             the connectivity matrix for your configuration with appropriate row
             and column labels, use the `inter_neuron_type_connectivity_template_df`
             method of this class.
-        inter_neuron_type_spatial_extents: Spatial extent for each circuit motif connection.
-        inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif connection.
-        inter_neuron_type_bias: Whether to add a bias term for each circuit motif connection.
+        inter_neuron_type_spatial_extents: Spatial extent for each circuit
+            motif connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_num_subtype_groups: Number of subtype groups for each
+            circuit motif connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif
+            connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_bias: Whether to add a bias term for each circuit
+            motif connection. Same shape as `inter_neuron_type_connectivity`.
         tau_mode: Mode determining which parts of
             neuron activity share a time constant. Can be "type" (one tau for each neuron type),
             "subtype" (one tau per neuron subtype), "spatial" (one tau per spatial location), or
@@ -166,6 +171,7 @@ class SpatiallyEmbeddedAreaConfig:
         3,
         3,
     )
+    inter_neuron_type_num_subtype_groups: ScalarOrArray2dType[int] = 1
     inter_neuron_type_nonlinearity: ScalarOrArray2dType[
         Optional[Union[str, nn.Module]]
     ] = None
@@ -252,6 +258,7 @@ class SpatiallyEmbeddedArea(nn.Module):
         num_cols_connectivity: Number of columns in the connectivity matrix.
         inter_neuron_type_connectivity: Connectivity matrix for the circuit motif.
         inter_neuron_type_spatial_extents: Spatial extent for each circuit motif connection.
+        inter_neuron_type_num_subtype_groups: Number of subtype groups for each circuit motif connection.
         inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif connection.
         inter_neuron_type_bias: Whether to add a bias term for each circuit motif connection.
 
@@ -421,6 +428,11 @@ class SpatiallyEmbeddedArea(nn.Module):
             self.inter_neuron_type_connectivity.shape[1],
             depth=1,
         )
+        self.inter_neuron_type_num_subtype_groups = expand_array_2d(
+            config.inter_neuron_type_num_subtype_groups,
+            self.inter_neuron_type_connectivity.shape[0],
+            self.inter_neuron_type_connectivity.shape[1],
+        )
         self.inter_neuron_type_nonlinearity = expand_array_2d(
             config.inter_neuron_type_nonlinearity,
             self.inter_neuron_type_connectivity.shape[0],
@@ -468,6 +480,7 @@ class SpatiallyEmbeddedArea(nn.Module):
                 Conv2d = nn.Conv2d
 
             # Handle output neurons
+            # TODO: Optimize using smart grouping and convolution sharing
             to_indices = np.nonzero(row)[0]
             for j in to_indices:
                 if self.inter_neuron_type_connectivity[i, j]:
@@ -521,6 +534,9 @@ class SpatiallyEmbeddedArea(nn.Module):
                                 self.inter_neuron_type_spatial_extents[i, j][1]
                                 // 2,
                             ),
+                            groups=self.inter_neuron_type_num_subtype_groups[
+                                i, j
+                            ],
                             bias=self.inter_neuron_type_bias[i, j],
                         )
                     )
@@ -941,6 +957,38 @@ class SpatiallyEmbeddedRNN(nn.Module):
             connections between areas.
         inter_area_feedback_spatial_extents: Kernel sizes for feedback
             convolutions between areas.
+
+    Examples:
+        >>> # Create a SpatiallyEmbeddedRNN with 2 areas
+        >>> area_configs = [
+        ...     SpatiallyEmbeddedAreaConfig(
+        ...         in_channels=1,
+        ...         out_channels=16,
+        ...         in_size=(64, 64),
+        ...         feedback_channels=16,
+        ...     ),
+        ...     SpatiallyEmbeddedAreaConfig(
+        ...         in_channels=16,
+        ...         out_channels=32,
+        ...         in_size=(32, 32),
+        ...         feedback_channels=32,
+        ...     ),
+        ... ]
+        >>> connectivity = [
+        ...     [0, 0],
+        ...     [1, 0]
+        ... ]
+        >>> rnn = SpatiallyEmbeddedRNN(
+        ...     num_areas=2,
+        ...     area_configs=area_configs,
+        ...     inter_area_feedback_connectivity=connectivity,
+        ... )
+        >>> # Create a SpatiallyEmbeddedRNN with 2 areas
+        >>> area_configs = [
+        >>>     SpatiallyEmbeddedAreaConfig(in_channels=1, out_channels=16, in_size=(64, 64)),
+        >>>     SpatiallyEmbeddedAreaConfig(in_channels=16, out_channels=32, in_size=(32, 32)),
+        >>> ]
+        >>> rnn = SpatiallyEmbeddedRNN(num_areas=2, area_configs=area_configs)
     """
 
     def __init__(

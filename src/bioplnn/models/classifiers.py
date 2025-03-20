@@ -211,7 +211,8 @@ class SpatiallyEmbeddedClassifier(nn.Module):
         self,
         rnn_kwargs: Mapping[str, Any],
         num_classes: int,
-        pool_size: tuple[int, int] = (1, 1),
+        pool_size_classifier: tuple[int, int] = (1, 1),
+        pool_mode_classifier: str = "max",
         fc_dim: int = 512,
         dropout: float = 0.2,
     ):
@@ -219,12 +220,19 @@ class SpatiallyEmbeddedClassifier(nn.Module):
 
         self.rnn = SpatiallyEmbeddedRNN(**rnn_kwargs)
 
-        self.pool = nn.AdaptiveAvgPool2d(pool_size)
+        if pool_mode_classifier == "avg":
+            self.pool = nn.AdaptiveAvgPool2d(pool_size_classifier)
+        elif pool_mode_classifier == "max":
+            self.pool = nn.AdaptiveMaxPool2d(pool_size_classifier)
+        else:
+            raise ValueError(f"Invalid pool_mode: {pool_mode_classifier}")
 
         self.readout = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(
-                self.rnn.areas[-1].out_channels * pool_size[0] * pool_size[1],  # type: ignore
+                self.rnn.areas[-1].out_channels
+                * pool_size_classifier[0]
+                * pool_size_classifier[1],  # type: ignore
                 fc_dim,
             ),
             nn.ReLU(),
@@ -232,6 +240,7 @@ class SpatiallyEmbeddedClassifier(nn.Module):
             nn.Linear(fc_dim, num_classes),
         )
 
+    @torch.compiler.disable(recursive=False)
     def forward(
         self,
         x: torch.Tensor,
@@ -272,12 +281,13 @@ class SpatiallyEmbeddedClassifier(nn.Module):
         outs_last_layer = outs[-1]
         if self.rnn.batch_first:
             outs_last_layer = outs_last_layer.transpose(0, 1)
-        outs_last_layer = self.pool(outs_last_layer)
 
         if loss_all_timesteps:
-            pred = torch.stack([self.readout(out) for out in outs_last_layer])
+            pred = torch.stack(
+                [self.readout(self.pool(out)) for out in outs_last_layer]
+            )
         else:
-            pred = self.readout(outs_last_layer[-1])
+            pred = self.readout(self.pool(outs_last_layer[-1]))
 
         if return_activations:
             return pred, outs, h_neurons, fbs

@@ -6,13 +6,13 @@ from typing import Any, Optional
 
 import hydra
 import torch
+import wandb
 import yaml
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
-import wandb
 from bioplnn.utils import (
     AttrDict,
     initialize_criterion,
@@ -320,13 +320,24 @@ def train(dict_config: DictConfig) -> None:
     # Initialize model
     model = initialize_model(**config.model).to(device)
 
-    # Compile the model if requested
-    model = torch.compile(model, **config.compile)
-
     # Initialize the optimizer
     optimizer = initialize_optimizer(
         model_parameters=model.parameters(), **config.optimizer
     )
+
+    # Load the model checkpoint if requested
+    if config.checkpoint.load:
+        checkpoint = torch.load(
+            config.checkpoint.path, weights_only=True, map_location=device
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        epoch = checkpoint["epoch"]
+    else:
+        epoch = 0
+
+    # Compile the model if requested
+    model = torch.compile(model, **config.compile)
 
     # Initialize the loss function
     criterion = initialize_criterion(**config.criterion)
@@ -347,7 +358,7 @@ def train(dict_config: DictConfig) -> None:
     else:
         scheduler = None
 
-    for epoch in range(config.train.epochs):
+    for epoch in range(epoch, config.train.epochs):
         print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log({"epoch": epoch}, step=global_step)
         # Train the model

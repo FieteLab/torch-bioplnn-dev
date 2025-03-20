@@ -2,8 +2,8 @@
 data:
   dataset: cabc
   resolution: [128, 128]
-  root: data/cabc/hard
-  batch_size: 256
+  root: data/cabc/easy
+  batch_size: 128
   num_workers: 8
   shuffle_test: true
 
@@ -16,9 +16,13 @@ optimizer:
 train:
   forward_kwargs:
     num_steps: 10
-# overrides:
-#   model:
-#     rnn_kwargs:
-#       area_kwargs:
-#         - in_size: [128, 128]
-#           in_channels: 1
+
+overrides:
+  model:
+    rnn_kwargs:
+      area_kwargs:
+        - in_size: [128, 128]
+          in_channels: 1
+
+wandb:
+  group: cabc_1

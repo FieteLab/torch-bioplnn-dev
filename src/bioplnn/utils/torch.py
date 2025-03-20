@@ -1,10 +1,13 @@
 import math
 import os
 import random
+from collections.abc import Iterable
 from os import PathLike
-from typing import List, Optional, Type, Union
+from typing import Any, List, Optional, Type, Union
 
 import numpy as np
+import pandas as pd
+import scipy
 import torch
 import torch.nn as nn
 from torch.profiler import ProfilerActivity, profile
@@ -166,8 +169,228 @@ def init_tensor(
             raise e
 
 
-def load_tensor(tensor: Union[torch.Tensor, PathLike]) -> torch.Tensor:
+def array_from_numpy(
+    array: Union[np.ndarray, PathLike, str],
+) -> np.ndarray:
+    """Create a numpy array from a numpy array or path to file.
+
+    Args:
+        array: Numpy array or path to file.
+
+    Returns:
+        np.ndarray: The loaded numpy array.
+    """
+    if isinstance(array, np.ndarray):
+        return array
+    else:
+        return np.load(array)
+
+
+def array_from_df(
+    df: Union[pd.DataFrame, PathLike, str],
+) -> np.ndarray:
+    """Create a numpy array from a dataframe.
+
+    Args:
+        df (Union[pd.DataFrame, PathLike, str]): Dataframe or path to file
+            containing dataframe.
+
+    Returns:
+        The connectivity numpy array.
+    """
+    if isinstance(df, pd.DataFrame):
+        return df.to_numpy()
+    else:
+        return pd.read_csv(df).to_numpy()
+
+
+def array_from_tensor(
+    tensor: Union[torch.Tensor, PathLike, str],
+) -> np.ndarray:
+    """Create a numpy array from a numpy array.
+
+    Args:
+        tensor (Union[torch.Tensor, PathLike, str]): Torch tensor or path to file.
+
+    Returns:
+        np.ndarray: The numpy array.
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu().numpy()
+    else:
+        return torch.load(tensor, weights_only=True).numpy()
+
+
+def tensor_from_df(
+    df: Union[pd.DataFrame, PathLike, str],
+) -> torch.Tensor:
+    """Create a dense tensor from a dataframe.
+
+    Args:
+        df (Union[pd.DataFrame, PathLike, str]): Dataframe or path to file
+            containing dataframe.
+
+    Returns:
+        torch.Tensor: The connectivity tensor.
+    """
+    if isinstance(df, pd.DataFrame):
+        return torch.tensor(df.to_numpy())
+    else:
+        return torch.tensor(pd.read_csv(df).to_numpy())
+
+
+def tensor_from_numpy(
+    tensor: Union[np.ndarray, PathLike, str],
+) -> torch.Tensor:
+    """Create a dense tensor from a numpy array.
+
+    Args:
+        tensor (np.ndarray): Numpy array.
+
+    Returns:
+        torch.Tensor: The sparse tensor.
+    """
+    if isinstance(tensor, np.ndarray):
+        return torch.tensor(tensor)
+    else:
+        return torch.tensor(np.load(tensor))
+
+
+def tensor_from_tensor(
+    tensor: Union[torch.Tensor, PathLike, str],
+) -> torch.Tensor:
+    """Create a tensor from a torch tensor or path to file.
+
+    Args:
+        tensor: Torch tensor or path to file.
+
+    Returns:
+        The original or loaded tensor.
+
+    Raises:
+        ValueError: If the file is not a torch tensor or path to file.
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor
+    else:
+        return torch.load(tensor, weights_only=True)
+
+
+def sparse_tensor_from_df(
+    df: Union[pd.DataFrame, PathLike, str],
+) -> torch.Tensor:
+    """Create a sparse tensor from a dataframe.
+
+    Args:
+        df (Union[pd.DataFrame, PathLike, str]): Dataframe or path to file
+            containing dataframe.
+
+    Returns:
+        torch.Tensor: The connectivity tensor.
+    """
+    if isinstance(df, pd.DataFrame):
+        return torch.tensor(df.to_numpy()).to_sparse()
+    else:
+        return torch.tensor(pd.read_csv(df).to_numpy()).to_sparse()
+
+
+def sparse_tensor_from_numpy(
+    tensor: Union[np.ndarray, PathLike, str],
+) -> torch.Tensor:
+    """Create a sparse tensor from a numpy array.
+
+    Args:
+        tensor (np.ndarray): Numpy array.
+
+    Returns:
+        torch.Tensor: The sparse tensor.
+    """
+    if isinstance(tensor, np.ndarray):
+        return torch.tensor(tensor).to_sparse()
+    else:
+        return torch.tensor(np.load(tensor)).to_sparse()
+
+
+def sparse_tensor_from_scipy(
+    array: Union[scipy.sparse.sparray, PathLike, str],
+) -> torch.Tensor:
+    """Create a sparse tensor from a scipy csr matrix.
+
+    Args:
+        tensor (Union[scipy.sparse.coo_matrix, scipy.sparse.csr_matrix, PathLike, str]): Scipy csr matrix.
+
+    Returns:
+        torch.Tensor: The sparse tensor.
+    """
+    if not isinstance(array, scipy.sparse.sparray):
+        array = scipy.sparse.load_npz(array)
+
+    array = scipy.sparse.coo_array(array)
+    return torch.sparse_coo_tensor(array.row, array.col, array.shape)  # type: ignore
+
+
+def sparse_tensor_from_tensor(
+    tensor: Union[torch.Tensor, PathLike, str],
+) -> torch.Tensor:
+    """Create a sparse tensor from a torch tensor or path to file.
+
+    Caution: This function will load the tensor even if it is a dense tensor.
+    Take care to ensure that the tensor is sufficiently sparse to avoid
+    excessive memory usage.
+
+    Args:
+        tensor: Torch tensor or path to file.
+
+    Returns:
+        The original or loaded sparse tensor.
+
+    Raises:
+        ValueError: If the file is not a torch tensor or path to file.
+
+    Returns:
+        torch.Tensor: The sparse tensor.
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor.to_sparse()
+    else:
+        return torch.load(tensor, weights_only=True).to_sparse()
+
+
+def load_tensor(
+    tensor: Union[torch.Tensor, Iterable, PathLike, str],
+) -> torch.Tensor:
     """Load a tensor from a file or tensor.
+
+    Args:
+        tensor: Tensor or path to file containing tensor.
+
+    Returns:
+        The original or loaded tensor.
+    """
+    try:
+        loaded_tensor = tensor_from_tensor(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = tensor_from_numpy(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = tensor_from_df(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = torch.tensor(tensor)
+    except Exception:
+        raise ValueError(f"Failed to load tensor from {tensor}")
+
+    return loaded_tensor
+
+
+def load_sparse_tensor(
+    tensor: Union[torch.Tensor, Iterable[Any], PathLike, str],
+) -> torch.Tensor:
+    """Load a sparse tensor from a file or tensor.
 
     Args:
         tensor (Union[torch.Tensor, PathLike]): Tensor or path to file
@@ -176,10 +399,70 @@ def load_tensor(tensor: Union[torch.Tensor, PathLike]) -> torch.Tensor:
     Returns:
         torch.Tensor: The original or loaded tensor.
     """
-    if isinstance(tensor, torch.Tensor):
-        return tensor
-    else:
-        return torch.load(tensor, weights_only=True).squeeze()
+    try:
+        loaded_tensor = sparse_tensor_from_tensor(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = sparse_tensor_from_numpy(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = sparse_tensor_from_scipy(tensor)
+    except Exception:
+        pass
+    try:
+        loaded_tensor = sparse_tensor_from_df(tensor)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_tensor = torch.tensor(tensor)
+    except Exception:
+        raise ValueError(f"Failed to load tensor from {tensor}")
+
+    assert loaded_tensor.layout == torch.sparse_coo
+
+    return loaded_tensor
+
+
+def load_array(
+    array: Union[np.ndarray, Iterable, PathLike, str],
+) -> np.ndarray:
+    """Load a numpy array from an array, iterable, or file.
+
+    Supported file formats:
+    - npz
+    - npy
+    - csv
+    - pt
+
+    Args:
+        array: numpy array, iterable, or path to file containing numpy array.
+
+    Returns:
+        The original or loaded numpy array.
+
+    Raises:
+        ValueError: If the array cannot be loaded from the given file or iterable.
+    """
+    try:
+        loaded_array = array_from_numpy(array)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_array = array_from_tensor(array)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_array = array_from_df(array)  # type: ignore
+    except Exception:
+        pass
+    try:
+        loaded_array = np.array(array)
+    except Exception:
+        raise ValueError(f"Failed to load array from {array}")
+
+    return loaded_array
 
 
 def idx_1D_to_2D_tensor(x: torch.Tensor, m: int, n: int) -> torch.Tensor:
