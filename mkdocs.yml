@@ -1,5 +1,5 @@
 site_name: torch-biopl
-site_url: https://fietelab.github.io/torch-bioplnn-dev/
+site_url: https://fietelab.github.io/torch-biopl-dev/
 
 nav:
   - Home: index.md
@@ -106,6 +106,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+  - pymdownx.superfences
 
 extra_javascript:
   - javascripts/mathjax.js

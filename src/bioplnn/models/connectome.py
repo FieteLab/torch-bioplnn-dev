@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from bioplnn.models.sparse import SparseODERNN, SparseRNN
-from bioplnn.typing import NeuronTypeParam, TensorInitFnType
+from bioplnn.typing import ScalarOrListLike, TensorInitFnType
 from bioplnn.utils import (
     check_possible_values,
     expand_list,
@@ -49,14 +49,14 @@ class ConnectomeRNNMixIn:
         *args,
         output_neurons: Optional[Union[torch.Tensor, PathLike]] = None,
         num_neuron_types: int = 0,
-        neuron_type_class: NeuronTypeParam[str] = "excitatory",
+        neuron_type_class: ScalarOrListLike[str] = "excitatory",
         neuron_type_indices: Optional[
             Sequence[Union[torch.Tensor, PathLike]]
         ] = None,
-        neuron_type_nonlinearity: NeuronTypeParam[
+        neuron_type_nonlinearity: ScalarOrListLike[
             Optional[Union[str, nn.Module]]
         ] = "Sigmoid",
-        neuron_type_tau_init: NeuronTypeParam[float] = 1.0,
+        neuron_type_tau_init: ScalarOrListLike[float] = 1.0,
         train_tau: bool = True,
         default_tau_init_fn: Union[str, TensorInitFnType] = "ones",
         **kwargs,

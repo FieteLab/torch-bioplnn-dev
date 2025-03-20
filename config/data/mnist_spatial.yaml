@@ -5,15 +5,16 @@ data:
   batch_size: 256
   num_workers: 8
   shuffle_test: true
+
 model:
-  rnn_kwargs:
-    batch_first: false
   num_classes: 10
+
+optimizer:
+  lr: 0.005
+
 overrides:
   model:
     rnn_kwargs:
       area_kwargs:
         - in_channels: 1
           in_size: [28, 28]
-optimizer:
-  lr: 0.005

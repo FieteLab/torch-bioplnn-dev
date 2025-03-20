@@ -1,0 +1,18 @@
+class_name: SpatiallyEmbeddedClassifier
+rnn_kwargs:
+  num_areas: 1
+  area_kwargs:
+    - in_size: [32, 32]
+      in_channels: 3
+      out_channels: 32
+      num_neuron_types: 2
+      neuron_type_class:
+        - excitatory
+        - inhibitory
+      num_neuron_subtypes:
+        - 32
+        - 8
+      inter_neuron_type_connectivity:
+        - [1, 0, 0]
+        - [1, 1, 1]
+        - [1, 0, 0]

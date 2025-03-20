@@ -1,6 +1,7 @@
 # experiment/activation: choice(tanh_none, relu_tanh, none_tanh)
-# experiment/rectify: choice(baseline, both, neither)
-model: choice(eifb, ei, eiffb)
+optimizer.lr: choice(0.0005, 0.001)
+experiment/activation: choice(tanh, sigmoid)
+model: choice(spatial_h2alf, spatial_h2al, spatial_hal)
 # data.root: choice(data/cabc/medium, data/cabc/hard)
 
 # python examples/ei_trainer.py -m +hydra/sweeper/params=cabc_sweep wandb.mode=disabled data=cabc

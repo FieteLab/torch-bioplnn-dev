@@ -3,27 +3,22 @@ data:
   dataset: cabc
   resolution: [128, 128]
   root: data/cabc/hard
-  batch_size: 128
+  batch_size: 256
   num_workers: 8
   shuffle_test: true
+
 model:
-  rnn_kwargs:
-    in_size: [128, 128]
-    in_channels: 1
-    exc_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    inh_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    fb_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    batch_first: false
   num_classes: 2
+
+optimizer:
+  lr: 0.0005
+
+train:
+  forward_kwargs:
+    num_steps: 10
+# overrides:
+#   model:
+#     rnn_kwargs:
+#       area_kwargs:
+#         - in_size: [128, 128]
+#           in_channels: 1

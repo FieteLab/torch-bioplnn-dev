@@ -140,7 +140,7 @@ connectome_rnn_kwargs = {
     ],
 
     # note how the nonlinearity is global -- it can be per-celltype if needed
-    # also note how the taus are initialized per cell type.
+    # also note how the taus are initialized per neuron type.
     "neuron_type_nonlinearity": "Sigmoid",
     "neuron_type_tau_init": [1.25, 2.0],
 

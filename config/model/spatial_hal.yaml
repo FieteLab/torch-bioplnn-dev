@@ -1,0 +1,11 @@
+# 1 hybrid area with 1 hybrid neuron type
+class_name: SpatiallyEmbeddedClassifier
+rnn_kwargs:
+  num_areas: 1
+  area_kwargs:
+    - in_size: [32, 32]
+      in_channels: 3
+      out_channels: 32
+      num_neuron_subtypes: 128
+      neuron_type_nonlinearity: "Tanh"
+      inter_neuron_type_spatial_extents: [5, 5]

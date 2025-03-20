@@ -4,7 +4,7 @@ from typing import Any, Optional, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from bioplnn.typing import Param1dType, Param2dType, T
+from bioplnn.typing import ScalarOrArray2dType, ScalarOrListLike, T
 
 try:
     from addict import Dict
@@ -123,7 +123,7 @@ def dict_flatten(d, delimiter=".", key=None):
 
 
 def expand_list(
-    x: Optional[Param1dType[T]], n: int, depth: int = 0
+    x: Optional[ScalarOrListLike[T]], n: int, depth: int = 0
 ) -> Union[list[T], NDArray[Any]]:
     """Expands a value to a list of length n.
 
@@ -169,7 +169,7 @@ def expand_list(
 
 
 def expand_array_2d(
-    x: Optional[Param2dType[T]], m: int, n: int, depth: int = 0
+    x: Optional[ScalarOrArray2dType[T]], m: int, n: int, depth: int = 0
 ) -> NDArray[Any]:
     """Expands a value to a 2D numpy array of shape (m, n).
 
@@ -217,7 +217,17 @@ def expand_array_2d(
 
 
 def check_possible_values(
-    param_name: str, param: Iterable, valid_values: Iterable
+    param_name: str, params: Iterable, valid_values: Iterable
 ) -> None:
-    if not set(param) <= set(valid_values):
+    """Check if the provided parameters are all valid values.
+
+    Args:
+        param_name (str): The name of the parameter (for error message).
+        params (Iterable): The parameters to check.
+        valid_values (Iterable): The valid values to check against.
+
+    Raises:
+        ValueError: If any of the parameters are not one of the valid values.
+    """
+    if not set(params) <= set(valid_values):
         raise ValueError(f"{param_name} must be one of {valid_values}.")

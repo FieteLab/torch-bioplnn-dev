@@ -6,7 +6,9 @@
 **/*.out
 **/.DS_Store
 **/*.egg-info/
+
 **/config_log.yaml
+**/test.ipynb
 
 /data/
 /wandb/
