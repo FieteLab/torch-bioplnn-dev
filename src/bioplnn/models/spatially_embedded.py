@@ -66,10 +66,10 @@ class SpatiallyEmbeddedAreaConfig:
     (lateral connections).
 
     Args:
-        in_size (tuple[int, int]): Size of the input data (height, width).
-        in_channels (int): Number of input channels.
-        out_channels (int): Number of output channels.
-        feedback_channels (int, optional): Number of feedback channels. Defaults to
+        in_size: Size of the input data (height, width).
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        feedback_channels: Number of feedback channels. Defaults to
             None.
         in_class (CellTypeParam[str], optional): Class of input signal. Can be
             "excitatory", "inhibitory", or "hybrid". Defaults to "hybrid".
@@ -200,7 +200,7 @@ class SpatiallyEmbeddedArea(nn.Module):
     configurable connectivity patterns, activation functions, and time constants.
 
     Args:
-        config (Optional[SpatiallyEmbeddedAreaConfig]): Configuration object that
+        config: Configuration object that
             specifies the area architecture and parameters. See
             SpatiallyEmbeddedAreaConfig for details. If None, parameters must be
             provided as keyword arguments.
