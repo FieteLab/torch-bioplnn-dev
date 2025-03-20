@@ -8,7 +8,6 @@ nav:
     - Spatially embedded networks:
       - Basic example: examples/basic_spatial_example.md
       - Advanced configurability: examples/advance_configs.md
-      #- Advnaced datasets: examples/advance_datasets.md
     - Connectome-constrained models:
       - Running forward dynamics: examples/connectome_forward.md
       - Running reverse dynamics: examples/connectome_backward.md
@@ -28,21 +27,12 @@ theme:
     text: Roboto
     code: Red Hat Mono
   palette:
-      # Light Mode
       - scheme: mcgovern
         toggle:
-          icon: material/weather-night
+          # icon: material/weather-night
           name: Light mode
         primary: indigo
         accent: deep orange
-        
-      # # Dark Mode
-      # - scheme: slate
-      #   toggle:
-      #     icon: material/weather-sunny
-      #     name: Dark mode
-      #   primary: lime
-      #   accent: light green
 
   favicon: images/biopl-logo.png
   logo: images/biopl-logo-light.png
@@ -111,9 +101,3 @@ markdown_extensions:
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
-
-# markdown_extensions:
-#   # - extra
-#   # - smarty
-#   - markdown_include.include:
-#       base_path: ../
