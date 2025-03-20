@@ -551,7 +551,7 @@ def initialize_connectome(
     celltype_connectivity: np.ndarray,
     deterministic_type_assignment: bool = False,
 ) -> tuple[torch.Tensor, np.ndarray]:
-    """Initialize a synthetic connectome as a sparse adjacency matrix.
+    """_initialize a synthetic connectome as a sparse adjacency matrix.
 
     Args:
         num_neurons (int): Total number of neurons.
