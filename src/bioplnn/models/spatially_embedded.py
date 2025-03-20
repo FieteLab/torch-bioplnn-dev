@@ -267,21 +267,20 @@ class SpatiallyEmbeddedArea(nn.Module):
         out_convs: Convolutional layers connecting to the output.
 
     Examples:
-    >>> config = SpatiallyEmbeddedAreaConfig(
-    ...     in_size=(32, 32),
-    ...     in_channels=3,
-    ...     out_channels=16,
-    ...     num_neuron_types=2,
-    ...     num_neuron_subtypes=16,
-    ...     neuron_type_class=["excitatory", "inhibitory"],
-    ...     neuron_type_density=["same", "half"],
-    ...     neuron_type_nonlinearity=,
-    ...     inter_neuron_type_connectivity=[[1, 0, 0], [1, 1, 1], [1, 0, 0]],
-    ...     inter_neuron_type_spatial_extents=(3, 3),
-    ... )
-    >>> area = SpatiallyEmbeddedArea(config)
-    >>> print(area.summary())
-    '''
+        >>> config = SpatiallyEmbeddedAreaConfig(
+        ...     in_size=(32, 32),
+        ...     in_channels=3,
+        ...     out_channels=16,
+        ...     num_neuron_types=2,
+        ...     num_neuron_subtypes=16,
+        ...     neuron_type_class=["excitatory", "inhibitory"],
+        ...     neuron_type_density=["same", "half"],
+        ...     neuron_type_nonlinearity=,
+        ...     inter_neuron_type_connectivity=[[1, 0, 0], [1, 1, 1], [1, 0, 0]],
+        ...     inter_neuron_type_spatial_extents=(3, 3),
+        ... )
+        >>> area = SpatiallyEmbeddedArea(config)
+        >>> print(area.summary())
     """
 
     def __init__(
