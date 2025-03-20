@@ -30,7 +30,14 @@ theme:
     text: Roboto
     code: Red Hat Mono
   palette:
-    scheme: mcgovern
+      - scheme: mcgovern
+        toggle:
+          # icon: material/weather-night
+          name: Light mode
+        primary: indigo
+        accent: deep orange
+
+  favicon: images/biopl-logo.png
   logo: images/biopl-logo-light.png
   favicon: images/biopl-logo.png
 
