@@ -36,15 +36,15 @@ In addition to the connectome from before, we also have typing information prepr
 save_dir = "connectivity/turaga"
 os.makedirs(save_dir, exist_ok=True)
 save_path = f"{save_dir}/turaga-dros-visual-connectome.pt"
-!gdown "https://drive.google.com/uc?id=18448HYpYrm60boziHG73bxN4CK5jG-1g" -O "{save_path}" 
+!gdown "https://drive.google.com/uc?id=18448HYpYrm60boziHG73bxN4CK5jG-1g" -O "{save_path}"
 connectome = torch.load(save_path, weights_only=True)
 
 save_path_index_1 = f"{save_dir}/example_indices_ntype1.pt"
-!gdown "https://drive.google.com/uc?id=19ePGRpMznn2l1Mp8Gu0rTk-PP-EDlyEC" -O "{save_path_index_1}" 
+!gdown "https://drive.google.com/uc?id=19ePGRpMznn2l1Mp8Gu0rTk-PP-EDlyEC" -O "{save_path_index_1}"
 ex_indices_neuron_type1 = torch.load(save_path_index_1, weights_only=True)
 
 save_path_index_2 = f"{save_dir}/example_indices_ntype2.pt"
-!gdown "https://drive.google.com/uc?id=1eb0H-WTQWg1DzFZ201-ihIFqgZ8u3N0Y" -O "{save_path_index_2}" 
+!gdown "https://drive.google.com/uc?id=1eb0H-WTQWg1DzFZ201-ihIFqgZ8u3N0Y" -O "{save_path_index_2}"
 ex_indices_neuron_type2 = torch.load(save_path_index_2, weights_only=True)
 ```
 
@@ -93,13 +93,13 @@ plt.show()
 
 
 
-    
+
 ![png](connectome_forward_neuron_types_files/connectome_forward_neuron_types_6_1.png)
-    
+
 
 
 ## Creating input and output projection matrices
-To drive the network with external inputs, you'd want to specify the subset of neurons in the model that receive input or project to downstream areas. We have an utility to create these sparse projection matrices. For the purposes of this example, we shall pick a random subset of input/output neurons. 
+To drive the network with external inputs, you'd want to specify the subset of neurons in the model that receive input or project to downstream areas. We have an utility to create these sparse projection matrices. For the purposes of this example, we shall pick a random subset of input/output neurons.
 In a world where each neuron receives external input, you can also initialize this projection as an arbitrary *dense* matrix.
 
 
@@ -243,7 +243,5 @@ ax.set_ylabel("Activity", fontsize=18)
 
 
 
-    
-![png](connectome_forward_neuron_types_files/connectome_forward_neuron_types_14_1.png)
-    
 
+![png](connectome_forward_neuron_types_files/connectome_forward_neuron_types_14_1.png)
