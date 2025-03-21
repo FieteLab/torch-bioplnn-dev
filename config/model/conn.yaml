@@ -2,13 +2,18 @@
 model:
   class_name: ConnectomeODEClassifier
   rnn_kwargs:
-    input_size: 4751
-    hidden_size: 47521
-    connectivity_hh: connectivity/sunny/connectivity_hh.pt
-    connectivity_ih: connectivity/sunny/connectivity_ih.pt
-    nonlinearity: Sigmoid
+    input_size: 784
+    num_neurons: 47521
+    output_size: 1000
+    connectome: connectivity/sunny/connectome.pt
+    input_projection: connectivity/sunny/input_projection_matrix.pt
+    output_projection: connectivity/sunny/output_projection_matrix.pt
     batch_first: false
     compile_solver_kwargs:
+      mode: max-autotune
+      dynamic: false
+      fullgraph: true
+    compile_update_fn_kwargs:
       mode: max-autotune
       dynamic: false
       fullgraph: true
@@ -16,4 +21,4 @@ model:
   dropout: 0.5
 train:
   forward_kwargs:
-    num_steps: 2
+    num_evals: 2

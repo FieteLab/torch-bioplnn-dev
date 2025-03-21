@@ -12,6 +12,10 @@ model:
 optimizer:
   lr: 0.005
 
+train:
+  forward_kwargs:
+    num_steps: 5
+
 overrides:
   model:
     rnn_kwargs:

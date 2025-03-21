@@ -34,14 +34,9 @@ class ConnectomeClassifier(nn.Module):
 
         self.rnn = ConnectomeRNN(**rnn_kwargs)
 
-        if self.rnn.output_neurons is None:
-            out_size = self.rnn.hidden_size
-        else:
-            out_size = len(self.rnn.output_neurons)
-
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
-            nn.Linear(out_size, fc_dim),
+            nn.Linear(self.rnn.output_size, fc_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(fc_dim, num_classes),
@@ -120,14 +115,9 @@ class ConnectomeODEClassifier(nn.Module):
 
         self.rnn = ConnectomeODERNN(**rnn_kwargs)
 
-        if self.rnn.output_neurons is None:
-            out_size = self.rnn.hidden_size
-        else:
-            out_size = len(self.rnn.output_neurons)
-
         self.out_layer = nn.Sequential(
             nn.Flatten(1),
-            nn.Linear(out_size, fc_dim),
+            nn.Linear(self.rnn.output_size, fc_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(fc_dim, num_classes),
@@ -137,7 +127,7 @@ class ConnectomeODEClassifier(nn.Module):
         self,
         x: torch.Tensor,
         *,
-        num_steps: int,
+        num_evals: int,
         start_time: float = 0.0,
         end_time: float = 1.0,
         loss_all_timesteps: bool = False,
@@ -147,7 +137,7 @@ class ConnectomeODEClassifier(nn.Module):
 
         Args:
             x (torch.Tensor): Input tensor of shape [batch_size, channels, ...].
-            num_steps (int): Number of integration steps.
+            num_evals (int): Number of evaluations to return.
             start_time (float, optional): Start time for ODE integration.
                 Defaults to 0.0.
             end_time (float, optional): End time for ODE integration.
@@ -171,9 +161,9 @@ class ConnectomeODEClassifier(nn.Module):
 
         outs, hs, ts = self.rnn(
             x,
+            num_evals=num_evals,
             start_time=start_time,
             end_time=end_time,
-            num_steps=num_steps,
         )
 
         if self.rnn.batch_first:

@@ -2,6 +2,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, Optional, Union
 
 import numpy as np
+import torch
 from numpy.typing import NDArray
 
 from bioplnn.typing import ScalarOrArray2dType, ScalarOrListLike, T
@@ -217,7 +218,9 @@ def expand_array_2d(
 
 
 def check_possible_values(
-    param_name: str, params: Iterable, valid_values: Iterable
+    param_name: str,
+    params: Union[Iterable, NDArray[Any], torch.Tensor],
+    valid_values: Union[Iterable, NDArray[Any], torch.Tensor],
 ) -> None:
     """Check if the provided parameters are all valid values.
 
@@ -229,5 +232,19 @@ def check_possible_values(
     Raises:
         ValueError: If any of the parameters are not one of the valid values.
     """
-    if not set(params) <= set(valid_values):
+    if isinstance(params, torch.Tensor):
+        params = set(torch.unique(params).tolist())
+    elif isinstance(params, np.ndarray):
+        params = set(np.unique(params).tolist())
+    else:
+        params = set(params)
+
+    if isinstance(valid_values, torch.Tensor):
+        valid_values = set(torch.unique(valid_values).tolist())
+    elif isinstance(valid_values, np.ndarray):
+        valid_values = set(np.unique(valid_values).tolist())
+    else:
+        valid_values = set(valid_values)
+
+    if not params <= valid_values:
         raise ValueError(f"{param_name} must be one of {valid_values}.")

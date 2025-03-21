@@ -2,22 +2,28 @@
 model:
   class_name: ConnectomeODEClassifier
   rnn_kwargs:
-    input_size: 4751
-    hidden_size: 47521
-    connectivity_hh: connectivity/sunny/connectivity_hh.pt
-    connectivity_ih: connectivity/sunny/connectivity_ih.pt
+    input_size: 784
+    num_neurons: 47521
+    output_size: 1000
+    connectome: connectivity/sunny/connectome.pt
+    input_projection: connectivity/sunny/input_projection_matrix.pt
+    output_projection: connectivity/sunny/output_projection_matrix.pt
     num_neuron_types: 2
-    neuron_type_class:
+    neuron_type: connectivity/sunny/neuron_type.csv
+    neuron_class:
       - excitatory
       - inhibitory
-    neuron_type_indices:
-      - connectivity/sunny/indices_neuron_type_1.pt
-      - connectivity/sunny/indices_neuron_type_2.pt
-    neuron_type_nonlinearity: Sigmoid
-    neuron_type_tau_init:
+    neuron_class_mode: per_neuron_type
+    neuron_nonlinearity: Sigmoid
+    neuron_tau_init:
       - 1.5
       - 1
+    neuron_tau_mode: per_neuron_type
     compile_solver_kwargs:
+      mode: max-autotune
+      dynamic: false
+      fullgraph: true
+    compile_update_fn_kwargs:
       mode: max-autotune
       dynamic: false
       fullgraph: true
@@ -25,4 +31,4 @@ model:
   dropout: 0.5
 train:
   forward_kwargs:
-    num_steps: 2
+    num_evals: 2

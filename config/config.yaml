@@ -21,16 +21,15 @@ optimizer:
 criterion:
   class_name: CrossEntropyLoss
 compile:
-  disable: false
+  disable: true
   # fullgraph: false
   # dynamic: null
   # backend: inductor
   # mode: default
 train:
   epochs: 100
-  log_freq: 5
+  log_freq: 10
   forward_kwargs:
-    num_steps: 5
     loss_all_timesteps: false
   grad_clip:
     enable: false
