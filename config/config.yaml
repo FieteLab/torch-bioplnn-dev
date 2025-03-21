@@ -53,5 +53,5 @@ seed: null
 deterministic: false
 tqdm: true
 matmul_precision: high
-debug_level: 1
+debug_level: 0
 debug_num_batches: null

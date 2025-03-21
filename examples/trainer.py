@@ -287,14 +287,8 @@ def train(dict_config: DictConfig) -> None:
 
     if "overrides" in config:
         config = parse_overrides(config, config.overrides)
-    # if (
-    #     "layer_one_in_channels_override" in config
-    #     and config.layer_one_in_channels_override is not None
-    # ):
-    #     config.model.rnn_kwargs.area_kwargs[
-    #         0
-    #     ].in_channels = config.layer_one_in_channels_override
 
+    # Set up debugging
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))
         yaml.dump(config.to_dict(), open("examples/config_log.yaml", "w+"))
@@ -302,24 +296,16 @@ def train(dict_config: DictConfig) -> None:
     if config.debug_level > 1:
         torch.autograd.set_detect_anomaly(True)
 
+    # Set up Weights & Biases
     if config.wandb.group is None:
         config.wandb.group = f"{config.model.class_name}_{config.data.dataset}"
 
-    # Initialize Weights & Biases
     wandb.init(
         config=config,
         settings=wandb.Settings(start_method="thread"),
         **config.wandb,
     )
     global_step: int = 0
-
-    if config.wandb.mode != "disabled":
-        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)  # type: ignore
-    else:
-        checkpoint_dir = os.path.join(
-            config.checkpoint.root, config.checkpoint.run
-        )
-    os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Set the random seed
     if config.seed is not None:
@@ -348,6 +334,14 @@ def train(dict_config: DictConfig) -> None:
     )
 
     # Load the model checkpoint if requested
+    if config.wandb.mode != "disabled":
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)  # type: ignore
+    else:
+        checkpoint_dir = os.path.join(
+            config.checkpoint.root, config.checkpoint.run
+        )
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
     if config.checkpoint.load:
         checkpoint = torch.load(
             config.checkpoint.path, weights_only=True, map_location=device
