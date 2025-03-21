@@ -1,4 +1,3 @@
-# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 site_name: torch-biopl
 site_url: https://fietelab.github.io/torch-biopl-dev/
 
@@ -32,18 +31,8 @@ theme:
     code: Red Hat Mono
   palette:
     scheme: mcgovern
-
-      # Light Mode
-      # - scheme: mcgovern
-      #   # toggle:
-      #   #   icon: material/weather-night
-      #   #   name: Light mode
-      # - scheme: mcgovern
-      #   primary: indigo
-      #   accent: deep orange
-
-  favicon: images/biopl-logo.png
   logo: images/biopl-logo-light.png
+  favicon: images/biopl-logo.png
 
 plugins:
   - search
@@ -77,8 +66,6 @@ extra:
   social:
     - icon: 'fontawesome/brands/github-alt'
       link: 'https://github.com/FieteLab/torch-biopl-dev'
-  # version:
-  #   provider: mike
 
 extra_css:
   - stylesheets/extra.css
@@ -114,9 +101,3 @@ markdown_extensions:
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
-
-# markdown_extensions:
-#   # - extra
-#   # - smarty
-#   - markdown_include.include:
-#       base_path: ../
