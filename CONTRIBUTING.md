@@ -1,7 +1,7 @@
 # Contributing to BioPlNN
 
 ## Branch or fork
-If you have permission to create branches in the BioPlNN GitHub repository, 
+If you have permission to create branches in the BioPlNN GitHub repository,
 create a new branch for your changes. You can then submit a pull request to the
 main branch of the BioPlNN repository.
 
@@ -45,8 +45,7 @@ git push origin <your-branch-name>
 ```
 7. Submit a pull request
 Go to the BioPlNN repository and submit a pull request from your branch or fork
-to the main branch. See [GitHub's Pull Request documentation](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) 
+to the main branch. See [GitHub's Pull Request documentation](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)
 for more information.
 
 ## Testing
-

@@ -8,8 +8,8 @@ TensorInitFnType = Callable[..., torch.Tensor]
 """Type alias for a function that initializes a tensor.
 
 A function that takes a variable number of positional arguments describing the
-shape of the tensor to initialize. Can optionally take a `device` keyword 
-argument, in which case the function is expected to return a tensor on that 
+shape of the tensor to initialize. Can optionally take a `device` keyword
+argument, in which case the function is expected to return a tensor on that
 device.
 
 Returns:
@@ -33,14 +33,14 @@ T = TypeVar("T")
 ListLike = Union[Sequence[T], NDArray[Any]]
 """Type alias for a sequence of values.
 
-Used to annotate function arguments that can be a Sequence or 1D NumPy array. 
+Used to annotate function arguments that can be a Sequence or 1D NumPy array.
 Generic over the element type T.
 """
 
 ScalarOrListLike = Union[T, ListLike[T]]
 """Type alias for a single value or a list-like of values.
 
-Used to annotate function arguments that can be a single value, a Sequence, or a 
+Used to annotate function arguments that can be a single value, a Sequence, or a
 1D NumPy array. Generic over the element type T.
 """
 
@@ -55,7 +55,7 @@ apply to all neuron types, and if list-like, apply to each neuron type
 Array2dType = Union[Sequence[Sequence[T]], NDArray[Any]]
 """Type alias for a 2D parameter.
 
-Used to annotate function arguments that can be a nested list, or a 2D NumPy array. 
+Used to annotate function arguments that can be a nested list, or a 2D NumPy array.
 Generic over the element type T.
 """
 
@@ -69,17 +69,17 @@ or a 2D NumPy array. Generic over the element type T.
 CircuitParam = ScalarOrArray2dType[T]
 """Type alias for `ScalarOrArray2dType`.
 
-Used to annotate function arguments and class attributes that, if single-valued, 
-apply to all connections in an area's circuit motif, and if 2D-array-like, apply to 
-each connection in the circuit motif (shape must match that of the connectivity 
+Used to annotate function arguments and class attributes that, if single-valued,
+apply to all connections in an area's circuit motif, and if 2D-array-like, apply to
+each connection in the circuit motif (shape must match that of the connectivity
 matrix for the circuit motif).
 """
 
 InterAreaParam = ScalarOrArray2dType[T]
 """Type alias for `ScalarOrArray2dType`.
 
-Used to annotate function arguments and class attributes that, if single-valued, 
-apply to all connections between areas, and if 2D-array-like, apply to each 
-connection between areas (shape must match that of the connectivity matrix between 
+Used to annotate function arguments and class attributes that, if single-valued,
+apply to all connections between areas, and if 2D-array-like, apply to each
+connection between areas (shape must match that of the connectivity matrix between
 areas).
 """

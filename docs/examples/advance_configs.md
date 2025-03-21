@@ -19,7 +19,7 @@ from bioplnn.models import SpatiallyEmbeddedRNN, SpatiallyEmbeddedAreaConfig
 
 ## Synapse vs neuron nonlinearities
 
-What do we mean by this? In an attempt to distinguish synaptic transfer functions from post-aggregation neuronal transfer functions, we give users the ability to specify pre- and post-integration nonlinearities. 
+What do we mean by this? In an attempt to distinguish synaptic transfer functions from post-aggregation neuronal transfer functions, we give users the ability to specify pre- and post-integration nonlinearities.
 
 Let us consider the same example model from the previous tutorial: A simple one-area network with two neural classes with the following `inter_neuron_type_connectivity`: $\begin{bmatrix}1&1&0\cr1&1&1\cr1&1&0\end{bmatrix}$. Following the same convention as the connectivity matrix, you can specify the transfer function for each of those synapse groups by setting the `inter_neuron_type_nonlinearity` parameter. Similarly, `neuron_type_nonlinearity` can be used to control the post-aggregation transfer function for each neuron type.
 
@@ -171,8 +171,8 @@ area_configs_feedback_model = [
 ]
 
 model_wFeedback = SpatiallyEmbeddedRNN(
-                            num_areas = 2, 
-                            area_configs = area_configs_feedback_model, 
+                            num_areas = 2,
+                            area_configs = area_configs_feedback_model,
                             batch_first = False,
                             inter_area_feedback_connectivity = np.array([[0, 0],[1, 0]])
                     )
