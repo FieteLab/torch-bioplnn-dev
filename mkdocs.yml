@@ -16,6 +16,7 @@ nav:
       - Running reverse dynamics: examples/connectome_backward.md
       - Cell typing connectomes: examples/connectome_forward_neuron_types.md
   - API Reference:
+    - reference/index.md
     - Spatially embedded networks: reference/eirnn.md
     - Connectome-constrained models: reference/connectome.md
     - Sparse utilities: reference/sparse.md
@@ -25,7 +26,9 @@ theme:
   name: material
   features:
     - content.code.copy
+    - navigation.path
     - navigation.expand
+    - navigation.indexes
   font:
     text: Roboto
     code: Red Hat Mono
