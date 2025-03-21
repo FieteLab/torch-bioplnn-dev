@@ -6,15 +6,15 @@ from typing import Any, Optional
 
 import hydra
 import torch
-import wandb
 import yaml
+from addict import Dict
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
+import wandb
 from bioplnn.utils import (
-    AttrDict,
     initialize_criterion,
     initialize_dataloader,
     initialize_model,
@@ -24,6 +24,28 @@ from bioplnn.utils import (
     manual_seed_deterministic,
     pass_fn,
 )
+
+
+class AttrDict(Dict):
+    """A non-default version of the `addict.Dict` class that raises a `KeyError`
+    when a key is not found in the dictionary.
+
+    Args:
+        *args: Any positional arguments.
+        **kwargs: Any keyword arguments.
+    """
+
+    def __missing__(self, key: Any):
+        """Override the default behavior of `addict.Dict` to raise a `KeyError`
+        when a key is not found in the dictionary.
+
+        Args:
+            key: The key that was not found.
+
+        Raises:
+            KeyError: Always raised.
+        """
+        raise KeyError(key)
 
 
 def train_epoch(

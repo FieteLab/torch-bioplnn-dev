@@ -7,36 +7,6 @@ from numpy.typing import NDArray
 
 from bioplnn.typing import ScalarOrArray2dType, ScalarOrListLike, T
 
-try:
-    from addict import Dict
-
-    class AttrDict(Dict):
-        """A non-default version of the `addict.Dict` class that raises a `KeyError`
-        when a key is not found in the dictionary.
-
-        Args:
-            *args: Any positional arguments.
-            **kwargs: Any keyword arguments.
-        """
-
-        def __missing__(self, key: Any):
-            """Override the default behavior of `addict.Dict` to raise a `KeyError`
-            when a key is not found in the dictionary.
-
-            Args:
-                key: The key that was not found.
-
-            Raises:
-                KeyError: Always raised.
-            """
-            raise KeyError(key)
-
-except ImportError as e:
-    raise ImportError(
-        "addict is not installed. Please install it with `pip install addict`"
-        "or `pip install bioplnn[dev]`."
-    ) from e
-
 
 def pass_fn(*args, **kwargs):
     """A no-op function that accepts any arguments and does nothing.

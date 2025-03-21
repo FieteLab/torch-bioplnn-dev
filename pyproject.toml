@@ -24,22 +24,22 @@ dependencies = [
   "opencv-python",
   "matplotlib",
   "pandas",
-  "addict",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "addict",
+  "gdown",
   "hydra-core",
   "hydra-submitit-launcher",
+  "ipykernel",
   "pre-commit",
   "pytest",
   "ruff",
   "scikit-learn",
+  "seaborn",
   "tqdm",
   "wandb",
-  "ipykernel",
-  "seaborn",
-  "gdown",
 ]
 
 [project.urls]
