@@ -1,4 +1,4 @@
-# `torch-biopl`: Biologically-plausible networks made easy 
+# `torch-biopl`: Biologically-plausible networks made easy
 ![code-api](images/code-snippet-edited.gif)
 
 ## Overview

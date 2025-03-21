@@ -70,20 +70,20 @@ plt.show()
 
 
 
-    
+
 ![png](connectome_forward_files/connectome_forward_6_1.png)
-    
+
 
 
 ## Creating input and output projection matrices
-To drive the network with external inputs, you'd want to specify the subset of neurons in the model that receive input or project to downstream areas. We have an utility to create these sparse projection matrices. For the purposes of this example, we shall pick a random subset of input/output neurons. 
+To drive the network with external inputs, you'd want to specify the subset of neurons in the model that receive input or project to downstream areas. We have an utility to create these sparse projection matrices. For the purposes of this example, we shall pick a random subset of input/output neurons.
 In a world where each neuron receives external input, you can also initialize this projection as an arbitrary *dense* matrix.
 
 
 ```python
 from bioplnn.utils.torch import create_identity_ih_connectivity
 # since we are feeding in MNIST images
-input_size = 28 * 28 
+input_size = 28 * 28
 num_neurons = connectome.shape[0]
 
 input_projection_matrix = create_identity_ih_connectivity(
@@ -176,7 +176,7 @@ print(f"Neural activity shape: {neural_activities.shape}")
 fig = plt.figure(figsize=(6,6))
 ax = fig.add_subplot(111)
 ax.plot(
-    timesteps[:, 0].detach().cpu().numpy(), 
+    timesteps[:, 0].detach().cpu().numpy(),
     neural_activities[:, 0, torch.randint(0, 47521, (25,))].detach().cpu().numpy()
 )
 ax.spines['top'].set_visible(False)
@@ -193,7 +193,5 @@ ax.set_ylabel('Activity', fontsize=18)
 
 
 
-    
-![png](connectome_forward_files/connectome_forward_14_1.png)
-    
 
+![png](connectome_forward_files/connectome_forward_14_1.png)

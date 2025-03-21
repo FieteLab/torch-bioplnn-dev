@@ -1,6 +1,9 @@
 site_name: torch-biopl
 site_url: https://fietelab.github.io/torch-biopl-dev/
 
+repo_name: 'FieteLab/torch-biopl-dev'
+repo_url: https://github.com/FieteLab/torch-biopl-dev
+
 nav:
   - Home: index.md
   - Quick start guide: install.md
@@ -27,15 +30,9 @@ theme:
     text: Roboto
     code: Red Hat Mono
   palette:
-      - scheme: mcgovern
-        toggle:
-          # icon: material/weather-night
-          name: Light mode
-        primary: indigo
-        accent: deep orange
-
-  favicon: images/biopl-logo.png
+    scheme: mcgovern
   logo: images/biopl-logo-light.png
+  favicon: images/biopl-logo.png
 
 plugins:
   - search
@@ -65,14 +62,18 @@ plugins:
             show_root_full_path: false
             show_root_heading: true
 
+extra:
+  social:
+    - icon: 'fontawesome/brands/github-alt'
+      link: 'https://github.com/FieteLab/torch-biopl-dev'
+
 extra_css:
   - stylesheets/extra.css
 
-markdown_extensions: 
-  - extra
-  - attr_list
+markdown_extensions:
+  - markdown.extensions.admonition
   - md_in_html
-  - admonition
+  - markdown.extensions.attr_list
   - codehilite:
       guess_lang: false
   - toc:
@@ -96,7 +97,6 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
-  - pymdownx.superfences
 
 extra_javascript:
   - javascripts/mathjax.js

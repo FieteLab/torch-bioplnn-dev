@@ -7,7 +7,7 @@ The goal of this tutorial is to wire up a simple model that is comprised of a sp
 Before we begin, here are a few notes pertaining to the nomenclature we have adopted.
 
 - A neuron ***class*** is defined by its synaptic affiliation. In `torch-biopl` you can configure types to be `Excitatory`/`Inhibitory` (where synapses have a postive/negative sign), or `Hybrid` which defaults to standard machine learning-style synapses that are unconstrained.
-- Within each neuron class, you can instantiate neuron ***types***. We employ the definition of neuron types with an eye to be able to specify inter-type local connectivity rules. 
+- Within each neuron class, you can instantiate neuron ***types***. We employ the definition of neuron types with an eye to be able to specify inter-type local connectivity rules.
 - Within each neuron type, are ***subtypes***. Neurons within a subtype can (but don't have to) share properties like time constants, nonlinearities, and biases.
 - Each neural area can be configured independently by specifying its classes, types, subtypes, and inter-type connectivity rules.
 - Areas can be stitched together to form larger networks.
@@ -33,12 +33,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.set_float32_matmul_precision("high")
 ```
 
-Let us wire up a simple one-area network with two neural classes. Let one of them be an `Excitatory` cell class and one be `Inhibitory` each with `16` subtypes. Now, we have our neural populations. All that's left to do is to specify the inter-type connectivity. 
+Let us wire up a simple one-area network with two neural classes. Let one of them be an `Excitatory` cell class and one be `Inhibitory` each with `16` subtypes. Now, we have our neural populations. All that's left to do is to specify the inter-type connectivity.
 
 In `torch-biopl` we adopt the following convention:
 
 - Inter-celltype connectivity (within a given area) is specified through an adjacency matrix.
-- In addition to the neuron types within an area, we also have to account for projections into and out of the area. Keeping this in mind, we use a schema where rows in the adjacency matrix represent the ***pre-synaptic*** neuron type and columns represent the ***post-synaptic*** neuron type. 
+- In addition to the neuron types within an area, we also have to account for projections into and out of the area. Keeping this in mind, we use a schema where rows in the adjacency matrix represent the ***pre-synaptic*** neuron type and columns represent the ***post-synaptic*** neuron type.
 - The **first row** always denotes projections into the area, and the **last column** always denotes feedforward projections out of the area.
 
 For example, if our neuron_type_1 is E and neuron_type_2 is I, then `inter_neuron_type_connectivity`= $\begin{bmatrix} 1 & 1 & 0 \cr 1 & 1 & 1 \cr 1 & 1 & 0 \end{bmatrix}$ represents a standard recurrent inhibitory circuit motif (ala [Wong et al. (2006)](https://pubmed.ncbi.nlm.nih.gov/16436619/)), where both the E and I populations receive input, and only the E population projects downstream.
@@ -237,4 +237,3 @@ for epoch in range(n_epochs):
 
 
     100%|██████████| 235/235 [00:15<00:00, 15.27it/s]
-

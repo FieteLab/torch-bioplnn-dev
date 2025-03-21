@@ -385,34 +385,41 @@ def initialize_connectome(
 
     # Determine number of cell types
     num_cell_types = len(cell_type_probs)
-    
+
     # Assign cell types to neurons
     if deterministic_type_assignment:
         neuron_counts = (np.array(cell_type_probs) * num_neurons).astype(int)
-        neuron_types = np.concatenate([
-            np.full(count, i, dtype=int) for i, count in enumerate(neuron_counts)
-        ])
+        neuron_types = np.concatenate(
+            [
+                np.full(count, i, dtype=int)
+                for i, count in enumerate(neuron_counts)
+            ]
+        )
         np.random.shuffle(neuron_types)  # Shuffle to avoid ordering bias
     else:
-        neuron_types = np.random.choice(num_cell_types, size=num_neurons, p=cell_type_probs)
-    
+        neuron_types = np.random.choice(
+            num_cell_types, size=num_neurons, p=cell_type_probs
+        )
+
     # Generate all possible neuron-neuron pairs
-    row_indices, col_indices = np.meshgrid(np.arange(num_neurons), np.arange(num_neurons), indexing='ij')
+    row_indices, col_indices = np.meshgrid(
+        np.arange(num_neurons), np.arange(num_neurons), indexing="ij"
+    )
     row_indices = row_indices.flatten()
     col_indices = col_indices.flatten()
-    
+
     # Get corresponding cell-type pairs
     src_types = neuron_types[row_indices]
     tgt_types = neuron_types[col_indices]
-    
+
     # Get connection probabilities from the connectivity matrix
     probs = celltype_connectivity[src_types, tgt_types]
-    
+
     # Sample connections
     mask = np.random.rand(len(probs)) < probs
     row_indices = row_indices[mask]
     col_indices = col_indices[mask]
-    
+
     # Create sparse adjacency matrix
     indices = torch.tensor([row_indices, col_indices], dtype=torch.long)
     values = torch.ones(len(row_indices), dtype=torch.float)
@@ -423,5 +430,4 @@ def initialize_connectome(
         (num_neurons, num_neurons),
         check_invariants=True,
     ).coalesce()
-    
     return sparse_adj, neuron_types

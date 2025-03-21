@@ -1,6 +1,6 @@
 # Computing gradients and backpropagating through connectome-initialized models
 
-While the previous tutorial showed you how to initialize a neural network with connectome-determined weights, it didn't provide you with information on how to "tune" model parameters in a data-driven manner. Turns out, computing (and backpropagating) gradients in networks with both ***sparse and dense*** tensors is non-trivial. In this tutorial, we spin up a small example on how you can accomplish this in `torch-biopl`. 
+While the previous tutorial showed you how to initialize a neural network with connectome-determined weights, it didn't provide you with information on how to "tune" model parameters in a data-driven manner. Turns out, computing (and backpropagating) gradients in networks with both ***sparse and dense*** tensors is non-trivial. In this tutorial, we spin up a small example on how you can accomplish this in `torch-biopl`.
 
 Goals:
 
@@ -41,7 +41,7 @@ connectome = torch.load('turaga-dros-visual-connectome.pt', weights_only=True)
 
 from bioplnn.utils.torch import create_identity_ih_connectivity
 # since we are feeding in MNIST images
-input_size = 28 * 28 
+input_size = 28 * 28
 num_neurons = connectome.shape[0]
 
 input_projection_matrix = create_identity_ih_connectivity(
@@ -181,4 +181,3 @@ for epoch in range(n_epochs):
     Training | Epoch: 0 | Loss: 115.1163 | Acc: 11.39%
     Training | Epoch: 0 | Loss: 115.0861 | Acc: 10.94%
     Training | Epoch: 0 | Loss: 115.0515 | Acc: 11.91%
-
