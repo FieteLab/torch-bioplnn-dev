@@ -363,7 +363,6 @@ def create_identity_ih_connectivity(
 
     return connectivity_ih
 
-
 def initialize_connectome(
     num_neurons: int,
     cell_type_probs: np.ndarray,
@@ -431,5 +430,4 @@ def initialize_connectome(
         (num_neurons, num_neurons),
         check_invariants=True,
     ).coalesce()
-
     return sparse_adj, neuron_types
