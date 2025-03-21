@@ -111,7 +111,7 @@ Then, you can install the package using one of the following methods:
 ### From PyPI (recommended) (not yet available)
 
 ```bash
-pip install bioplnn
+pip install torch-biopl
 ```
 
 ### From source
@@ -119,13 +119,13 @@ pip install bioplnn
 1. Clone the BioPlNN repository:
 
 ```bash
-git clone https://github.com/valmikikothare/bioplnn.git
+git clone https://github.com/FieteLab/torch-biopl-dev.git
 ```
 
 2. Navigate to the cloned directory:
 
 ```bash
-cd bioplnn
+cd torch-biopl-dev
 ```
 
 3. Install the package:

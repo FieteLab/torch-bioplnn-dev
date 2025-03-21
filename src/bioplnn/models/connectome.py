@@ -460,67 +460,43 @@ class _ConnectomeRNNMixIn:
 
     def query_neuron_states(
         self,
-        neuron_states: list[list[torch.Tensor]],
-        area: int,
-        neuron_type: int,
+        neuron_states: torch.Tensor,
         time_step: Optional[Union[int, slice]] = None,
         batch: Optional[Union[int, slice]] = None,
-        neuron_subtype: Optional[Union[int, slice]] = None,
-        spatial_location_i: Optional[Union[int, slice]] = None,
-        spatial_location_j: Optional[Union[int, slice]] = None,
+        neuron_type: Optional[Union[str, int]] = None,
+        neurons: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Query the model states for a given area, time step, neuron type, neuron subtype, and spatial location.
 
         Args:
-            neuron_states: List of lists of tensors containing the model states.
-            area: The area index.
-            neuron_type: The neuron type index.
+            neuron_states: Tensor containing the neuron states.
             time_step: The time step index. If not provided, all time steps are returned.
             batch: The batch index. If not provided, all batches are returned.
-            neuron_subtype: The neuron subtype index. If not provided, all neuron subtypes are returned.
-            spatial_location_i: The spatial location (height). If not provided, all spatial locations are returned.
-            spatial_location_j: The spatial location (width). If not provided, all spatial locations are returned.
+            neuron_type: The neuron type label. If not provided, all neuron types are returned.
+            neurons: The neuron indices. If not provided, all neurons are returned.
 
         Returns:
             The queried state of shape (batch_size_slice, channels, height, width)
         """
-        if time_step is None:
-            time_idx = slice(None)
+        time_idx = time_step if time_step is not None else slice(None)
+        batch_idx = batch if batch is not None else slice(None)
+
+        if neurons is not None:
+            if neuron_type is not None:
+                raise ValueError(
+                    "neuron_type must be None if neurons is provided."
+                )
+            neuron_idx = neurons
+        elif neuron_type is not None:
+            neuron_type_idx = self.neuron_type_index_map[neuron_type]
+            neuron_idx = self.neuron_type_indices[neuron_type_idx]
         else:
-            time_idx = time_step
-        if batch is None:
-            batch_idx = slice(None)
-        else:
-            batch_idx = batch
-        if neuron_subtype is None:
-            neuron_subtype_idx = slice(None)
-        else:
-            neuron_subtype_idx = neuron_subtype
-        if spatial_location_i is None:
-            spatial_location_idx_i = slice(None)
-        else:
-            spatial_location_idx_i = spatial_location_i
-        if spatial_location_j is None:
-            spatial_location_idx_j = slice(None)
-        else:
-            spatial_location_idx_j = spatial_location_j
+            neuron_idx = slice(None)
 
         if self.batch_first:  # type: ignore
-            return neuron_states[area][neuron_type][
-                batch_idx,
-                time_idx,
-                neuron_subtype_idx,
-                spatial_location_idx_i,
-                spatial_location_idx_j,
-            ]
+            return neuron_states[batch_idx, time_idx, neuron_idx]
         else:
-            return neuron_states[area][neuron_type][
-                time_idx,
-                batch_idx,
-                neuron_subtype_idx,
-                spatial_location_idx_i,
-                spatial_location_idx_j,
-            ]
+            return neuron_states[time_idx, batch_idx, neuron_idx]
 
     def forward(self, *args, **kwargs):
         """Forward pass of the ConnectomeRNN or ConnectomeODERNN.
