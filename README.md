@@ -28,8 +28,8 @@ For instructions to install the right dependencies and use either the API or CLI
 
 ### Tutorials and examples
 
-This README provides a basic introduction to BioPlNN. More detailed documentation, including advanced usage examples and configuration options, will be available soon. Example are provided in the `examples` directory.
+For [basic](https://fietelab.github.io/torch-biopl-dev/examples/basic_spatial_example) and [advanced](https://fietelab.github.io/torch-biopl-dev/examples/advance_configs) examples please refer to the webpage.
 
 ### Contributing
 
-We welcome contributions to `torch-biopl`. Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on submitting code and documentation changes.
+We welcome contributions to `torch-biopl`. For guidelines on submitting code and documentation changes, please refer to [contributing](#).
