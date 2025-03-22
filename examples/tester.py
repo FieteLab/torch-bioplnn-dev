@@ -6,13 +6,13 @@ from typing import Any
 
 import hydra
 import torch
+import wandb
 import yaml
 from addict import Dict
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from tqdm import tqdm
 
-import wandb
 from bioplnn.utils import (
     initialize_criterion,
     initialize_dataloader,
