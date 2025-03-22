@@ -343,8 +343,13 @@ def train(dict_config: DictConfig) -> None:
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     if config.checkpoint.load:
+        checkpoint_path = os.path.join(checkpoint_dir, "checkpoint.pt")
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(
+                f"Checkpoint file not found at {checkpoint_path}"
+            )
         checkpoint = torch.load(
-            config.checkpoint.path, weights_only=True, map_location=device
+            checkpoint_path, weights_only=True, map_location=device
         )
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

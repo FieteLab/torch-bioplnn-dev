@@ -1,6 +1,0 @@
-# @package _global_
-model:
-  rnn_kwargs:
-    pool_kernel_size: null
-    pool_stride: null
-  num_down_conv: 2

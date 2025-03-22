@@ -1,5 +1,0 @@
-# @package _global_
-model:
-  rnn_kwargs:
-    h_pyr_channels: 64
-    h_inter_channels: [64]

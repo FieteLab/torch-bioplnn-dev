@@ -1,0 +1,2 @@
+model.pool_mode_classifier: choice(max, avg)
+model: choice(spatial_4h1a, spatial_big_1h1a)
