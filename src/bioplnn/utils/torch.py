@@ -612,5 +612,4 @@ def initialize_connectome(
         (num_neurons, num_neurons),
         check_invariants=True,
     ).coalesce()
-
     return sparse_adj, neuron_types
