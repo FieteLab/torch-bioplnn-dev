@@ -14,18 +14,28 @@ from bioplnn.utils import (
     load_array,
 )
 
+# TODO: Some docstrings may be outdated, might need to update
+
 attributes_docstring = """
-        num_neurons (int): Number of neurons in the network (equivalent to hidden_size)
-        num_neuron_types (int): Number of distinct neuron types
-        default_neuron_state_init_fn (callable): Default initialization function for neuron states
-        neuron_type_mask (torch.Tensor): Tensor mapping each neuron to its type index
-        neuron_type_indices (List[torch.Tensor]): List of indices for each neuron type
-        neuron_type_index_map (dict): Mapping from original type labels to consecutive indices
-        neuron_sign_mask (torch.Tensor): Mask indicating excitatory (+1) or inhibitory (-1) neurons
-        neuron_class_mode (str): Determines if neuron classes are 'per_neuron' or 'per_neuron_type'
-        tau (torch.Tensor): Time constant parameters for neurons or types
-        neuron_tau_mode (str): Whether tau is 'per_neuron' or 'per_neuron_type'
-        neuron_nonlinearity (Union[nn.Module, nn.ModuleList]): Activation functions per neuron type
+    num_neurons (int): Number of neurons in the network (equivalent to
+        hidden_size).
+    num_neuron_types (int): Number of distinct neuron types.
+    default_neuron_state_init_fn (callable): Default initialization
+        function for neuron states.
+    neuron_type_mask (torch.Tensor): Tensor mapping each neuron to its
+        type index.
+    neuron_type_indices (List[torch.Tensor]): List of indices for each
+        neuron type.
+    neuron_type_index_map (dict): Mapping from original type labels to
+        consecutive indices.
+    neuron_sign_mask (torch.Tensor): Mask indicating excitatory (+1) or
+        inhibitory (-1) neurons.
+    neuron_class_mode (str): Determines if neuron classes are 'per_neuron'
+        or 'per_neuron_type'.
+    tau (torch.Tensor): Time constant parameters for neurons or types.
+    neuron_tau_mode (str): Whether tau is 'per_neuron' or 'per_neuron_type'.
+    neuron_nonlinearity (Union[nn.Module, nn.ModuleList]): Activation
+        functions per neuron type.
 """
 
 key_features_docstring = """
@@ -101,20 +111,34 @@ class _ConnectomeRNNMixIn:
         """Initialize ConnectomeRNN and ConnectomeODERNN.
 
         Args:
+            input_size: Size of the input layer.
+            num_neurons: Number of neurons in the network.
+            connectome: Connectivity matrix or path to it.
+            output_size: Size of the output layer. Defaults to None.
+            input_projection: Input projection matrix or path. Defaults to None.
+            output_projection: Output projection matrix or path. Defaults to None.
+            use_dense_input_projection: Use dense input projection if True.
+            use_dense_output_projection: Use dense output projection if True.
+            train_connectome: Train the connectome if True.
+            train_input_projection: Train input projection if True.
+            train_output_projection: Train output projection if True.
             num_neuron_types: Number of neuron types.
-            neuron_class: Neuron class specifications (excitatory/inhibitory).
             neuron_type: Tensor/path defining neuron type indices. Required when
                 num_neuron_types > 0.
-            neuron_nonlinearity: Nonlinearity for neurons. Can be single or list
-                of activations matching num_neuron_types.
+            neuron_class: Neuron class specifications (excitatory/inhibitory).
+            neuron_class_mode: Determines if neuron classes are 'per_neuron' or
+                'per_neuron_type'.
             neuron_tau_init: Initial time constants for neurons. Can provide
                 per-type or per-neuron values.
             neuron_tau_init_fn: Initialization function for time constants
-                (clamped ≥1.0). Prefer initializers near 1.0 like 'ones'.
+                (clamped ≥ 1.0). Prefer initializers near 1.0 like 'ones'.
             neuron_tau_mode: Whether tau is 'per_neuron' or 'per_neuron_type'.
             train_tau: Whether time constants are trainable parameters.
+            neuron_nonlinearity: Nonlinearity for neurons. Can be single or list
+                of activations matching num_neuron_types.
             default_neuron_state_init_fn: Hidden state initialization function.
-            bias: Whether to add bias terms.
+            connectome_bias: Add bias to connectome if True.
+            output_projection_bias: Add bias to output projection if True.
             batch_first: Whether input tensors have batch dimension first.
             compile_solver_kwargs: Kwargs for ODE solver compilation.
             compile_update_fn_kwargs: Kwargs for update_fn compilation.
