@@ -24,27 +24,27 @@ dependencies = [
   "opencv-python",
   "matplotlib",
   "pandas",
-  "addict",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "addict",
+  "gdown",
   "hydra-core",
   "hydra-submitit-launcher",
+  "ipykernel",
   "pre-commit",
   "pytest",
   "ruff",
   "scikit-learn",
+  "seaborn",
   "tqdm",
   "wandb",
-  "ipykernel",
-  "seaborn",
-  "gdown",
 ]
 
 [project.urls]
-Homepage = "https://github.com/valmikikothare/bioplnn"
-Issues = "https://github.com/valmikikothare/bioplnn/issues"
+Homepage = "https://github.com/FieteLab/torch-biopl-dev.git"
+Issues = "https://github.com/FieteLab/torch-biopl-dev/issues"
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

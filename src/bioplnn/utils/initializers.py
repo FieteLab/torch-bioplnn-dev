@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Optional
 
 import torch
@@ -42,7 +43,7 @@ def initialize_model(*, class_name: str, **kwargs) -> nn.Module:
 
 
 def initialize_optimizer(
-    *, class_name: str, model_parameters: nn.ParameterList, **kwargs
+    *, class_name: str, model_parameters: Iterator[nn.Parameter], **kwargs
 ) -> torch.optim.Optimizer:
     """Initialize an optimizer for model training.
 

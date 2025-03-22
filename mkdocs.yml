@@ -1,25 +1,25 @@
 site_name: torch-biopl
 site_url: https://fietelab.github.io/torch-biopl-dev/
 
-repo_name: 'FieteLab/torch-biopl-dev'
+repo_name: "FieteLab/torch-biopl-dev"
 repo_url: https://github.com/FieteLab/torch-biopl-dev
 
 nav:
   - Home: index.md
   - Quick start guide: install.md
   - Examples:
-    - Spatially embedded networks:
-      - Basic example: examples/basic_spatial_example.md
-      - Advanced configurability: examples/advance_configs.md
-    - Connectome-constrained models:
-      - Running forward dynamics: examples/connectome_forward.md
-      - Running reverse dynamics: examples/connectome_backward.md
-      - Cell typing connectomes: examples/connectome_forward_neuron_types.md
+      - Spatially embedded networks:
+          - Basic example: examples/basic_spatial_example.md
+          - Advanced configurability: examples/advance_configs.md
+      - Connectome-constrained models:
+          - Running forward dynamics: examples/connectome_forward.md
+          - Running reverse dynamics: examples/connectome_backward.md
+          - Cell typing connectomes: examples/connectome_forward_neuron_types.md
   - API Reference:
-    - Spatially embedded networks: reference/eirnn.md
-    - Connectome-constrained models: reference/connectome.md
-    - Sparse utilities: reference/sparse.md
-    - Misc utilities: reference/misc.md
+      - Spatially embedded networks: reference/eirnn.md
+      - Connectome-constrained models: reference/connectome.md
+      - Sparse utilities: reference/sparse.md
+      - Misc utilities: reference/misc.md
 
 theme:
   name: material
@@ -64,8 +64,8 @@ plugins:
 
 extra:
   social:
-    - icon: 'fontawesome/brands/github-alt'
-      link: 'https://github.com/FieteLab/torch-biopl-dev'
+    - icon: "fontawesome/brands/github-alt"
+      link: "https://github.com/FieteLab/torch-biopl-dev"
 
 extra_css:
   - stylesheets/extra.css

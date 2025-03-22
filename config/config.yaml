@@ -21,16 +21,15 @@ optimizer:
 criterion:
   class_name: CrossEntropyLoss
 compile:
-  disable: false
+  disable: true
   # fullgraph: false
   # dynamic: null
   # backend: inductor
   # mode: default
 train:
   epochs: 100
-  log_freq: 5
+  log_freq: 10
   forward_kwargs:
-    num_steps: 5
     loss_all_timesteps: false
   grad_clip:
     enable: false
@@ -43,7 +42,7 @@ checkpoint:
   epoch: null
 wandb:
   project: bioplnn
-  mode: disabled
+  mode: online
   group: null
 activations:
   save_root: activations/ei
@@ -54,5 +53,5 @@ seed: null
 deterministic: false
 tqdm: true
 matmul_precision: high
-debug_level: 1
+debug_level: 0
 debug_num_batches: null

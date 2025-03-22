@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from os import PathLike
 from typing import Any, TypeVar, Union
 
 import torch
@@ -29,6 +30,12 @@ Returns:
 """
 
 T = TypeVar("T")
+
+PathLikeType = Union[PathLike, str]
+"""Type alias for a path-like object or string.
+
+Used to annotate function arguments that can be a path-like object or string.
+"""
 
 ListLike = Union[Sequence[T], NDArray[Any]]
 """Type alias for a sequence of values.

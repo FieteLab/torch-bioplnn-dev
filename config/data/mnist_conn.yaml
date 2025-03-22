@@ -2,14 +2,15 @@
 data:
   dataset: mnist
   root: data
-  batch_size: 8
+  batch_size: 256
   num_workers: 8
   shuffle_test: true
+
 model:
   rnn_kwargs:
     input_size: 784
-    connectivity_ih: connectivity/sunny/connectivity_ih_mnist.pt
-    output_neurons: connectivity/sunny/output_indices_mnist.pt
+    input_projection: connectivity/sunny/input_projection_matrix.pt
   num_classes: 10
+
 optimizer:
-  lr: 0.005
+  lr: 0.01

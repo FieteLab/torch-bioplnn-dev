@@ -9,7 +9,7 @@ import torch_sparse
 import torchode as to
 
 from bioplnn.typing import TensorInitFnType
-from bioplnn.utils import get_activation, init_tensor
+from bioplnn.utils import get_activation, init_tensor, load_sparse_tensor
 
 
 class SparseLinear(nn.Module):
@@ -19,15 +19,12 @@ class SparseLinear(nn.Module):
     but operates on sparse matrices for memory efficiency.
 
     Args:
-        in_features (int): Size of the input feature dimension.
-        out_features (int): Size of the output feature dimension.
-        connectivity (torch.Tensor): Sparse connectivity matrix in COO format.
-        feature_dim (int, optional): Dimension on which features reside (0 for
-            rows, 1 for columns). Defaults to -1 (unchanged).
-        bias (bool, optional): If set to False, no bias term is added.
-            Defaults to True.
-        requires_grad (bool, optional): Whether the weight and bias parameters
-            require gradient updates. Defaults to True.
+        in_features: Size of the input feature dimension.
+        out_features: Size of the output feature dimension.
+        connectivity: Sparse connectivity matrix in COO format.
+        feature_dim: Dimension on which features reside (0 for rows, 1 for columns).
+        bias: If set to False, no bias term is added.
+        requires_grad: Whether the weight and bias parameters require gradient updates.
     """
 
     def __init__(
@@ -85,11 +82,10 @@ class SparseLinear(nn.Module):
         """Performs sparse linear transformation on the input tensor.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (H, *) if feature_dim is 0,
-                otherwise (*, H).
+            x: Input tensor of shape (H, *) if feature_dim is 0, otherwise (*, H).
 
         Returns:
-            torch.Tensor: Output tensor after sparse linear transformation.
+            Output tensor after sparse linear transformation.
         """
 
         shape = list(x.shape)
@@ -125,46 +121,73 @@ class SparseLinear(nn.Module):
 class SparseRNN(nn.Module):
     """Sparse Recurrent Neural Network (RNN) layer.
 
-    Implements a RNN using sparse linear transformations.
+    A sparse variant of the standard RNN that uses truly sparse linear
+    transformations to compute the input-to-hidden and hidden-to-hidden
+    transformations (and optionally the hidden-to-output transformations).
 
-    Args:
-        input_size (int): Size of the input features.
-        hidden_size (int): Size of the hidden state.
-        connectivity_hh (Union[PathLike, torch.Tensor]): Connectivity matrix for
-            hidden-to-hidden connections.
-        connectivity_ih (Union[PathLike, torch.Tensor], optional): Connectivity
-            matrix for input-to-hidden connections. If not provided, the
-            input-to-hidden connections will be dense. Defaults to None.
-        default_hidden_init_fn (str, optional): Initialization mode for the
-            hidden state. Defaults to "zeros".
-        nonlinearity (str, optional): Nonlinearity function. Defaults to "Tanh".
-        batch_first (bool, optional): Whether the input is in (batch_size,
-            seq_len, input_size) format. Defaults to True.
-        bias (bool, optional): Whether to use bias. Defaults to True.
+    These sparse transformations are computed using the `torch_sparse` package
+    and allow for efficient memory usage for large networks.
+
+    This allows for the network weights to directly be trained, a departure
+    from GANs, which typically use fixed sparse weights.
     """
 
     def __init__(
         self,
         input_size: int,
         hidden_size: int,
-        connectivity_hh: Union[PathLike, torch.Tensor],
-        connectivity_ih: Optional[Union[PathLike, torch.Tensor]] = None,
+        connectivity_hh: Union[torch.Tensor, PathLike, str],
+        output_size: Optional[int] = None,
+        connectivity_ih: Optional[Union[torch.Tensor, PathLike, str]] = None,
+        connectivity_ho: Optional[Union[torch.Tensor, PathLike, str]] = None,
+        bias_hh: bool = True,
+        bias_ih: bool = False,
+        bias_ho: bool = True,
+        use_dense_ih: bool = False,
+        use_dense_ho: bool = False,
         train_hh: bool = True,
         train_ih: bool = True,
+        train_ho: bool = True,
         default_hidden_init_fn: str = "zeros",
         nonlinearity: str = "Sigmoid",
         batch_first: bool = True,
-        bias: bool = True,
     ):
+        """Initialize the SparseRNN layer.
+
+        Args:
+            input_size: Size of the input features.
+            hidden_size: Size of the hidden state.
+            connectivity_hh: Connectivity matrix for hidden-to-hidden connections.
+            output_size: Size of the output features.
+            connectivity_ih: Connectivity matrix for input-to-hidden connections.
+            connectivity_ho: Connectivity matrix for hidden-to-output connections.
+            bias_hh: Whether to use bias in the hidden-to-hidden connections.
+            bias_ih: Whether to use bias in the input-to-hidden connections.
+            bias_ho: Whether to use bias in the hidden-to-output connections.
+            use_dense_ih: Whether to use a dense linear layer for input-to-hidden connections.
+            use_dense_ho: Whether to use a dense linear layer for hidden-to-output connections.
+            train_hh: Whether to train the hidden-to-hidden connections.
+            train_ih: Whether to train the input-to-hidden connections.
+            train_ho: Whether to train the hidden-to-output connections.
+            default_hidden_init_fn: Initialization mode for the hidden state.
+            nonlinearity: Nonlinearity function.
+            batch_first: Whether the input is in (batch_size, seq_len, input_size) format.
+        """
+
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.output_size = (
+            output_size if output_size is not None else hidden_size
+        )
         self.default_hidden_init_fn = default_hidden_init_fn
         self.nonlinearity = get_activation(nonlinearity)
         self.batch_first = batch_first
 
-        connectivity_hh, connectivity_ih = self._init_connectivity(
-            connectivity_hh, connectivity_ih
+        connectivity_hh, connectivity_ih, connectivity_ho = (
+            self._init_connectivity(
+                connectivity_hh, connectivity_ih, connectivity_ho
+            )
         )
 
         self.hh = SparseLinear(
@@ -172,32 +195,31 @@ class SparseRNN(nn.Module):
             out_features=hidden_size,
             connectivity=connectivity_hh,
             feature_dim=0,
-            bias=bias,
+            bias=bias_hh,
             requires_grad=train_hh,
         )
 
         if connectivity_ih is not None:
+            if use_dense_ih:
+                raise ValueError(
+                    "use_dense_ih must be False if connectivity_ih is provided"
+                )
             self.ih = SparseLinear(
                 in_features=input_size,
                 out_features=hidden_size,
                 connectivity=connectivity_ih,
                 feature_dim=0,
-                bias=False,
+                bias=bias_ih,
                 requires_grad=train_ih,
             )
-        else:
+        elif use_dense_ih:
             warnings.warn(
-                "connectivity_ih is not provided and input_size does not "
-                "match hidden_size, using a dense linear layer instead"
+                "connectivity_ih is not provided and use_dense_ih is True, "
+                "using a dense linear layer for input-to-hidden connections. "
+                "This may result in memory issues. If you are running out of "
+                "memory, consider providing connectivity_ih or decreasing "
+                "input_size."
             )
-            if input_size >= hidden_size:
-                warnings.warn(
-                    "input_size is greater than or equal to hidden_size, "
-                    "the dense linear layer weight will have shape "
-                    f"({input_size}, {hidden_size}). This may result in too "
-                    "many parameters to fit on your GPU. Consider providing "
-                    "connectivity_ih or decreasing input_size."
-                )
             if not train_ih:
                 raise ValueError(
                     "train_ih must be True if connectivity_ih is not provided"
@@ -205,57 +227,97 @@ class SparseRNN(nn.Module):
             self.ih = nn.Linear(
                 in_features=input_size,
                 out_features=hidden_size,
-                bias=False,
+                bias=bias_ih,
             )
+        else:
+            if input_size != hidden_size:
+                raise ValueError(
+                    "input_size must be equal to hidden_size if "
+                    "connectivity_ih is not provided and use_dense_ih is False"
+                )
+            self.ih = nn.Identity()
+
+        if connectivity_ho is not None:
+            if use_dense_ho:
+                raise ValueError(
+                    "use_dense_ho must be False if connectivity_ho is provided"
+                )
+            if output_size is None:
+                raise ValueError(
+                    "output_size must be provided if and only if connectivity_ho is provided"
+                )
+            self.ho = SparseLinear(
+                in_features=hidden_size,
+                out_features=output_size,
+                connectivity=connectivity_ho,
+                feature_dim=0,
+                bias=bias_ho,
+                requires_grad=train_ho,
+            )
+        elif use_dense_ho:
+            warnings.warn(
+                "connectivity_ho is not provided and use_dense_ho is True, "
+                "using a dense linear layer for hidden-to-output connections. "
+                "This may result in memory issues. If you are running out of "
+                "memory, consider providing connectivity_ho or decreasing "
+                "hidden_size."
+            )
+            if output_size is None:
+                raise ValueError(
+                    "output_size must be provided if and only if use_dense_ho is True"
+                )
+            if not train_ho:
+                raise ValueError(
+                    "train_ho must be True if connectivity_ho is not provided"
+                )
+            self.ho = nn.Linear(
+                in_features=hidden_size,
+                out_features=output_size,
+                bias=bias_ho,
+            )
+        else:
+            if output_size is not None and output_size != hidden_size:
+                raise ValueError(
+                    "output_size should not be provided or should be equal to "
+                    "hidden_size if connectivity_ho is not provided and "
+                    "use_dense_ho is False"
+                )
+            self.ho = nn.Identity()
 
     def _init_connectivity(
         self,
-        connectivity_hh: Union[PathLike, torch.Tensor],
-        connectivity_ih: Optional[Union[PathLike, torch.Tensor]] = None,
-    ) -> tuple[torch.Tensor, Union[torch.Tensor, None]]:
+        connectivity_hh: Union[torch.Tensor, PathLike, str],
+        connectivity_ih: Optional[Union[torch.Tensor, PathLike, str]] = None,
+        connectivity_ho: Optional[Union[torch.Tensor, PathLike, str]] = None,
+    ) -> tuple[
+        torch.Tensor, Union[torch.Tensor, None], Union[torch.Tensor, None]
+    ]:
         """Initialize connectivity matrices.
 
         Args:
-            connectivity_hh (Union[PathLike, torch.Tensor]): Connectivity matrix
-                for hidden-to-hidden connections or path to load it from.
-            connectivity_ih (Union[PathLike, torch.Tensor], optional):
-                Connectivity matrix for input-to-hidden connections or path to
-                load it from. Defaults to None.
+            connectivity_hh: Connectivity matrix for hidden-to-hidden connections or path to load it from.
+            connectivity_ih: Connectivity matrix for input-to-hidden connections or path to load it from.
+            connectivity_ho: Connectivity matrix for hidden-to-output connections or path to load it from.
 
         Returns:
-            tuple[torch.Tensor, Union[torch.Tensor, None]]: Tuple containing the
-                hidden-to-hidden connectivity tensor and input-to-hidden
-                connectivity tensor (or None).
+            Tuple containing the hidden-to-hidden connectivity tensor and input-to-hidden connectivity tensor (or None).
 
         Raises:
             ValueError: If connectivity matrices are not in COO format or have
                 invalid dimensions.
         """
 
-        connectivity_hh_tensor: torch.Tensor
-        connectivity_ih_tensor: Union[torch.Tensor, None] = None
-
-        if isinstance(connectivity_hh, torch.Tensor):
-            connectivity_hh_tensor = connectivity_hh
-        else:
-            connectivity_hh_tensor = torch.load(
-                connectivity_hh, weights_only=True
-            )
+        connectivity_hh_tensor = load_sparse_tensor(connectivity_hh)
 
         if connectivity_ih is not None:
-            if isinstance(connectivity_ih, torch.Tensor):
-                connectivity_ih_tensor = connectivity_ih
-            else:
-                connectivity_ih_tensor = torch.load(
-                    connectivity_ih, weights_only=True
-                )
+            connectivity_ih_tensor = load_sparse_tensor(connectivity_ih)
+        else:
+            connectivity_ih_tensor = None
 
-        # Validate connectivity matrix format
-        if connectivity_hh_tensor.layout != torch.sparse_coo or (
-            connectivity_ih_tensor is not None
-            and connectivity_ih_tensor.layout != torch.sparse_coo
-        ):
-            raise ValueError("Connectivity matrices must be in COO format")
+        if connectivity_ho is not None:
+            connectivity_ho_tensor = load_sparse_tensor(connectivity_ho)
+        else:
+            connectivity_ho_tensor = None
 
         # Validate connectivity matrix dimensions
         if not (
@@ -275,7 +337,19 @@ class SparseRNN(nn.Module):
                 "connectivity_ih.shape[1] and input_size must be equal"
             )
 
-        return connectivity_hh_tensor, connectivity_ih_tensor
+        if connectivity_ho_tensor is not None and (
+            self.hidden_size != connectivity_ho_tensor.shape[1]
+            or self.output_size != connectivity_ho_tensor.shape[0]
+        ):
+            raise ValueError(
+                "connectivity_ho.shape[0] and output_size must be equal"
+            )
+
+        return (
+            connectivity_hh_tensor,
+            connectivity_ih_tensor,
+            connectivity_ho_tensor,
+        )
 
     def init_hidden(
         self,
@@ -283,18 +357,15 @@ class SparseRNN(nn.Module):
         init_fn: Optional[Union[str, TensorInitFnType]] = None,
         device: Optional[Union[torch.device, str]] = None,
     ) -> torch.Tensor:
-        """_initialize the hidden state.
+        """Initialize the hidden state.
 
         Args:
-            batch_size (int): Batch size.
-            init_fn (Union[str, TensorInitFnType], optional): Initialization
-                function. Defaults to None (uses default_hidden_init_fn).
-            device (Union[torch.device, str], optional): Device to allocate the
-                hidden state on. Defaults to None.
+            batch_size: Batch size.
+            init_fn: Initialization function.
+            device: Device to allocate the hidden state on.
 
         Returns:
-            torch.Tensor: The initialized hidden state of shape
-                (batch_size, hidden_size).
+            The initialized hidden state of shape (batch_size, hidden_size).
         """
 
         if init_fn is None:
@@ -315,19 +386,14 @@ class SparseRNN(nn.Module):
         """Initialize the internal state of the network.
 
         Args:
-            num_steps (int): Number of time steps.
-            batch_size (int): Batch size.
-            h0 (torch.Tensor, optional): Initial hidden states. Defaults to
-                None (uses hidden_init_fn or default_hidden_init_fn).
-            hidden_init_fn (Union[str, TensorInitFnType], optional):
-                Initialization function. Defaults to None (uses
-                default_hidden_init_fn).
-            device (Union[torch.device, str], optional): Device to allocate
-                tensors on. Defaults to None.
+            num_steps: Number of time steps.
+            batch_size: Batch size.
+            h0: Initial hidden states.
+            hidden_init_fn: Initialization function.
+            device: Device to allocate tensors on.
 
         Returns:
-            list[Optional[torch.Tensor]]: The initialized hidden states for each
-                time step.
+            The initialized hidden states for each time step.
         """
 
         hs: list[Optional[torch.Tensor]] = [None] * num_steps
@@ -344,19 +410,14 @@ class SparseRNN(nn.Module):
         """Format the input tensor to match the expected shape.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size,
-                sequence_length, input_size) if batch_first, else
-                (sequence_length, batch_size, input_size).
-            num_steps (int, optional): Number of time steps. Defaults to None.
+            x: Input tensor.
+            num_steps: Number of time steps.
 
         Returns:
-            tuple[torch.Tensor, int]: The formatted input tensor of shape
-                (num_steps, batch_size, input_size) and the corrected number of
-                time steps.
+            The formatted input tensor and corrected number of time steps.
 
         Raises:
-            ValueError: If x is 2D and num_steps is None or < 1, or if x is 3D
-                and num_steps doesn't match sequence length.
+            ValueError: For invalid input dimensions or step counts.
         """
         if x.dim() == 2:
             if num_steps is None or num_steps < 1:
@@ -382,28 +443,25 @@ class SparseRNN(nn.Module):
             )
         return x, num_steps
 
-    def _format_hs(
+    def _format_result(
         self,
-        hs: Union[torch.Tensor, list[torch.Tensor]],
-    ) -> torch.Tensor:
-        """Format the hidden states for output.
+        outs: torch.Tensor,
+        hs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Format the hidden states and outputs for output.
 
         Args:
-            hs (Union[torch.Tensor, list[torch.Tensor]]): Hidden states for each
-                time step.
+            hs: Hidden states for each time step.
+            outs: Outputs for each time step.
 
         Returns:
-            torch.Tensor: The formatted hidden states of shape
-                (batch_size, num_steps, hidden_size) if batch_first, else
-                (num_steps, batch_size, hidden_size).
+            Formatted outputs and hidden states.
         """
-        if not isinstance(hs, torch.Tensor):
-            hs = torch.stack(hs)
 
         if self.batch_first:
-            return hs.permute(2, 0, 1)
+            return outs.permute(2, 0, 1), hs.permute(2, 0, 1)
         else:
-            return hs.permute(0, 2, 1)
+            return outs.permute(0, 2, 1), hs.permute(0, 2, 1)
 
     def _clamp_connectivity(self) -> None:
         """Ensure the connectivity matrix is nonnegative."""
@@ -413,14 +471,12 @@ class SparseRNN(nn.Module):
     def update_fn(self, x: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """Update function for the SparseRNN.
 
-        Computes the new hidden state based on input and previous hidden state.
-
         Args:
-            x (torch.Tensor): Input tensor at current timestep.
-            h (torch.Tensor): Hidden state from previous timestep.
+            x: Input tensor at current timestep.
+            h: Hidden state from previous timestep.
 
         Returns:
-            torch.Tensor: Updated hidden state.
+            Updated hidden state.
         """
         return self.nonlinearity(self.ih(x) + self.hh(h))
 
@@ -430,23 +486,17 @@ class SparseRNN(nn.Module):
         num_steps: Optional[int] = None,
         h0: Optional[torch.Tensor] = None,
         hidden_init_fn: Optional[Union[str, TensorInitFnType]] = None,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the SparseRNN layer.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size,
-                sequence_length, input_size) if batch_first, else
-                (sequence_length, batch_size, input_size).
-            num_steps (int, optional): Number of time steps. Defaults to None.
-            h0 (torch.Tensor, optional): Initial hidden state of shape
-                (batch_size, hidden_size). Defaults to None.
-            hidden_init_fn (Union[str, TensorInitFnType], optional):
-                Initialization function for the hidden state. Defaults to None.
+            x: Input tensor.
+            num_steps: Number of time steps.
+            h0: Initial hidden state.
+            hidden_init_fn: Initialization function.
 
         Returns:
-            torch.Tensor: Hidden states of shape (batch_size, num_steps,
-                hidden_size) if batch_first, else (num_steps, batch_size,
-                hidden_size).
+            Hidden states and outputs.
         """
 
         # Ensure connectivity matrix is nonnegative
@@ -469,30 +519,43 @@ class SparseRNN(nn.Module):
             hs[t] = self.update_fn(x[t], hs[t - 1])  # type: ignore
 
         assert all(h is not None for h in hs)
+        hs = torch.stack(hs)  # type: ignore
 
-        return self._format_hs(hs)  # type: ignore
+        assert hs.shape == (num_steps, self.hidden_size, batch_size)
+        outs = self.ho(hs.transpose(0, 1).flatten(1))
+        outs = outs.view(self.output_size, num_steps, batch_size).transpose(
+            0, 1
+        )
+
+        return self._format_result(outs, hs)
 
 
 class SparseODERNN(SparseRNN):
     """Sparse Ordinary Differential Equation Recurrent Neural Network.
 
-    A continuous-time version of SparseRNN that uses an ODE solver to compute
-    neural dynamics.
+    A continuous-time version of SparseRNN that uses an ODE solver to
+    simulate the dynamics of the network and simultaneously compute the
+    parameter gradients (see `torchode.AutoDiffAdjoint`).
 
     Args:
-        compile_solver_kwargs (Mapping[str, Any], optional): Keyword arguments
-            to pass to torch.compile for the ODE solver. Defaults to None.
-        *args: Additional positional arguments to pass to the parent class.
-        **kwargs: Additional keyword arguments to pass to the parent class.
+        compile_solver_kwargs: Keyword arguments for torch.compile.
     """
 
     def __init__(
         self,
         *args,
         compile_solver_kwargs: Optional[Mapping[str, Any]] = None,
+        compile_update_fn_kwargs: Optional[Mapping[str, Any]] = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+
+        # Compile update_fn
+        if compile_update_fn_kwargs is not None:
+            self.update_fn = torch.compile(
+                self.update_fn, **compile_update_fn_kwargs
+            )
+
         # Define ODE solver
         term = to.ODETerm(self.update_fn, with_args=True)  # type: ignore
         step_method = to.Dopri5(term=term)
@@ -509,18 +572,17 @@ class SparseODERNN(SparseRNN):
         """Format the input tensor to match the expected shape.
 
         Args:
-            x (torch.Tensor): Input tensor. If 2-dimensional, it is assumed
-                to be of shape (batch_size, input_size). If 3-dimensional,
-                it is assumed to be of shape (batch_size, sequence_length,
-                input_size) if batch_first, else (sequence_length, batch_size,
-                input_size).
+            x: Input tensor. If 2-dimensional, it is assumed to be of shape
+                (batch_size, input_size). If 3-dimensional, it is assumed to be
+                of shape (batch_size, sequence_length, input_size) if
+                batch_first, else (sequence_length, batch_size, input_size).
 
         Returns:
-            torch.Tensor: The formatted input tensor of shape
-                (sequence_length, input_size, batch_size).
+            Formatted input tensor of shape (sequence_length, batch_size,
+            input_size)
 
         Raises:
-            ValueError: If input tensor is not 2D or 3D.
+            ValueError: For invalid input dimensions.
         """
 
         if x.dim() == 2:
@@ -542,10 +604,10 @@ class SparseODERNN(SparseRNN):
         """Format the time points based on batch_first setting.
 
         Args:
-            ts (torch.Tensor): Time points tensor.
+            ts: Time points tensor.
 
         Returns:
-            torch.Tensor: Formatted time points tensor.
+            Formatted time points tensor.
         """
         if self.batch_first:
             return ts
@@ -562,13 +624,13 @@ class SparseODERNN(SparseRNN):
         """Calculate the index of the input tensor corresponding to the given time.
 
         Args:
-            t (torch.Tensor): Current time point.
-            x (torch.Tensor): Input tensor.
-            start_time (float): Start time for simulation.
-            end_time (float): End time for simulation.
+            t: Current time point.
+            x: Input tensor.
+            start_time: Start time for simulation.
+            end_time: End time for simulation.
 
         Returns:
-            torch.Tensor: Index tensor for selecting the correct input.
+            Index tensor for selecting the correct input.
         """
         idx = (t - start_time) / (end_time - start_time) * x.shape[0]
         idx[idx == x.shape[0]] = x.shape[0] - 1
@@ -581,13 +643,12 @@ class SparseODERNN(SparseRNN):
         """ODE function for the SparseODERNN.
 
         Args:
-            t (torch.Tensor): Current time point.
-            h (torch.Tensor): Current hidden state.
-            args (Mapping[str, Any]): Additional arguments including input 'x',
-                'start_time', and 'end_time'.
+            t: Current time point.
+            h: Current hidden state.
+            args: Additional arguments including input data.
 
         Returns:
-            torch.Tensor: Rate of change of the hidden state (dh/dt).
+            Rate of change of the hidden state.
         """
         h = h.t()
         x = args["x"]
@@ -605,36 +666,34 @@ class SparseODERNN(SparseRNN):
     def forward(
         self,
         x: torch.Tensor,
-        num_steps: int,
+        num_evals: int = 2,
         start_time: float = 0.0,
         end_time: float = 1.0,
         h0: Optional[torch.Tensor] = None,
         hidden_init_fn: Optional[Union[str, TensorInitFnType]] = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass of the SparseODERNN layer.
 
         Solves the initial value problem for the ODE defined by update_fn.
+        The gradients of the parameters are computed using the adjoint method
+        (see `torchode.AutoDiffAdjoint`).
 
         Args:
-            x (torch.Tensor): Input tensor.
-            num_steps (int): Number of time steps.
-            start_time (float, optional): Start time for simulation.
-                Defaults to 0.0.
-            end_time (float, optional): End time for simulation.
-                Defaults to 1.0.
-            h0 (torch.Tensor, optional): Initial hidden state. Defaults to None.
-            hidden_init_fn (Union[str, TensorInitFnType], optional):
-                Initialization function for the hidden state. Defaults to None.
+            x: Input tensor.
+            num_evals: Number of evaluations to return. The default of 2 means
+                that the ODE will be evaluated at the start and end of the
+                simulation and those values will be returned. Note that this
+                does not mean the `update_fn` will be called `num_evals` times.
+                It only affects the number of values returned, the step size
+                controller determines the number of times the solver will call
+                the `update_fn`.
+            start_time: Start time for simulation.
+            end_time: End time for simulation.
+            h0: Initial hidden state.
+            hidden_init_fn: Initialization function.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Tuple containing:
-                - Hidden states of shape (batch_size, num_steps, hidden_size) if
-                  batch_first, else (num_steps, batch_size, hidden_size)
-                - Time points of shape (batch_size, num_steps) if batch_first,
-                  else (num_steps, batch_size)
-
-        Raises:
-            ValueError: If num_steps is less than 2.
+            Hidden states, outputs, and time points.
         """
 
         # Ensure connectivity matrix is nonnegative
@@ -646,10 +705,10 @@ class SparseODERNN(SparseRNN):
         device = x.device
 
         # Define evaluation time points
-        if num_steps < 2:
-            raise ValueError("num_steps must be greater than 1")
+        if num_evals < 2:
+            raise ValueError("num_evals must be greater than 1")
         t_eval = (
-            torch.linspace(start_time, end_time, num_steps, device=device)
+            torch.linspace(start_time, end_time, num_evals, device=device)
             .unsqueeze(0)
             .expand(batch_size, -1)
         )
@@ -673,10 +732,15 @@ class SparseODERNN(SparseRNN):
             },
         )
         hs = sol.ys.permute(1, 2, 0)
-        assert hs.shape == (num_steps, self.hidden_size, batch_size)
+
+        # Project to output space
+        outs = self.ho(hs.transpose(0, 1).flatten(1))
+        outs = outs.view(self.output_size, num_evals, batch_size).transpose(
+            0, 1
+        )
 
         # Format outputs
-        hs = self._format_hs(hs)
         ts = self._format_ts(sol.ts)
+        outs, hs = self._format_result(outs, hs)
 
-        return hs, ts
+        return outs, hs, ts

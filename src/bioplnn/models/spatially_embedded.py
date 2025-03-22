@@ -102,9 +102,14 @@ class SpatiallyEmbeddedAreaConfig:
             the connectivity matrix for your configuration with appropriate row
             and column labels, use the `inter_neuron_type_connectivity_template_df`
             method of this class.
-        inter_neuron_type_spatial_extents: Spatial extent for each circuit motif connection.
-        inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif connection.
-        inter_neuron_type_bias: Whether to add a bias term for each circuit motif connection.
+        inter_neuron_type_spatial_extents: Spatial extent for each circuit
+            motif connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_num_subtype_groups: Number of subtype groups for each
+            circuit motif connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif
+            connection. Same shape as `inter_neuron_type_connectivity`.
+        inter_neuron_type_bias: Whether to add a bias term for each circuit
+            motif connection. Same shape as `inter_neuron_type_connectivity`.
         tau_mode: Mode determining which parts of
             neuron activity share a time constant. Can be "type" (one tau for each neuron type),
             "subtype" (one tau per neuron subtype), "spatial" (one tau per spatial location), or
@@ -166,6 +171,7 @@ class SpatiallyEmbeddedAreaConfig:
         3,
         3,
     )
+    inter_neuron_type_num_subtype_groups: ScalarOrArray2dType[int] = 1
     inter_neuron_type_nonlinearity: ScalarOrArray2dType[
         Optional[Union[str, nn.Module]]
     ] = None
@@ -232,39 +238,58 @@ class SpatiallyEmbeddedArea(nn.Module):
     - Customizable activation functions
 
     Attributes:
-        in_size: Spatial size of the input data (height, width).
-        in_channels: Number of input channels.
-        out_channels: Number of output channels.
-        feedback_channels: Number of feedback channels.
-        use_feedback: Whether this area receives feedback from another area.
-        in_class: Class of input signal ("excitatory", "inhibitory", or "hybrid").
-        feedback_class: Class of feedback signal ("excitatory", "inhibitory", or "hybrid").
-        out_nonlinearity: Nonlinearity applied to the output.
+        in_size (tuple[int, int]): Spatial size of the input data
+            (height, width).
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        feedback_channels (int): Number of feedback channels (0 if none).
+        use_feedback (bool): Whether this area receives feedback from another
+            area.
+        in_class (str): Class of input signal ("excitatory", "inhibitory", or
+            "hybrid").
+        feedback_class (str): Class of feedback signal ("excitatory", "inhibitory",
+            or "hybrid").
+        out_nonlinearity (nn.Module): Nonlinearity applied to the output.
 
-        num_neuron_types: Number of neuron types in the area.
-        num_neuron_subtypes: Number of subtypes for each neuron type.
-        neuron_type_class: Class of each neuron type ("excitatory", "inhibitory", or "hybrid").
-        neuron_type_density: Spatial density of each neuron type ("same" or "half").
-        neuron_type_nonlinearity: Nonlinearity for each neuron type's activity.
-        neuron_type_size: Spatial size of each neuron type.
+        num_neuron_types (int): Number of neuron types in the area.
+        num_neuron_subtypes (list[int]): Number of subtypes for each neuron type.
+        neuron_type_class (list[str]): Class of each neuron type ("excitatory",
+            "inhibitory", or "hybrid").
+        neuron_type_density (list[str]): Spatial density of each neuron type
+            ("same" or "half").
+        neuron_type_nonlinearity (nn.ModuleList): Nonlinearity for each neuron
+            type's activity.
+        neuron_type_size (list[tuple[int, int]]): Spatial size of each neuron type.
 
-        num_rows_connectivity: Number of rows in the connectivity matrix.
-        num_cols_connectivity: Number of columns in the connectivity matrix.
-        inter_neuron_type_connectivity: Connectivity matrix for the circuit motif.
-        inter_neuron_type_spatial_extents: Spatial extent for each circuit motif connection.
-        inter_neuron_type_nonlinearity: Nonlinearity for each circuit motif connection.
-        inter_neuron_type_bias: Whether to add a bias term for each circuit motif connection.
+        num_rows_connectivity (int): Number of rows in the connectivity matrix.
+        num_cols_connectivity (int): Number of columns in the connectivity matrix.
+        inter_neuron_type_connectivity (np.ndarray): Connectivity matrix for the
+            circuit motif.
+        inter_neuron_type_spatial_extents (np.ndarray): Spatial extent for each
+            circuit motif connection.
+        inter_neuron_type_num_subtype_groups (np.ndarray): Number of subtype groups
+            for each circuit motif connection.
+        inter_neuron_type_nonlinearity (np.ndarray): Nonlinearity for each circuit
+            motif connection.
+        inter_neuron_type_bias (np.ndarray): Whether to add a bias term for each
+            circuit motif connection.
 
-        tau_mode: Mode determining which parts of neuron activity share a time constant.
-        tau_init_fn: Initialization for the membrane time constants.
-        tau: Learnable time constants for each neuron type.
+        tau_mode (list[str]): Mode determining which parts of neuron activity share
+            a time constant.
+        tau_init_fn (list[Union[str, TensorInitFnType]]): Initialization for the
+            membrane time constants.
+        tau (nn.ParameterList): Learnable time constants for each neuron type.
 
-        default_neuron_state_init_fn: Default initialization for neuron states.
-        default_feedback_state_init_fn: Default initialization for feedback states.
-        default_output_state_init_fn: Default initialization for output states.
+        default_neuron_state_init_fn (Union[str, TensorInitFnType]): Default
+            initialization for neuron states.
+        default_feedback_state_init_fn (Union[str, TensorInitFnType]): Default
+            initialization for feedback states.
+        default_output_state_init_fn (Union[str, TensorInitFnType]): Default
+            initialization for output states.
 
-        convs: Convolutional layers representing connections between neuron types.
-        out_convs: Convolutional layers connecting to the output.
+        convs (nn.ModuleDict): Convolutional layers representing connections between
+            neuron types.
+        out_convs (nn.ModuleDict): Convolutional layers connecting to the output.
 
     Examples:
         >>> config = SpatiallyEmbeddedAreaConfig(
@@ -421,6 +446,11 @@ class SpatiallyEmbeddedArea(nn.Module):
             self.inter_neuron_type_connectivity.shape[1],
             depth=1,
         )
+        self.inter_neuron_type_num_subtype_groups = expand_array_2d(
+            config.inter_neuron_type_num_subtype_groups,
+            self.inter_neuron_type_connectivity.shape[0],
+            self.inter_neuron_type_connectivity.shape[1],
+        )
         self.inter_neuron_type_nonlinearity = expand_array_2d(
             config.inter_neuron_type_nonlinearity,
             self.inter_neuron_type_connectivity.shape[0],
@@ -468,6 +498,7 @@ class SpatiallyEmbeddedArea(nn.Module):
                 Conv2d = nn.Conv2d
 
             # Handle output neurons
+            # TODO: Optimize using smart grouping and convolution sharing
             to_indices = np.nonzero(row)[0]
             for j in to_indices:
                 if self.inter_neuron_type_connectivity[i, j]:
@@ -521,6 +552,9 @@ class SpatiallyEmbeddedArea(nn.Module):
                                 self.inter_neuron_type_spatial_extents[i, j][1]
                                 // 2,
                             ),
+                            groups=self.inter_neuron_type_num_subtype_groups[
+                                i, j
+                            ],
                             bias=self.inter_neuron_type_bias[i, j],
                         )
                     )
@@ -941,6 +975,38 @@ class SpatiallyEmbeddedRNN(nn.Module):
             connections between areas.
         inter_area_feedback_spatial_extents: Kernel sizes for feedback
             convolutions between areas.
+
+    Examples:
+        >>> # Create a SpatiallyEmbeddedRNN with 2 areas
+        >>> area_configs = [
+        ...     SpatiallyEmbeddedAreaConfig(
+        ...         in_channels=1,
+        ...         out_channels=16,
+        ...         in_size=(64, 64),
+        ...         feedback_channels=16,
+        ...     ),
+        ...     SpatiallyEmbeddedAreaConfig(
+        ...         in_channels=16,
+        ...         out_channels=32,
+        ...         in_size=(32, 32),
+        ...         feedback_channels=32,
+        ...     ),
+        ... ]
+        >>> connectivity = [
+        ...     [0, 0],
+        ...     [1, 0]
+        ... ]
+        >>> rnn = SpatiallyEmbeddedRNN(
+        ...     num_areas=2,
+        ...     area_configs=area_configs,
+        ...     inter_area_feedback_connectivity=connectivity,
+        ... )
+        >>> # Create a SpatiallyEmbeddedRNN with 2 areas
+        >>> area_configs = [
+        >>>     SpatiallyEmbeddedAreaConfig(in_channels=1, out_channels=16, in_size=(64, 64)),
+        >>>     SpatiallyEmbeddedAreaConfig(in_channels=16, out_channels=32, in_size=(32, 32)),
+        >>> ]
+        >>> rnn = SpatiallyEmbeddedRNN(num_areas=2, area_configs=area_configs)
     """
 
     def __init__(
@@ -1464,6 +1530,70 @@ class SpatiallyEmbeddedRNN(nn.Module):
         else:
             assert x.shape[-2] == size[0] and x.shape[-1] == size[1]
             return x
+
+    def query_neuron_states(
+        self,
+        neuron_states: list[list[torch.Tensor]],
+        area: int,
+        neuron_type: int,
+        time_step: Optional[Union[int, slice]] = None,
+        batch: Optional[Union[int, slice]] = None,
+        neuron_subtype: Optional[Union[int, slice]] = None,
+        spatial_location_i: Optional[Union[int, slice]] = None,
+        spatial_location_j: Optional[Union[int, slice]] = None,
+    ) -> torch.Tensor:
+        """Query the model states for a given area, time step, neuron type, neuron subtype, and spatial location.
+
+        Args:
+            neuron_states: List of lists of tensors containing the model states.
+            area: The area index.
+            neuron_type: The neuron type index.
+            time_step: The time step index. If not provided, all time steps are returned.
+            batch: The batch index. If not provided, all batches are returned.
+            neuron_subtype: The neuron subtype index. If not provided, all neuron subtypes are returned.
+            spatial_location_i: The spatial location (height). If not provided, all spatial locations are returned.
+            spatial_location_j: The spatial location (width). If not provided, all spatial locations are returned.
+
+        Returns:
+            The queried state of shape (batch_size_slice, channels, height, width)
+        """
+        if time_step is None:
+            time_idx = slice(None)
+        else:
+            time_idx = time_step
+        if batch is None:
+            batch_idx = slice(None)
+        else:
+            batch_idx = batch
+        if neuron_subtype is None:
+            neuron_subtype_idx = slice(None)
+        else:
+            neuron_subtype_idx = neuron_subtype
+        if spatial_location_i is None:
+            spatial_location_idx_i = slice(None)
+        else:
+            spatial_location_idx_i = spatial_location_i
+        if spatial_location_j is None:
+            spatial_location_idx_j = slice(None)
+        else:
+            spatial_location_idx_j = spatial_location_j
+
+        if self.batch_first:
+            return neuron_states[area][neuron_type][
+                batch_idx,
+                time_idx,
+                neuron_subtype_idx,
+                spatial_location_idx_i,
+                spatial_location_idx_j,
+            ]
+        else:
+            return neuron_states[area][neuron_type][
+                time_idx,
+                batch_idx,
+                neuron_subtype_idx,
+                spatial_location_idx_i,
+                spatial_location_idx_j,
+            ]
 
     def forward(
         self,

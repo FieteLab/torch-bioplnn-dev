@@ -8,13 +8,13 @@ import hydra
 import torch
 import wandb
 import yaml
+from addict import Dict
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 from tqdm import tqdm
 
 from bioplnn.utils import (
-    AttrDict,
     initialize_criterion,
     initialize_dataloader,
     initialize_model,
@@ -24,6 +24,28 @@ from bioplnn.utils import (
     manual_seed_deterministic,
     pass_fn,
 )
+
+
+class AttrDict(Dict):
+    """A non-default version of the `addict.Dict` class that raises a `KeyError`
+    when a key is not found in the dictionary.
+
+    Args:
+        *args: Any positional arguments.
+        **kwargs: Any keyword arguments.
+    """
+
+    def __missing__(self, key: Any):
+        """Override the default behavior of `addict.Dict` to raise a `KeyError`
+        when a key is not found in the dictionary.
+
+        Args:
+            key: The key that was not found.
+
+        Raises:
+            KeyError: Always raised.
+        """
+        raise KeyError(key)
 
 
 def train_epoch(
@@ -265,14 +287,8 @@ def train(dict_config: DictConfig) -> None:
 
     if "overrides" in config:
         config = parse_overrides(config, config.overrides)
-    # if (
-    #     "layer_one_in_channels_override" in config
-    #     and config.layer_one_in_channels_override is not None
-    # ):
-    #     config.model.rnn_kwargs.area_kwargs[
-    #         0
-    #     ].in_channels = config.layer_one_in_channels_override
 
+    # Set up debugging
     if config.debug_level > 0:
         print(yaml.dump(config.to_dict()))
         yaml.dump(config.to_dict(), open("examples/config_log.yaml", "w+"))
@@ -280,24 +296,16 @@ def train(dict_config: DictConfig) -> None:
     if config.debug_level > 1:
         torch.autograd.set_detect_anomaly(True)
 
+    # Set up Weights & Biases
     if config.wandb.group is None:
         config.wandb.group = f"{config.model.class_name}_{config.data.dataset}"
 
-    # Initialize Weights & Biases
     wandb.init(
         config=config,
         settings=wandb.Settings(start_method="thread"),
         **config.wandb,
     )
     global_step: int = 0
-
-    if config.wandb.mode != "disabled":
-        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)  # type: ignore
-    else:
-        checkpoint_dir = os.path.join(
-            config.checkpoint.root, config.checkpoint.run
-        )
-    os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Set the random seed
     if config.seed is not None:
@@ -320,13 +328,37 @@ def train(dict_config: DictConfig) -> None:
     # Initialize model
     model = initialize_model(**config.model).to(device)
 
-    # Compile the model if requested
-    model = torch.compile(model, **config.compile)
-
     # Initialize the optimizer
     optimizer = initialize_optimizer(
         model_parameters=model.parameters(), **config.optimizer
     )
+
+    # Load the model checkpoint if requested
+    if config.wandb.mode != "disabled":
+        checkpoint_dir = os.path.join(config.checkpoint.root, wandb.run.name)  # type: ignore
+    else:
+        checkpoint_dir = os.path.join(
+            config.checkpoint.root, config.checkpoint.run
+        )
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    if config.checkpoint.load:
+        checkpoint_path = os.path.join(checkpoint_dir, "checkpoint.pt")
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(
+                f"Checkpoint file not found at {checkpoint_path}"
+            )
+        checkpoint = torch.load(
+            checkpoint_path, weights_only=True, map_location=device
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        epoch = checkpoint["epoch"]
+    else:
+        epoch = 0
+
+    # Compile the model if requested
+    model = torch.compile(model, **config.compile)
 
     # Initialize the loss function
     criterion = initialize_criterion(**config.criterion)
@@ -347,7 +379,7 @@ def train(dict_config: DictConfig) -> None:
     else:
         scheduler = None
 
-    for epoch in range(config.train.epochs):
+    for epoch in range(epoch, config.train.epochs):
         print(f"Epoch {epoch}/{config.train.epochs}")
         wandb.log({"epoch": epoch}, step=global_step)
         # Train the model

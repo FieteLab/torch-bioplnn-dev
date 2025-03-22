@@ -8,7 +8,17 @@ model:
     connectome: connectivity/sunny/connectome.pt
     input_projection: connectivity/sunny/input_projection_matrix.pt
     output_projection: connectivity/sunny/output_projection_matrix.pt
-    batch_first: false
+    num_neuron_types: 2
+    neuron_type: connectivity/sunny/neuron_type.csv
+    neuron_class:
+      - excitatory
+      - inhibitory
+    neuron_class_mode: per_neuron_type
+    neuron_nonlinearity: Sigmoid
+    neuron_tau_init:
+      - 1.5
+      - 1
+    neuron_tau_mode: per_neuron_type
     compile_solver_kwargs:
       mode: max-autotune
       dynamic: false

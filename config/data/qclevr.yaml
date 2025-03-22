@@ -1,51 +1,14 @@
-# @package _global_
-data:
-  dataset: qclevr
-  root: data/qclevr
-  resolution: [128, 128]
-  cue_assets_root: null # data/CLEVR_v1.0/cues
-  return_metadata: false
-  train_batch_size: 256
-  val_batch_size: 128
-  mode: every
-  holdout: [] # [blue,green,cube,cube_blue,cube_green]
-  primitive: true
-  shape_cue_color: orange
-  use_cache: true
-  num_workers: 8
-  shuffle_test: true
-model:
-  rnn_kwargs:
-    in_size: [128, 128]
-    in_channels: 3
-    exc_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    inh_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    fb_kernel_size:
-      - [5, 5]
-      - [5, 5]
-      - [3, 3]
-      - [3, 3]
-    batch_first: false
-  flush_hidden: true
-  flush_out: true
-  flush_fb: true
-  modulation_enable: true
-  modulation_type: ag
-  modulation_op: mul
-  modulation_activation: relu
-  modulation_apply_to: layer_output
-  modulation_timestep_cue: same
-  modulation_timestep_mix: all
-train:
-  num_steps: 5
-  epochs: 100
-optimizer:
-  lr: 0.001
+dataset: qclevr
+root: data/qclevr
+resolution: [128, 128]
+cue_assets_root: null # data/CLEVR_v1.0/cues
+return_metadata: false
+train_batch_size: 256
+val_batch_size: 128
+mode: every
+holdout: [] # [blue,green,cube,cube_blue,cube_green]
+primitive: true
+shape_cue_color: orange
+use_cache: true
+num_workers: 8
+shuffle_test: true
