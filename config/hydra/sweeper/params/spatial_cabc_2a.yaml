@@ -1,3 +1,3 @@
 optimizer.lr: choice(0.0005, 0.001)
-experiment/activation_2a: choice(tanh, sigmoid)
+experiment/activation: choice(tanh_2a, sigmoid_2a)
 model: choice(spatial_h2alf, spatial_h2al)

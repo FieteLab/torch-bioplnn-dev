@@ -3,9 +3,6 @@ defaults:
   - model: null
   - data: null
   - experiment/activation: null
-  - experiment/rectify: null
-  - experiment/test_run: null
-  - experiment/dimensions: null
 
 optimizer:
   class_name: AdamW

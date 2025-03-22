@@ -26,6 +26,8 @@ from bioplnn.utils import (
     init_tensor,
 )
 
+# TODO: Some docstrings may be outdated, might need to update
+
 
 class Conv2dRectify(nn.Conv2d):
     """Applies a 2d convolution with nonnegative weights and biases."""

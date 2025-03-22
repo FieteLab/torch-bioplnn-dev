@@ -7,6 +7,8 @@ from torch import nn
 from bioplnn.models.connectome import ConnectomeODERNN, ConnectomeRNN
 from bioplnn.models.spatially_embedded import SpatiallyEmbeddedRNN
 
+# TODO: Some docstrings may be outdated, might need to update
+
 
 class ConnectomeClassifier(nn.Module):
     """Connectome-based image classifier.

@@ -11,6 +11,8 @@ import torchode as to
 from bioplnn.typing import TensorInitFnType
 from bioplnn.utils import get_activation, init_tensor, load_sparse_tensor
 
+# TODO: Some docstrings may be outdated, might need to update
+
 
 class SparseLinear(nn.Module):
     """Sparse linear layer for efficient operations with sparse matrices.

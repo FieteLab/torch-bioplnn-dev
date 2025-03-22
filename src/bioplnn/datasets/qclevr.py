@@ -84,7 +84,7 @@ class QCLEVRDataset(Dataset):
         self,
         root: str,
         cue_assets_root: Optional[str] = None,
-        transform: Callable = None,
+        transform: Optional[Callable] = None,
         return_metadata: bool = False,
         split: str = "train",
         mode: str = "color",
@@ -96,7 +96,7 @@ class QCLEVRDataset(Dataset):
     ):
         super().__init__()
         self.root = root
-        self.transform = transform
+        self.transform = transform if transform is not None else lambda x: x
         self.return_metadata = return_metadata
         self.split = "valid" if split == "val" else split
         self.mode = mode
@@ -231,7 +231,7 @@ class QCLEVRDataset(Dataset):
             return image_path, scene["cue"], scene["target_count"], mode
         return None, None, None, None
 
-    def get_files(self) -> list[str]:
+    def get_files(self):
         paths = []
         cues = []
         counts = []
